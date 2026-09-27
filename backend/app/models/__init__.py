@@ -26,6 +26,12 @@ from .integrations import (
     SearchIndex, Recommendation,
     IntegrationType, ReportType, NotificationType, AuditAction
 )
+from .advanced_features import (
+    ResourcePermission, ShareLink, StorageFile, CDNUrl,
+    VideoProcess, Thumbnail, Comment, Reaction, Mention,
+    UserPreference, Recommendation as RecommendationEngine, PersonalizationProfile,
+    PermissionLevel, StorageProvider, VideoQualityLevel, ProcessingStatus, ReactionType
+)
 
 __all__ = [
     "User",
