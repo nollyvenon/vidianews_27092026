@@ -38,6 +38,12 @@ from .monetization import (
     EmailCampaign, CampaignMetric,
     SubscriptionTier, BillingCycle, PaymentStatus, NotificationChannel
 )
+from .security_performance import (
+    RateLimitBucket, QuotaUsage, OAuthProvider, MFASetup,
+    PrivacySettings, DataDeletionRequest, ConsentLog,
+    CachePolicy, CacheMetric, DeviceToken, PushNotification,
+    AuthProvider, MFAMethod, PrivacyLevel, CacheType
+)
 
 __all__ = [
     "User",

@@ -3,7 +3,7 @@
 from fastapi import APIRouter
 
 # Import endpoints
-from app.api.v1 import auth, health, tenants, organizations, profiles, settings, notifications, activity, content, ai_providers, ai_core, ai_advanced, integrations, advanced_features, monetization
+from app.api.v1 import auth, health, tenants, organizations, profiles, settings, notifications, activity, content, ai_providers, ai_core, ai_advanced, integrations, advanced_features, monetization, security_performance
 
 api_router = APIRouter()
 
@@ -23,5 +23,6 @@ api_router.include_router(ai_advanced.router, tags=["ai-advanced"])
 api_router.include_router(integrations.router, tags=["system"])
 api_router.include_router(advanced_features.router, tags=["advanced"])
 api_router.include_router(monetization.router, tags=["monetization"])
+api_router.include_router(security_performance.router, tags=["security"])
 
 __all__ = ["api_router"]
