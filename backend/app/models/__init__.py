@@ -69,6 +69,12 @@ from .streaming_premium import (
     PremiumSubscription, PaywallContent, PremiumAccess,
     StreamStatus, AnalyticsMetric, PartnershipType, PremiumFeature
 )
+from .community_compliance import (
+    ForumThread, ForumReply, Badge, UserBadge, Leaderboard,
+    Report, DataExport, CompliancePolicy, UserCompliance, AuditLog,
+    Language, Translation, UserLocalization,
+    ForumCategory, BadgeType, ReportType, ComplianceStatus
+)
 
 __all__ = [
     "User",
