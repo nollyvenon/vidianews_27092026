@@ -1,0 +1,64 @@
+# Backend
+backend/vendor
+backend/.env
+backend/.env.local
+backend/node_modules
+backend/storage
+backend/bootstrap/cache
+backend/.idea
+backend/.vscode
+backend/*.log
+
+# Frontend
+frontend/.next
+frontend/node_modules
+frontend/.env.local
+frontend/.env*.local
+frontend/dist
+frontend/build
+
+# Mobile
+mobile/build
+mobile/.gradle
+mobile/.dart_tool
+mobile/pubspec.lock
+mobile/ios/Pods
+
+# Python AI Services
+ai-services/.venv
+ai-services/__pycache__
+ai-services/*.egg-info
+ai-services/dist
+ai-services/.env
+
+# Docker
+.docker-compose.override.yml
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Testing
+coverage/
+.nyc_output/
+htmlcov/
+
+# Cache
+.cache/
+.tmp/
+
+# Temp
+tmp/
+temp/
