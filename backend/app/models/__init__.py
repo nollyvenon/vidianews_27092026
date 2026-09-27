@@ -50,6 +50,12 @@ from .api_monitoring import (
     SystemMetric, PerformanceAlert, HealthCheck,
     APIVersion, EventType, WebhookStatus, MetricType, AlertSeverity
 )
+from .logging_analytics import (
+    LogEntry, LogAggregation, ErrorReport, ErrorSession,
+    FeatureFlag, ABTest, AnalyticsEvent, UserSession,
+    Documentation, APIDocumentation,
+    LogLevel, ErrorSeverity, FeatureFlagStatus, AnalyticsEventType, DocType
+)
 
 __all__ = [
     "User",
