@@ -1,0 +1,115 @@
+{
+  "project_info": {
+    "project_number": "910846108970",
+    "firebase_url": "https://gladegg247-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "gladegg247",
+    "storage_bucket": "gladegg247.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:910846108970:android:d407a9039160d0ecc32a53",
+        "android_client_info": {
+          "package_name": "com.johnnyup.gladegg"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "910846108970-pm2csgkeq1gtq1d707178r3n33ocedoi.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.johnnyup.gladegg",
+            "certificate_hash": "29ad46b3a664937278e73123714ecf87c1b490b3"
+          }
+        },
+        {
+          "client_id": "910846108970-u4i11qdak5unngsa6t913njbga0lpuc1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.johnnyup.gladegg",
+            "certificate_hash": "2b4cd852c1df4b1801d6b4698fa67331c29ec9c4"
+          }
+        },
+        {
+          "client_id": "910846108970-mvi05vqprp0lcamuts7bv0ro712aim55.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA_sKlwPSWph5pCSxJhSXJP1U44ib3SRKQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "910846108970-ku2e2uftrb8oalhflm8b74ds0k8vbmu6.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "910846108970-7p5hb5v2j8nf8m0kg81hf0qu3vavnv1f.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.johnnyup.gladegg"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:910846108970:android:01631c04eeba6affc32a53",
+        "android_client_info": {
+          "package_name": "com.onyxgroup.gladegg"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "910846108970-p5sj3br0orrmf2d80sr48v21nsmem2f1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.onyxgroup.gladegg",
+            "certificate_hash": "29ad46b3a664937278e73123714ecf87c1b490b3"
+          }
+        },
+        {
+          "client_id": "910846108970-utttkak32h8917ptvf593n767q0qleno.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.onyxgroup.gladegg",
+            "certificate_hash": "2b4cd852c1df4b1801d6b4698fa67331c29ec9c4"
+          }
+        },
+        {
+          "client_id": "910846108970-mvi05vqprp0lcamuts7bv0ro712aim55.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA_sKlwPSWph5pCSxJhSXJP1U44ib3SRKQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "910846108970-ku2e2uftrb8oalhflm8b74ds0k8vbmu6.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "910846108970-7p5hb5v2j8nf8m0kg81hf0qu3vavnv1f.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.johnnyup.gladegg"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
