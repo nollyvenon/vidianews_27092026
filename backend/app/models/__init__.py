@@ -44,6 +44,12 @@ from .security_performance import (
     CachePolicy, CacheMetric, DeviceToken, PushNotification,
     AuthProvider, MFAMethod, PrivacyLevel, CacheType
 )
+from .api_monitoring import (
+    APIEndpointVersion, VersionMigration, GraphQLQuery, GraphQLMutation,
+    Webhook, WebhookEvent, TestSuite, TestResult,
+    SystemMetric, PerformanceAlert, HealthCheck,
+    APIVersion, EventType, WebhookStatus, MetricType, AlertSeverity
+)
 
 __all__ = [
     "User",
