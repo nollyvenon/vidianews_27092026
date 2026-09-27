@@ -8,7 +8,7 @@ from app.core.security import hash_password, create_access_token
 
 
 @pytest.fixture
-async def auth_user(async_client: AsyncClient, session: AsyncSession):
+async def auth_user(async_client: AsyncClient, test_session: AsyncSession):
     """Create authenticated user"""
     user = User(
         email="settings_api_test@example.com",
@@ -17,8 +17,8 @@ async def auth_user(async_client: AsyncClient, session: AsyncSession):
         last_name="Test",
         status="active",
     )
-    session.add(user)
-    await session.flush()
+    test_session.add(user)
+    await test_session.flush()
 
     token = create_access_token({"sub": user.email, "user_id": user.id})
     return {"user": user, "token": token}
