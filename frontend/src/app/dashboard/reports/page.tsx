@@ -1,20 +1,10 @@
 'use client'
-
-import { useEffect, useState } from 'react'
-import { ApiClient } from '@/lib/api-client'
-
-interface Report {
-  id: number
-  report_type: string
-  title: string
-  created_at: string
-}
+import { useState, useEffect } from 'react'
 
 export default function ReportsPage() {
-  const [reports, setReports] = useState<Report[]>([])
-  const [loading, setLoading] = useState(true)
-  const [newTitle, setNewTitle] = useState('')
-  const [selectedType, setSelectedType] = useState('performance')
+  const [reports, setReports] = useState([])
+  const [reportType, setReportType] = useState('views')
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     fetchReports()
@@ -22,83 +12,97 @@ export default function ReportsPage() {
 
   const fetchReports = async () => {
     try {
-      const data = await ApiClient.get('/system/reports')
-      setReports(data)
+      const res = await fetch('/api/v1/reports')
+      if (res.ok) {
+        const data = await res.json()
+        setReports(data)
+      }
     } catch (err) {
-      console.error('Failed to fetch reports', err)
+      console.error('Failed to fetch reports:', err)
+    }
+  }
+
+  const handleGenerateReport = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/v1/reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ report_type: reportType })
+      })
+      if (res.ok) {
+        fetchReports()
+      }
+    } catch (err) {
+      console.error('Failed to generate report:', err)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleCreateReport = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newTitle) return
-
+  const handleExport = async () => {
     try {
-      const report = await ApiClient.post('/system/reports', {
-        report_type: selectedType,
-        title: newTitle,
-        data: {},
+      const res = await fetch('/api/v1/data-export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ export_type: 'csv' })
       })
-      setReports([...reports, report])
-      setNewTitle('')
+      if (res.ok) {
+        const data = await res.json()
+        console.log('Export requested:', data.id)
+      }
     } catch (err) {
-      console.error('Failed to create report', err)
+      console.error('Failed to request export:', err)
     }
   }
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold mb-8">Reports</h1>
-
+    <div className="p-8">
+      <h1 className="text-3xl font-bold mb-6">Reports & Analytics</h1>
+      
       <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-4">Create Report</h2>
-        <form onSubmit={handleCreateReport} className="flex gap-2 mb-4">
-          <input
-            type="text"
-            value={newTitle}
-            onChange={(e) => setNewTitle(e.target.value)}
-            placeholder="Report title"
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-md"
-          />
-          <select
-            value={selectedType}
-            onChange={(e) => setSelectedType(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-md"
+        <h2 className="text-xl font-semibold mb-4">Generate New Report</h2>
+        <div className="flex gap-4">
+          <select 
+            value={reportType}
+            onChange={(e) => setReportType(e.target.value)}
+            className="px-4 py-2 border rounded-lg"
           >
-            <option value="performance">Performance</option>
+            <option value="views">View Analytics</option>
             <option value="engagement">Engagement</option>
             <option value="revenue">Revenue</option>
-            <option value="compliance">Compliance</option>
+            <option value="growth">Growth</option>
           </select>
-          <button
-            type="submit"
-            className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          <button 
+            onClick={handleGenerateReport}
+            disabled={loading}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
-            Create
+            {loading ? 'Generating...' : 'Generate Report'}
           </button>
-        </form>
+          <button 
+            onClick={handleExport}
+            className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700"
+          >
+            Export Data
+          </button>
+        </div>
       </div>
 
-      {loading ? (
-        <div className="text-gray-600">Loading...</div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {reports.map((report) => (
-            <div key={report.id} className="bg-white rounded-lg shadow p-4">
-              <h3 className="font-semibold">{report.title}</h3>
-              <p className="text-sm text-gray-600">{report.report_type}</p>
-              <p className="text-xs text-gray-500 mt-2">
-                {new Date(report.created_at).toLocaleDateString()}
-              </p>
-              <button className="mt-3 text-blue-600 hover:underline text-sm">
-                Download
-              </button>
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold">Recent Reports</h2>
+        {reports.map(report => (
+          <div key={report.id} className="bg-white rounded-lg shadow p-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="font-semibold text-lg">{report.type} Report</h3>
+                <p className="text-sm text-gray-600">Generated: {new Date(report.generated).toLocaleDateString()}</p>
+              </div>
+              <button className="text-blue-600 hover:underline">Download</button>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
