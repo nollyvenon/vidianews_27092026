@@ -22,3 +22,9 @@ async def get_session() -> AsyncSession:
     """Dependency for getting database session"""
     async with AsyncSessionLocal() as session:
         yield session
+
+
+async def get_db() -> AsyncSession:
+    """Dependency for getting database session (alias)"""
+    async with AsyncSessionLocal() as session:
+        yield session

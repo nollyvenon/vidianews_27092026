@@ -21,7 +21,7 @@ class Organization(Base):
 
     # Settings (JSON)
     settings = Column(JSON, default={})
-    metadata = Column(JSON, default={})
+    extra_data = Column(JSON, default={})
 
     # Org type/category
     org_type = Column(String(50), default="department")
@@ -38,12 +38,12 @@ class Organization(Base):
     tenant = relationship("Tenant", backref="organizations")
     members = relationship("OrganizationMember", back_populates="organization", cascade="all, delete-orphan")
     settings_override = relationship("OrganizationSettings", back_populates="organization", cascade="all, delete-orphan")
-    children = relationship("Organization", remote_side=[parent_id], backref="parent")
+    children = relationship("Organization", remote_side=[id], backref="parent", foreign_keys=[parent_id])
 
     __table_args__ = (
-        Index("idx_tenant_slug", "tenant_id", "slug"),
-        Index("idx_tenant_status", "tenant_id", "status"),
-        Index("idx_parent", "parent_id"),
+        Index("idx_org_tenant_slug", "tenant_id", "slug"),
+        Index("idx_org_tenant_status", "tenant_id", "status"),
+        Index("idx_org_parent", "parent_id"),
     )
 
 
@@ -74,7 +74,7 @@ class OrganizationMember(Base):
 
     # Relationships
     organization = relationship("Organization", back_populates="members")
-    user = relationship("User")
+    user = relationship("User", foreign_keys=[user_id])
 
     __table_args__ = (
         Index("idx_org_user", "organization_id", "user_id"),
@@ -122,5 +122,5 @@ class OrganizationInvitation(Base):
 
     __table_args__ = (
         Index("idx_org_email", "organization_id", "email"),
-        Index("idx_token_expires", "token", "expires_at"),
+        Index("idx_org_token_expires", "token", "expires_at"),
     )

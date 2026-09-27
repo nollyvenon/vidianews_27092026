@@ -36,7 +36,7 @@ class UserProfile(Base):
 
     # Additional custom fields (JSON)
     custom_fields = Column(JSON, default={})
-    metadata = Column(JSON, default={})
+    extra_data = Column(JSON, default={})
 
     # Visibility
     is_public = Column(Boolean, default=False)
@@ -56,8 +56,8 @@ class UserProfile(Base):
     badges = relationship("UserBadge", back_populates="profile", cascade="all, delete-orphan")
 
     __table_args__ = (
-        Index("idx_user_id", "user_id"),
-        Index("idx_is_public", "is_public"),
+        Index("idx_profile_user_id", "user_id"),
+        Index("idx_profile_is_public", "is_public"),
     )
 
 
@@ -149,7 +149,7 @@ class UserBadge(Base):
     earned_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     expires_at = Column(DateTime(timezone=True), nullable=True)
 
-    metadata = Column(JSON, default={})
+    extra_data = Column(JSON, default={})
 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 

@@ -51,29 +51,6 @@ class UserSetting(Base):
     )
 
 
-class TenantSetting(Base):
-    """Tenant-specific settings"""
-    __tablename__ = "tenant_settings"
-
-    id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
-
-    key = Column(String(255), nullable=False)
-    value = Column(JSON, nullable=False)
-    data_type = Column(String(50))
-    description = Column(Text)
-
-    category = Column(String(100))  # billing, features, branding, etc.
-
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-
-    __table_args__ = (
-        Index("idx_tenant_key", "tenant_id", "key"),
-        Index("idx_tenant_category", "tenant_id", "category"),
-    )
-
-
 class NotificationPreference(Base):
     """User notification preferences"""
     __tablename__ = "notification_preferences"

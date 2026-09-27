@@ -5,6 +5,9 @@ from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import ValidationError
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer
+from starlette.authentication import AuthenticationError
 from app.core.config import settings
 
 # Password hashing
@@ -75,3 +78,42 @@ def verify_token_not_expired(token: str) -> bool:
         return False
 
     return datetime.now(timezone.utc) < datetime.fromtimestamp(exp, tz=timezone.utc)
+
+
+security = HTTPBearer()
+
+
+async def get_current_user(credentials = Depends(security)):
+    """Get current authenticated user from JWT token"""
+    token = credentials.credentials
+    payload = decode_token(token)
+
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user_id = payload.get("user_id")
+    email = payload.get("sub")
+
+    if not email or not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token claims",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    from app.db.session import AsyncSessionLocal
+    from app.models.user import User
+
+    async with AsyncSessionLocal() as session:
+        user = await session.get(User, user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return user

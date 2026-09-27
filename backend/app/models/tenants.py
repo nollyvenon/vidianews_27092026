@@ -21,7 +21,7 @@ class Tenant(Base):
 
     # Settings (JSON)
     settings = Column(JSON, default={})
-    metadata = Column(JSON, default={})
+    extra_data = Column(JSON, default={})
 
     # Limits
     max_users = Column(Integer, default=10)
@@ -69,7 +69,7 @@ class TenantMember(Base):
 
     # Relationships
     tenant = relationship("Tenant", back_populates="members")
-    user = relationship("User")
+    user = relationship("User", foreign_keys=[user_id])
 
     __table_args__ = (
         Index("idx_tenant_user", "tenant_id", "user_id"),
