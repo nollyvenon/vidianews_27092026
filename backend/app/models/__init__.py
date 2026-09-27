@@ -56,6 +56,13 @@ from .logging_analytics import (
     Documentation, APIDocumentation,
     LogLevel, ErrorSeverity, FeatureFlagStatus, AnalyticsEventType, DocType
 )
+from .social_messaging import (
+    ContentModerationRule, ModerationReport, ContentApproval,
+    UserFollow, Mention, Hashtag, ContentHashtag,
+    DirectMessage, Conversation, UserNotification, NotificationPreference,
+    SearchQuery, DiscoveryRecommendation, TrendingTopic,
+    ModerationStatus, NotificationType, MessageType, SearchType
+)
 
 __all__ = [
     "User",
