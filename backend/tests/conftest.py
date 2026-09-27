@@ -60,10 +60,18 @@ def client():
 
 
 @pytest.fixture
-async def async_client():
-    """Create async test client"""
+async def async_client(test_session):
+    """Create async test client with test database"""
+    async def override_get_db():
+        yield test_session
+
+    from app.db.session import get_db
+    app.dependency_overrides[get_db] = override_get_db
+
     async with AsyncClient(app=app, base_url="http://test") as client:
         yield client
+
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture

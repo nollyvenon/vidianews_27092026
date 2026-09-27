@@ -97,23 +97,3 @@ class ApiKey(Base):
     user = relationship("User", back_populates="api_keys")
 
 
-class ActivityLog(Base):
-    """Activity log model for tracking user actions"""
-    __tablename__ = "activity_logs"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
-    action = Column(String(255), nullable=False)
-    resource_type = Column(String(255))
-    resource_id = Column(Integer)
-    changes = Column(JSON)
-    ip_address = Column(String(45))
-    user_agent = Column(String(500))
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
-
-    __table_args__ = (
-        Index("idx_resource", "resource_type", "resource_id"),
-    )
-
-    # Relationships
-    user = relationship("User", back_populates="activity_logs")
