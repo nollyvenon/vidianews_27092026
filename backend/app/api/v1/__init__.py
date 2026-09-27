@@ -3,7 +3,7 @@
 from fastapi import APIRouter
 
 # Import endpoints
-from app.api.v1 import auth, health, tenants, organizations, profiles, settings, notifications, activity, content, ai_providers, ai_core, ai_advanced, integrations, advanced_features, monetization, security_performance, api_monitoring, logging_analytics, social_messaging
+from app.api.v1 import auth, health, tenants, organizations, profiles, settings, notifications, activity, content, ai_providers, ai_core, ai_advanced, integrations, advanced_features, monetization, security_performance, api_monitoring, logging_analytics, social_messaging, streaming_premium
 
 api_router = APIRouter()
 
@@ -27,5 +27,6 @@ api_router.include_router(security_performance.router, tags=["security"])
 api_router.include_router(api_monitoring.router, tags=["api-monitoring"])
 api_router.include_router(logging_analytics.router, tags=["logging-analytics"])
 api_router.include_router(social_messaging.router, tags=["social-messaging"])
+api_router.include_router(streaming_premium.router, tags=["streaming-premium"])
 
 __all__ = ["api_router"]

@@ -63,6 +63,12 @@ from .social_messaging import (
     SearchQuery, DiscoveryRecommendation, TrendingTopic,
     ModerationStatus, NotificationType, MessageType, SearchType
 )
+from .streaming_premium import (
+    LiveStream, StreamViewer, StreamChat, SubscriptionTier, SubscriberRecord,
+    CreatorAnalytics, DailyAnalytic, Partnership, Collaboration,
+    PremiumSubscription, PaywallContent, PremiumAccess,
+    StreamStatus, AnalyticsMetric, PartnershipType, PremiumFeature
+)
 
 __all__ = [
     "User",
