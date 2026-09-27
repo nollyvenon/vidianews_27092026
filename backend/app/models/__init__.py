@@ -32,6 +32,12 @@ from .advanced_features import (
     UserPreference, Recommendation as RecommendationEngine, PersonalizationProfile,
     PermissionLevel, StorageProvider, VideoQualityLevel, ProcessingStatus, ReactionType
 )
+from .monetization import (
+    WebSocketConnection, RealtimeEvent, Subscription, Invoice, Payment,
+    CreatorProfile, Monetization, CustomDashboard, DataExport,
+    EmailCampaign, CampaignMetric,
+    SubscriptionTier, BillingCycle, PaymentStatus, NotificationChannel
+)
 
 __all__ = [
     "User",
