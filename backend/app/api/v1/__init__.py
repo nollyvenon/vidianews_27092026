@@ -3,7 +3,7 @@
 from fastapi import APIRouter
 
 # Import endpoints
-from app.api.v1 import auth, health, tenants, organizations, profiles, settings
+from app.api.v1 import auth, health, tenants, organizations, profiles, settings, notifications
 
 api_router = APIRouter()
 
@@ -14,5 +14,6 @@ api_router.include_router(tenants.router, tags=["tenants"])
 api_router.include_router(organizations.router, tags=["organizations"])
 api_router.include_router(profiles.router, tags=["profiles"])
 api_router.include_router(settings.router, tags=["settings"])
+api_router.include_router(notifications.router, tags=["notifications"])
 
 __all__ = ["api_router"]
