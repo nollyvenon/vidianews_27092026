@@ -20,6 +20,12 @@ from .ai_advanced import (
     SafetyCheck, ComplianceLog,
     MemoryType, ChatStatus, DocumentType, MonitoringMetric, SafetyLevel
 )
+from .integrations import (
+    AnalyticsReport, Metric, Dashboard, Integration, Webhook, WebhookEvent,
+    NotificationPreference, Notification, AuditTrail, ComplianceReport,
+    SearchIndex, Recommendation,
+    IntegrationType, ReportType, NotificationType, AuditAction
+)
 
 __all__ = [
     "User",
