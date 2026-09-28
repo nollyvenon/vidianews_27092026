@@ -115,6 +115,11 @@ from .ecommerce import (
     Refund, Order, OrderItem, ProductStatus, ProductCategory, CartItemStatus,
     CheckoutStatus, PaymentStatus, PaymentMethod, OrderStatus, ShippingStatus
 )
+from .ecommerce_extended import (
+    ShippingAddress, Shipment, TrackingEvent, InventoryLevel, InventoryTransaction,
+    StockAlert, Wishlist, WishlistItem, Return, ReturnShipment,
+    ShippingCarrier, InventoryStatus, ReturnStatus, ReturnReason
+)
 
 __all__ = [
     "User",

@@ -15,6 +15,12 @@ from .ecommerce_service import (
     PaymentService,
     OrderService
 )
+from .ecommerce_extended_service import (
+    ShippingService,
+    InventoryService,
+    WishlistService,
+    ReturnService
+)
 
 __all__ = [
     "AuthService",
@@ -27,5 +33,9 @@ __all__ = [
     "CartService",
     "CheckoutService",
     "PaymentService",
-    "OrderService"
+    "OrderService",
+    "ShippingService",
+    "InventoryService",
+    "WishlistService",
+    "ReturnService"
 ]
