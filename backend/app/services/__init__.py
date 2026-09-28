@@ -21,6 +21,15 @@ from .ecommerce_extended_service import (
     WishlistService,
     ReturnService
 )
+from .marketing_service import (
+    EmailCampaignService,
+    SegmentationService,
+    LeadScoringService,
+    AutomationService,
+    AnalyticsService,
+    ABTestingService,
+    LoyaltyService
+)
 
 __all__ = [
     "AuthService",
@@ -37,5 +46,12 @@ __all__ = [
     "ShippingService",
     "InventoryService",
     "WishlistService",
-    "ReturnService"
+    "ReturnService",
+    "EmailCampaignService",
+    "SegmentationService",
+    "LeadScoringService",
+    "AutomationService",
+    "AnalyticsService",
+    "ABTestingService",
+    "LoyaltyService"
 ]

@@ -120,6 +120,12 @@ from .ecommerce_extended import (
     StockAlert, Wishlist, WishlistItem, Return, ReturnShipment,
     ShippingCarrier, InventoryStatus, ReturnStatus, ReturnReason
 )
+from .marketing import (
+    EmailCampaign, EmailTemplate, AutomationWorkflow, SMSCampaign,
+    Segment, SegmentMembership, LeadScore, EmailMetric, ABTest,
+    LoyaltyProgram, LoyaltyMember, LoyaltyTransaction,
+    CampaignStatus, EmailType, SegmentationType, LeadScoreStatus
+)
 
 __all__ = [
     "User",
