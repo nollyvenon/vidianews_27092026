@@ -71,9 +71,44 @@ from .streaming_premium import (
 )
 from .community_compliance import (
     ForumThread, ForumReply, Badge, UserBadge, Leaderboard,
-    Report, DataExport, CompliancePolicy, UserCompliance, AuditLog,
+    Report, DataExport, CompliancePolicy, UserCompliance,
     Language, Translation, UserLocalization,
     ForumCategory, BadgeType, ReportType, ComplianceStatus
+)
+from .content_quality import (
+    ContentCalendarEvent, ContentCalendarRecommendation,
+    ProofreadingCheck, ProofreadingIssue,
+    PlagiarismCheck,
+    ReadabilityScore,
+    BrandVoiceGuide, BrandVoiceCheck,
+    CalendarEventType, ProofreadingIssueType, IssueSeverity,
+    ReadabilityMetricType, PlagiarismCheckStatus, BrandVoiceCheckResult
+)
+from .publishing_distribution import (
+    PublishedContent, DistributionChannel, PublishingSchedule, SocialMediaPost,
+    PublishingStatus, DistributionChannelType
+)
+from .user_management import (
+    UserSegment, UserProfile, EmailCampaign, SubscriberList, PreferenceCenter,
+    SegmentType, CampaignStatus
+)
+from .enterprise_features import (
+    SecurityPolicy, ModerationRule, SecurityAuditLog, RateLimiterConfig,
+    NotificationConfig, ReportTemplate,
+    SecurityLevel, ModerationAction, AuditAction
+)
+from .analytics_reporting import (
+    AnalyticsEvent, UserBehavior, TrackingPixel, ConversionFunnel,
+    CustomReport, ReportSchedule, DataVisualization,
+    EventType, ReportFormat, VisualizationType
+)
+from .platform_completion import (
+    AdminUser, NotificationTemplate, SearchIndex, SocialFeature,
+    AdminAction, NotificationStatus
+)
+from .advanced_platform import (
+    WebSocketSession, BackgroundJob, DataPipeline, CacheEntry,
+    APIDocumentation, JobStatus, CacheStrategy
 )
 
 __all__ = [

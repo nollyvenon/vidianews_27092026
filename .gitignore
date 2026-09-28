@@ -31,6 +31,13 @@ ai-services/*.egg-info
 ai-services/dist
 ai-services/.env
 
+# Python Backend
+backend/**/__pycache__
+backend/**/*.pyc
+backend/**/*.pyo
+backend/.venv
+backend/venv
+
 # Docker
 .docker-compose.override.yml
 

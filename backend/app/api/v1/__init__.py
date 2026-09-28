@@ -3,7 +3,7 @@
 from fastapi import APIRouter
 
 # Import endpoints
-from app.api.v1 import auth, health, tenants, organizations, profiles, settings, notifications, activity, content, ai_providers, ai_core, ai_advanced, integrations, advanced_features, monetization, security_performance, api_monitoring, logging_analytics, social_messaging, streaming_premium, community_compliance
+from app.api.v1 import auth, health, tenants, organizations, profiles, settings, notifications, activity, content, ai_providers, ai_core, ai_advanced, integrations, advanced_features, monetization, security_performance, api_monitoring, logging_analytics, social_messaging, streaming_premium, community_compliance, content_quality, publishing_distribution, user_management, enterprise_features, analytics_reporting, platform_completion, advanced_platform
 
 api_router = APIRouter()
 
@@ -29,5 +29,12 @@ api_router.include_router(logging_analytics.router, tags=["logging-analytics"])
 api_router.include_router(social_messaging.router, tags=["social-messaging"])
 api_router.include_router(streaming_premium.router, tags=["streaming-premium"])
 api_router.include_router(community_compliance.router, tags=["community-compliance"])
+api_router.include_router(content_quality.router, tags=["content-quality"])
+api_router.include_router(publishing_distribution.router, tags=["publishing-distribution"])
+api_router.include_router(user_management.router, tags=["user-management"])
+api_router.include_router(enterprise_features.router, tags=["enterprise-features"])
+api_router.include_router(analytics_reporting.router, tags=["analytics-reporting"])
+api_router.include_router(platform_completion.router, tags=["platform-completion"])
+api_router.include_router(advanced_platform.router, tags=["advanced-platform"])
 
 __all__ = ["api_router"]
