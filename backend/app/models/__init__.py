@@ -126,6 +126,15 @@ from .marketing import (
     LoyaltyProgram, LoyaltyMember, LoyaltyTransaction,
     CampaignStatus, EmailType, SegmentationType, LeadScoreStatus
 )
+from .memberships import (
+    MembershipType, MembershipSubscription, MembershipInvoice, MembershipPaymentMethod,
+    MembershipTier, SubscriptionStatus, BillingCycle
+)
+from .courses import (
+    Course, Lesson, CourseSection, CourseEnrollment, StudentLessonProgress,
+    CourseReview, CourseBundle, Assignment, AssignmentSubmission, Certificate,
+    CourseStatus, LessonStatus, EnrollmentStatus, AssignmentStatus, SubmissionStatus
+)
 
 __all__ = [
     "User",

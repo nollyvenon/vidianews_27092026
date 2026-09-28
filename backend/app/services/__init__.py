@@ -30,6 +30,23 @@ from .marketing_service import (
     ABTestingService,
     LoyaltyService
 )
+from .memberships_service import (
+    MembershipTypeService,
+    MembershipSubscriptionService,
+    MembershipInvoiceService,
+    MembershipPaymentMethodService
+)
+from .courses_service import (
+    CourseService,
+    LessonService,
+    CourseSectionService,
+    EnrollmentService,
+    StudentLessonProgressService,
+    CourseReviewService,
+    AssignmentService,
+    AssignmentSubmissionService,
+    CertificateService
+)
 
 __all__ = [
     "AuthService",
@@ -53,5 +70,18 @@ __all__ = [
     "AutomationService",
     "AnalyticsService",
     "ABTestingService",
-    "LoyaltyService"
+    "LoyaltyService",
+    "MembershipTypeService",
+    "MembershipSubscriptionService",
+    "MembershipInvoiceService",
+    "MembershipPaymentMethodService",
+    "CourseService",
+    "LessonService",
+    "CourseSectionService",
+    "EnrollmentService",
+    "StudentLessonProgressService",
+    "CourseReviewService",
+    "AssignmentService",
+    "AssignmentSubmissionService",
+    "CertificateService"
 ]
