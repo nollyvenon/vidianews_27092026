@@ -8,6 +8,13 @@ from .content_quality_service import (
     ReadabilityService,
     BrandVoiceService
 )
+from .ecommerce_service import (
+    ProductService,
+    CartService,
+    CheckoutService,
+    PaymentService,
+    OrderService
+)
 
 __all__ = [
     "AuthService",
@@ -15,5 +22,10 @@ __all__ = [
     "ProofreadingService",
     "PlagiarismDetectionService",
     "ReadabilityService",
-    "BrandVoiceService"
+    "BrandVoiceService",
+    "ProductService",
+    "CartService",
+    "CheckoutService",
+    "PaymentService",
+    "OrderService"
 ]
