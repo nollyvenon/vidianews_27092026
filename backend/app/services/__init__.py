@@ -47,6 +47,19 @@ from .courses_service import (
     AssignmentSubmissionService,
     CertificateService
 )
+from .analytics_admin_service import (
+    AnalyticsEventService,
+    UserMetricService,
+    RevenueMetricService,
+    EngagementMetricService,
+    ReportService,
+    AdminLogService,
+    SystemHealthService,
+    UserBehaviorService,
+    NotificationPreferenceService,
+    PermissionPolicyService,
+    SystemAlertService
+)
 
 __all__ = [
     "AuthService",
@@ -83,5 +96,16 @@ __all__ = [
     "CourseReviewService",
     "AssignmentService",
     "AssignmentSubmissionService",
-    "CertificateService"
+    "CertificateService",
+    "AnalyticsEventService",
+    "UserMetricService",
+    "RevenueMetricService",
+    "EngagementMetricService",
+    "ReportService",
+    "AdminLogService",
+    "SystemHealthService",
+    "UserBehaviorService",
+    "NotificationPreferenceService",
+    "PermissionPolicyService",
+    "SystemAlertService"
 ]

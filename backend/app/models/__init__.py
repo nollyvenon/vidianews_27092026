@@ -135,6 +135,12 @@ from .courses import (
     CourseReview, CourseBundle, Assignment, AssignmentSubmission, Certificate,
     CourseStatus, LessonStatus, EnrollmentStatus, AssignmentStatus, SubmissionStatus
 )
+from .analytics_admin import (
+    AnalyticsEvent, AnalyticsDashboard, UserMetric, RevenueMetric,
+    EngagementMetric, Report, AdminLog, SystemHealth, UserBehavior,
+    NotificationPreference, ContentModeration, PermissionPolicy, UserRole,
+    SystemAlert, AnalyticsEventType, ReportType, AdminAction
+)
 
 __all__ = [
     "User",

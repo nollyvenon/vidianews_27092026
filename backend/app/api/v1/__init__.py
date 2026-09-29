@@ -3,7 +3,7 @@
 from fastapi import APIRouter
 
 # Import endpoints
-from app.api.v1 import auth, health, tenants, organizations, profiles, settings, notifications, activity, content, ai_providers, ai_core, ai_advanced, integrations, advanced_features, monetization, security_performance, api_monitoring, logging_analytics, social_messaging, streaming_premium, community_compliance, content_quality, publishing_distribution, user_management, enterprise_features, analytics_reporting, platform_completion, advanced_platform, ecommerce, ecommerce_extended, marketing, memberships, courses
+from app.api.v1 import auth, health, tenants, organizations, profiles, settings, notifications, activity, content, ai_providers, ai_core, ai_advanced, integrations, advanced_features, monetization, security_performance, api_monitoring, logging_analytics, social_messaging, streaming_premium, community_compliance, content_quality, publishing_distribution, user_management, enterprise_features, analytics_reporting, platform_completion, advanced_platform, ecommerce, ecommerce_extended, marketing, memberships, courses, analytics_admin
 
 api_router = APIRouter()
 
@@ -41,5 +41,6 @@ api_router.include_router(ecommerce_extended.router, tags=["ecommerce-extended"]
 api_router.include_router(marketing.router, tags=["marketing"])
 api_router.include_router(memberships.router, tags=["memberships"])
 api_router.include_router(courses.router, tags=["courses"])
+api_router.include_router(analytics_admin.router, tags=["analytics-admin"])
 
 __all__ = ["api_router"]
