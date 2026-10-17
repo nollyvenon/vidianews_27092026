@@ -51,7 +51,7 @@ class LogEntry(Base):
     level = Column(SQLEnum(LogLevel), nullable=False, index=True)
     service = Column(String(255), nullable=False, index=True)
     message = Column(Text, nullable=False)
-    metadata = Column(JSON, default={})
+    extra_metadata = Column("metadata", JSON, default={})
     timestamp = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
@@ -112,7 +112,7 @@ class FeatureFlag(Base):
 
 
 class ABTest(Base):
-    __tablename__ = "ab_tests"
+    __tablename__ = "logging_ab_tests"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False, unique=True)
     feature_flag_id = Column(Integer, ForeignKey("feature_flags.id", ondelete="CASCADE"), nullable=False)
@@ -124,13 +124,13 @@ class ABTest(Base):
     started_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     ended_at = Column(DateTime(timezone=True), nullable=True)
 
-    feature_flag = relationship("FeatureFlag", backref="ab_tests")
+    feature_flag = relationship("app.models.logging_analytics.FeatureFlag", backref="ab_tests")
 
 
 # ==================== MODULE 49: ANALYTICS ====================
 
 class AnalyticsEvent(Base):
-    __tablename__ = "analytics_events"
+    __tablename__ = "logging_analytics_events"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     event_type = Column(SQLEnum(AnalyticsEventType), nullable=False, index=True)

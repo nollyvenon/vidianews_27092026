@@ -53,7 +53,7 @@ class UserProfile(Base):
     skills = relationship("UserSkill", back_populates="profile", cascade="all, delete-orphan")
     experiences = relationship("UserExperience", back_populates="profile", cascade="all, delete-orphan")
     educations = relationship("UserEducation", back_populates="profile", cascade="all, delete-orphan")
-    badges = relationship("UserBadge", back_populates="profile", cascade="all, delete-orphan")
+    badges = relationship("app.models.profiles.UserBadge", back_populates="profile", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("idx_profile_user_id", "user_id"),

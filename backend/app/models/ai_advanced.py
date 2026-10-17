@@ -118,7 +118,7 @@ class ChatMessage(Base):
     cost = Column(Float, default=0.0)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
-    chat = relationship("Chat", backref="messages")
+    chat = relationship("Chat", backref="chat_messages")
 
 
 # Module 18: Research/RAG
@@ -132,7 +132,7 @@ class Document(Base):
     source_url = Column(String(500), nullable=True)
     embeddings = Column(JSON, default=[])
     chunks = Column(JSON, default=[])
-    metadata = Column(JSON, default={})
+    extra_metadata = Column("metadata", JSON, default={})
     is_indexed = Column(Boolean, default=False, index=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 

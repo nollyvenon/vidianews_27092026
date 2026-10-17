@@ -41,7 +41,7 @@ class AnalyticsEvent(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, index=True)
-    user_id = Column(Integer, ForeignKey("user.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     event_type = Column(SQLEnum(AnalyticsEventType), nullable=False)
     event_data = Column(JSON, default={})
     session_id = Column(String(255), index=True)
@@ -62,7 +62,7 @@ class AnalyticsDashboard(Base):
     description = Column(Text)
     widgets = Column(JSON, default=[])
     is_public = Column(Boolean, default=False)
-    created_by = Column(Integer, ForeignKey("user.id"))
+    created_by = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
 
@@ -71,7 +71,7 @@ class UserMetric(Base):
     __tablename__ = "user_metrics"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("user.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     total_logins = Column(Integer, default=0)
     last_login = Column(DateTime)
     total_session_time = Column(Integer, default=0)
@@ -128,7 +128,7 @@ class Report(Base):
     filters = Column(JSON, default={})
     is_scheduled = Column(Boolean, default=False)
     schedule_frequency = Column(String(50))
-    created_by = Column(Integer, ForeignKey("user.id"))
+    created_by = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
     generated_at = Column(DateTime)
 
@@ -138,7 +138,7 @@ class AdminLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, index=True)
-    admin_id = Column(Integer, ForeignKey("user.id"), nullable=False)
+    admin_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     action = Column(SQLEnum(AdminAction), nullable=False)
     resource_type = Column(String(100), nullable=False)
     resource_id = Column(Integer)
@@ -167,7 +167,7 @@ class UserBehavior(Base):
     __tablename__ = "user_behavior"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("user.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     page_visited = Column(String(255))
     time_spent = Column(Integer)
     actions_taken = Column(JSON, default=[])
@@ -180,10 +180,10 @@ class UserBehavior(Base):
 
 
 class NotificationPreference(Base):
-    __tablename__ = "notification_preferences"
+    __tablename__ = "analytics_admin_notification_preferences"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("user.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     email_enabled = Column(Boolean, default=True)
     sms_enabled = Column(Boolean, default=False)
     push_enabled = Column(Boolean, default=True)
@@ -203,10 +203,10 @@ class ContentModeration(Base):
     id = Column(Integer, primary_key=True, index=True)
     content_id = Column(Integer, nullable=False)
     content_type = Column(String(100), nullable=False)
-    reported_by = Column(Integer, ForeignKey("user.id"))
+    reported_by = Column(Integer, ForeignKey("users.id"))
     reason = Column(String(255))
     status = Column(String(50), default="pending")
-    moderator_id = Column(Integer, ForeignKey("user.id"))
+    moderator_id = Column(Integer, ForeignKey("users.id"))
     action_taken = Column(String(255))
     notes = Column(Text)
     created_at = Column(DateTime, default=datetime.now(timezone.utc), index=True)
@@ -226,13 +226,13 @@ class PermissionPolicy(Base):
 
 
 class UserRole(Base):
-    __tablename__ = "user_roles"
+    __tablename__ = "analytics_admin_user_roles"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("user.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     role_name = Column(String(100), nullable=False)
     permission_policy_id = Column(Integer, ForeignKey("permission_policies.id"))
-    assigned_by = Column(Integer, ForeignKey("user.id"))
+    assigned_by = Column(Integer, ForeignKey("users.id"))
     assigned_at = Column(DateTime, default=datetime.now(timezone.utc))
     expires_at = Column(DateTime)
 

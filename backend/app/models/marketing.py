@@ -104,7 +104,7 @@ class EmailCampaign(Base):
     sent_at = Column(DateTime(timezone=True))
 
     # Relationships
-    template = relationship("EmailTemplate", uselist=False)
+    template = relationship("app.models.marketing.EmailTemplate", uselist=False)
     metrics = relationship("EmailMetric", back_populates="campaign", cascade="all, delete-orphan")
 
     __table_args__ = (
@@ -232,7 +232,7 @@ class Segment(Base):
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
-    campaigns = relationship("EmailCampaign")
+    campaigns = relationship("app.models.marketing.EmailCampaign")
 
     __table_args__ = (
         Index("idx_segment_org", "organization_id"),
@@ -315,7 +315,7 @@ class EmailMetric(Base):
     bounce_rate = Column(Float, default=0.0)
 
     # Relationships
-    campaign = relationship("EmailCampaign", back_populates="metrics")
+    campaign = relationship("app.models.marketing.EmailCampaign", back_populates="metrics")
 
     __table_args__ = (
         Index("idx_email_metric_campaign", "campaign_id"),
@@ -329,7 +329,7 @@ class EmailMetric(Base):
 
 class ABTest(Base):
     """A/B testing campaigns"""
-    __tablename__ = "ab_tests"
+    __tablename__ = "marketing_ab_tests"
 
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)

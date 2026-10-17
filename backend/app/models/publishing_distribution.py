@@ -19,7 +19,7 @@ class PublishingStatus(str, enum.Enum):
     CANCELLED = "cancelled"
 
 
-class DistributionChannel(str, enum.Enum):
+class DistributionChannelType(str, enum.Enum):
     """Distribution channels"""
     WEBSITE = "website"
     EMAIL = "email"
@@ -90,7 +90,7 @@ class PublishingJob(Base):
 
     # Metadata
     tags = Column(JSON, default=[])
-    metadata = Column(JSON, default={})
+    extra_metadata = Column("metadata", JSON, default={})
     error_message = Column(Text)
 
     retry_count = Column(Integer, default=0)
@@ -170,7 +170,7 @@ class PublishingLog(Base):
     error_message = Column(Text)
 
     # Metadata
-    metadata = Column(JSON, default={})
+    extra_metadata = Column("metadata", JSON, default={})
 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
@@ -229,7 +229,7 @@ class DistributionChannel(Base):
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
 
-    channel_type = Column(SQLEnum(DistributionChannel), nullable=False, index=True)
+    channel_type = Column(SQLEnum(DistributionChannelType), nullable=False, index=True)
     display_name = Column(String(255), nullable=False)
     description = Column(Text)
 
@@ -282,7 +282,7 @@ class SyndicationLog(Base):
     error_message = Column(Text)
 
     # Metadata
-    metadata = Column(JSON, default={})
+    extra_metadata = Column("metadata", JSON, default={})
 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -298,7 +298,7 @@ class SyndicationLog(Base):
 
 class EngagementMetric(Base):
     """Real-time engagement metrics for published content"""
-    __tablename__ = "engagement_metrics"
+    __tablename__ = "publishing_engagement_metrics"
 
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -404,7 +404,7 @@ class EngagementTracker(Base):
     city = Column(String(100))
 
     # Metadata
-    metadata = Column(JSON, default={})
+    extra_metadata = Column("metadata", JSON, default={})
 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
@@ -466,7 +466,7 @@ class ABTestCampaign(Base):
 
 class ABTestVariant(Base):
     """A/B test variants (control and treatment groups)"""
-    __tablename__ = "ab_test_variants"
+    __tablename__ = "publishing_ab_test_variants"
 
     id = Column(Integer, primary_key=True, index=True)
     ab_test_campaign_id = Column(Integer, ForeignKey("ab_test_campaigns.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -651,3 +651,36 @@ class RecommendationLog(Base):
         Index("idx_recommendation_log_user", "user_id"),
         Index("idx_recommendation_log_clicked", "was_clicked"),
     )
+
+
+# ==================== DISTRIBUTION CHANNELS ====================
+
+
+class PublishedContent(Base):
+    """Record of a content item published to a distribution channel"""
+    __tablename__ = "published_content"
+
+    id = Column(Integer, primary_key=True, index=True)
+    content_id = Column(Integer, ForeignKey("contents.id", ondelete="CASCADE"), nullable=False, index=True)
+    channel_type = Column(SQLEnum(DistributionChannelType, native_enum=False, length=30), nullable=False, index=True)
+    external_id = Column(String(255), nullable=True)
+    external_url = Column(String(1000), nullable=True)
+    status = Column(String(50), nullable=False, default="published")
+    published_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class SocialMediaPost(Base):
+    """Social media post drafted, scheduled, or published by a user"""
+    __tablename__ = "social_media_posts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    channel_type = Column(SQLEnum(DistributionChannelType, native_enum=False, length=30), nullable=False, index=True)
+    body = Column(Text, nullable=False)
+    media_urls = Column(JSON, default=list)
+    scheduled_for = Column(DateTime(timezone=True), nullable=True)
+    posted_at = Column(DateTime(timezone=True), nullable=True)
+    external_post_id = Column(String(255), nullable=True)
+    status = Column(String(50), nullable=False, default="draft")
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)

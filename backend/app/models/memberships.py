@@ -51,7 +51,7 @@ class MembershipSubscription(Base):
     __tablename__ = "membership_subscriptions"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("user.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     membership_type_id = Column(Integer, ForeignKey("membership_types.id"), nullable=False, index=True)
     status = Column(SQLEnum(SubscriptionStatus), default=SubscriptionStatus.ACTIVE)
     start_date = Column(DateTime, nullable=False)

@@ -1,10 +1,19 @@
 """Course models"""
 
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, Enum as SQLEnum, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, Enum as SQLEnum, ForeignKey, JSON, Table
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from enum import Enum
 from app.db.base import Base
+
+
+# Many-to-many link between courses and bundles
+course_bundle_items = Table(
+    "course_bundle_items",
+    Base.metadata,
+    Column("course_id", Integer, ForeignKey("courses.id", ondelete="CASCADE"), primary_key=True),
+    Column("bundle_id", Integer, ForeignKey("course_bundles.id", ondelete="CASCADE"), primary_key=True),
+)
 
 
 class CourseStatus(str, Enum):
@@ -48,7 +57,7 @@ class Course(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, index=True)
-    instructor_id = Column(Integer, ForeignKey("user.id"), nullable=False, index=True)
+    instructor_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     title = Column(String(255), nullable=False)
     description = Column(Text)
     category = Column(String(100), index=True)
@@ -118,7 +127,7 @@ class CourseEnrollment(Base):
     __tablename__ = "course_enrollments"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("user.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=False, index=True)
     status = Column(SQLEnum(EnrollmentStatus), default=EnrollmentStatus.ACTIVE)
     enrolled_date = Column(DateTime, default=datetime.now(timezone.utc))
@@ -158,7 +167,7 @@ class CourseReview(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=False, index=True)
-    user_id = Column(Integer, ForeignKey("user.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     rating = Column(Integer, nullable=False)
     title = Column(String(255))
     content = Column(Text)
@@ -211,7 +220,7 @@ class AssignmentSubmission(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     assignment_id = Column(Integer, ForeignKey("assignments.id"), nullable=False, index=True)
-    user_id = Column(Integer, ForeignKey("user.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     status = Column(SQLEnum(SubmissionStatus), default=SubmissionStatus.DRAFT)
     content = Column(Text)
     file_urls = Column(JSON, default=[])
@@ -219,7 +228,7 @@ class AssignmentSubmission(Base):
     score = Column(Float)
     feedback = Column(Text)
     graded_date = Column(DateTime)
-    graded_by = Column(Integer, ForeignKey("user.id"))
+    graded_by = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
 
     assignment = relationship("Assignment", back_populates="submissions")
@@ -232,7 +241,7 @@ class Certificate(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=False, index=True)
-    user_id = Column(Integer, ForeignKey("user.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     certificate_number = Column(String(255), unique=True, nullable=False)
     certificate_url = Column(String(500))
     issue_date = Column(DateTime, default=datetime.now(timezone.utc))

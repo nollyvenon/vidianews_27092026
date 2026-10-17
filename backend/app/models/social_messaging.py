@@ -52,7 +52,7 @@ class ContentModerationRule(Base):
 class ModerationReport(Base):
     __tablename__ = "moderation_reports"
     id = Column(Integer, primary_key=True, index=True)
-    content_id = Column(Integer, ForeignKey("content.id", ondelete="CASCADE"), nullable=False, index=True)
+    content_id = Column(Integer, ForeignKey("contents.id", ondelete="CASCADE"), nullable=False, index=True)
     reported_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     reason = Column(String(255), nullable=False)
     status = Column(SQLEnum(ModerationStatus), default=ModerationStatus.PENDING, index=True)
@@ -67,7 +67,7 @@ class ModerationReport(Base):
 class ContentApproval(Base):
     __tablename__ = "content_approvals"
     id = Column(Integer, primary_key=True, index=True)
-    content_id = Column(Integer, ForeignKey("content.id", ondelete="CASCADE"), nullable=False, unique=True)
+    content_id = Column(Integer, ForeignKey("contents.id", ondelete="CASCADE"), nullable=False, unique=True)
     status = Column(SQLEnum(ModerationStatus), default=ModerationStatus.PENDING)
     reviewer_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
@@ -95,7 +95,7 @@ class UserFollow(Base):
 class Mention(Base):
     __tablename__ = "mentions"
     id = Column(Integer, primary_key=True, index=True)
-    content_id = Column(Integer, ForeignKey("content.id", ondelete="CASCADE"), nullable=False)
+    content_id = Column(Integer, ForeignKey("contents.id", ondelete="CASCADE"), nullable=False)
     mentioned_user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     mentioned_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
@@ -116,7 +116,7 @@ class Hashtag(Base):
 class ContentHashtag(Base):
     __tablename__ = "content_hashtags"
     id = Column(Integer, primary_key=True, index=True)
-    content_id = Column(Integer, ForeignKey("content.id", ondelete="CASCADE"), nullable=False)
+    content_id = Column(Integer, ForeignKey("contents.id", ondelete="CASCADE"), nullable=False)
     hashtag_id = Column(Integer, ForeignKey("hashtags.id", ondelete="CASCADE"), nullable=False)
 
     content = relationship("Content", backref="hashtags")
@@ -156,19 +156,19 @@ class UserNotification(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     notification_type = Column(SQLEnum(NotificationType), nullable=False)
     actor_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    content_id = Column(Integer, ForeignKey("content.id", ondelete="CASCADE"), nullable=True)
+    content_id = Column(Integer, ForeignKey("contents.id", ondelete="CASCADE"), nullable=True)
     message = Column(Text, nullable=False)
     is_read = Column(Boolean, default=False, index=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     read_at = Column(DateTime(timezone=True), nullable=True)
 
-    user = relationship("User", foreign_keys=[user_id], backref="notifications")
+    user = relationship("User", foreign_keys=[user_id], backref="social_notifications")
     actor = relationship("User", foreign_keys=[actor_id], backref="notifications_caused")
     content = relationship("Content", backref="notifications")
 
 
 class NotificationPreference(Base):
-    __tablename__ = "notification_preferences"
+    __tablename__ = "social_notification_preferences"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
     notify_follows = Column(Boolean, default=True)
@@ -177,7 +177,7 @@ class NotificationPreference(Base):
     notify_messages = Column(Boolean, default=True)
     email_notifications = Column(Boolean, default=False)
 
-    user = relationship("User", backref="notification_preferences")
+    user = relationship("User", backref="social_notification_preferences")
 
 
 # ==================== MODULE 55: SEARCH & DISCOVERY ====================
@@ -198,12 +198,12 @@ class DiscoveryRecommendation(Base):
     __tablename__ = "discovery_recommendations"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    content_id = Column(Integer, ForeignKey("content.id", ondelete="CASCADE"), nullable=False)
+    content_id = Column(Integer, ForeignKey("contents.id", ondelete="CASCADE"), nullable=False)
     recommendation_score = Column(Float, default=0.0)
     reason = Column(String(255))
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
-    user = relationship("User", backref="recommendations")
+    user = relationship("User", backref="social_recommendations")
     content = relationship("Content", backref="recommended_to")
 
 

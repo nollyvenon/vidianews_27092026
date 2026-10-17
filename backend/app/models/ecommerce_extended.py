@@ -7,6 +7,15 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from app.db.base import Base
+
+
+# Users subscribed to low-stock notifications for a stock alert
+stock_alert_subscribers = Table(
+    "stock_alert_subscribers",
+    Base.metadata,
+    Column("stock_alert_id", Integer, ForeignKey("stock_alerts.id", ondelete="CASCADE"), primary_key=True),
+    Column("user_id", Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+)
 import enum
 
 

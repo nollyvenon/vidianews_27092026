@@ -11,8 +11,8 @@ user_roles = Table(
     Base.metadata,
     Column("user_id", Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
     Column("role_id", Integer, ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True),
-    Index("idx_user_id", "user_id"),
-    Index("idx_role_id", "role_id"),
+    Index("idx_user_id_user_roles", "user_id"),
+    Index("idx_role_id_user_roles", "role_id"),
 )
 
 
@@ -33,8 +33,8 @@ class User(Base):
     deleted_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
-    sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
-    roles = relationship("Role", secondary=user_roles, back_populates="users")
+    sessions = relationship("app.models.user.UserSession", back_populates="user", cascade="all, delete-orphan")
+    roles = relationship("app.models.user.Role", secondary=user_roles, back_populates="users")
     api_keys = relationship("ApiKey", back_populates="user", cascade="all, delete-orphan")
     activity_logs = relationship("ActivityLog", back_populates="user", cascade="all, delete-orphan")
 

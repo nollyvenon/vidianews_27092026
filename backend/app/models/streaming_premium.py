@@ -106,7 +106,7 @@ class SubscriberRecord(Base):
     auto_renew = Column(Boolean, default=True)
 
     subscriber = relationship("User", foreign_keys=[subscriber_id], backref="subscriptions")
-    tier = relationship("SubscriptionTier", backref="subscribers")
+    tier = relationship("app.models.streaming_premium.SubscriptionTier", backref="subscribers")
 
 
 # ==================== MODULE 58: CREATOR ANALYTICS ====================
@@ -183,7 +183,7 @@ class PremiumSubscription(Base):
 class PaywallContent(Base):
     __tablename__ = "paywall_content"
     id = Column(Integer, primary_key=True, index=True)
-    content_id = Column(Integer, ForeignKey("content.id", ondelete="CASCADE"), nullable=False, unique=True)
+    content_id = Column(Integer, ForeignKey("contents.id", ondelete="CASCADE"), nullable=False, unique=True)
     price = Column(Float, nullable=False)
     description = Column(Text)
     is_premium_only = Column(Boolean, default=False)
@@ -196,7 +196,7 @@ class PremiumAccess(Base):
     __tablename__ = "premium_access"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    content_id = Column(Integer, ForeignKey("content.id", ondelete="CASCADE"), nullable=False)
+    content_id = Column(Integer, ForeignKey("contents.id", ondelete="CASCADE"), nullable=False)
     purchased_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     expires_at = Column(DateTime(timezone=True), nullable=True)
     price_paid = Column(Float)

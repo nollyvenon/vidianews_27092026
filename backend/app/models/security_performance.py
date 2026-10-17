@@ -143,7 +143,7 @@ class CachePolicy(Base):
 
 
 class CacheMetric(Base):
-    __tablename__ = "cache_metrics"
+    __tablename__ = "security_cache_metrics"
     id = Column(Integer, primary_key=True, index=True)
     resource_type = Column(String(100), nullable=False, index=True)
     hits = Column(Integer, default=0)
@@ -169,7 +169,7 @@ class DeviceToken(Base):
 
 
 class PushNotification(Base):
-    __tablename__ = "push_notifications"
+    __tablename__ = "security_push_notifications"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     title = Column(String(255), nullable=False)

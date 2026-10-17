@@ -3,11 +3,10 @@ from sqlalchemy import (
     Enum, UniqueConstraint, Index, JSON, ARRAY, func, Numeric, DECIMAL
 )
 from sqlalchemy.orm import relationship
-from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 import enum
 
-Base = declarative_base()
+from app.db.base import Base
 
 
 class RecommendationType(str, enum.Enum):
@@ -86,7 +85,7 @@ class UserEmbedding(Base):
     updated_at = Column(DateTime, onupdate=func.now())
 
     __table_args__ = (
-        Index("idx_user_id", "user_id"),
+        Index("idx_user_id_user_embeddings", "user_id"),
         Index("idx_embedding_version", "embedding_version"),
     )
 
@@ -108,8 +107,8 @@ class ContentRecommendation(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_user_id", "user_id"),
-        Index("idx_content_id", "content_id"),
+        Index("idx_user_id_content_recommendations", "user_id"),
+        Index("idx_content_id_content_recommendations", "content_id"),
         Index("idx_recommendation_type", "recommendation_type"),
         Index("idx_similarity_score", "similarity_score"),
         UniqueConstraint("user_id", "content_id", "recommendation_type", name="uq_recommendation"),
@@ -128,7 +127,7 @@ class CollaborativeFilteringModel(Base):
     last_updated = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     __table_args__ = (
-        Index("idx_user_id", "user_id"),
+        Index("idx_user_id_collaborative_filtering_models", "user_id"),
         Index("idx_model_version", "model_version"),
     )
 
@@ -149,7 +148,7 @@ class RetentionMetric(Base):
     updated_at = Column(DateTime, onupdate=func.now())
 
     __table_args__ = (
-        Index("idx_user_id", "user_id"),
+        Index("idx_user_id_retention_metrics", "user_id"),
         Index("idx_status", "status"),
         Index("idx_churn_probability", "churn_probability"),
     )
@@ -173,7 +172,7 @@ class RetentionCampaign(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_status", "status"),
+        Index("idx_status_retention_campaigns", "status"),
         Index("idx_target_segment", "target_segment"),
     )
 
@@ -201,7 +200,7 @@ class ABTest(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_status", "status"),
+        Index("idx_status_ab_tests", "status"),
         Index("idx_name", "name"),
     )
 
@@ -220,7 +219,7 @@ class ABTestVariant(Base):
 
     __table_args__ = (
         Index("idx_ab_test_id", "ab_test_id"),
-        Index("idx_user_id", "user_id"),
+        Index("idx_user_id_ab_test_variants", "user_id"),
         Index("idx_variant", "variant"),
     )
 
@@ -261,7 +260,7 @@ class UserCohort(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_name", "name"),
+        Index("idx_name_user_cohorts", "name"),
         Index("idx_cohort_type", "cohort_type"),
     )
 
@@ -277,7 +276,7 @@ class CohortMembership(Base):
     __table_args__ = (
         UniqueConstraint("cohort_id", "user_id", name="uq_cohort_user"),
         Index("idx_cohort_id", "cohort_id"),
-        Index("idx_user_id", "user_id"),
+        Index("idx_user_id_cohort_memberships", "user_id"),
     )
 
 
@@ -301,7 +300,7 @@ class PredictionModel(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_name", "name"),
+        Index("idx_name_prediction_models", "name"),
         Index("idx_model_type", "model_type"),
         Index("idx_deployed", "deployed"),
     )
@@ -321,7 +320,147 @@ class UserPrediction(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_user_id", "user_id"),
+        Index("idx_user_id_user_predictions", "user_id"),
         Index("idx_model_id", "model_id"),
         Index("idx_prediction_score", "prediction_score"),
     )
+
+
+# ==================== SHARING, STORAGE, MEDIA & ENGAGEMENT ====================
+
+
+class PermissionLevel(str, enum.Enum):
+    NONE = "none"
+    READ = "read"
+    COMMENT = "comment"
+    EDIT = "edit"
+    ADMIN = "admin"
+
+
+class ShareLink(Base):
+    """Shareable access link for a content resource"""
+    __tablename__ = "share_links"
+
+    id = Column(Integer, primary_key=True, index=True)
+    resource_type = Column(String(50), nullable=False, index=True)
+    resource_id = Column(Integer, nullable=False, index=True)
+    token = Column(String(64), unique=True, nullable=False, index=True)
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    permission_level = Column(Enum(PermissionLevel, native_enum=False, length=20), nullable=False, default=PermissionLevel.READ)
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    access_count = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class StorageProvider(str, enum.Enum):
+    LOCAL = "local"
+    S3 = "s3"
+    GCS = "gcs"
+    AZURE = "azure"
+
+
+class StorageFile(Base):
+    """A stored file owned by a user"""
+    __tablename__ = "storage_files"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    filename = Column(String(255), nullable=False)
+    storage_path = Column(String(1000), nullable=False)
+    storage_provider = Column(Enum(StorageProvider, native_enum=False, length=20), nullable=False, default=StorageProvider.LOCAL)
+    mime_type = Column(String(255), nullable=True)
+    size_bytes = Column(Integer, nullable=False, default=0)
+    checksum_sha256 = Column(String(64), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class CDNUrl(Base):
+    """Signed CDN URL for a stored file"""
+    __tablename__ = "cdn_urls"
+
+    id = Column(Integer, primary_key=True, index=True)
+    storage_file_id = Column(Integer, ForeignKey("storage_files.id", ondelete="CASCADE"), nullable=False, index=True)
+    url = Column(String(1000), nullable=False)
+    region = Column(String(50), nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class VideoQualityLevel(str, enum.Enum):
+    Q_480P = "480p"
+    Q_720P = "720p"
+    Q_1080P = "1080p"
+    Q_2160P = "2160p"
+
+
+class ProcessingStatus(str, enum.Enum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class VideoProcess(Base):
+    """Transcoding job for one quality level of a video"""
+    __tablename__ = "video_processes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    video_id = Column(Integer, ForeignKey("videos.id", ondelete="CASCADE"), nullable=False, index=True)
+    quality = Column(Enum(VideoQualityLevel, native_enum=False, length=20), nullable=False)
+    status = Column(Enum(ProcessingStatus, native_enum=False, length=20), nullable=False, default=ProcessingStatus.PENDING)
+    output_url = Column(String(1000), nullable=True)
+    error_message = Column(Text, nullable=True)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class Thumbnail(Base):
+    """Thumbnail image generated for a video"""
+    __tablename__ = "thumbnails"
+
+    id = Column(Integer, primary_key=True, index=True)
+    video_id = Column(Integer, ForeignKey("videos.id", ondelete="CASCADE"), nullable=False, index=True)
+    url = Column(String(1000), nullable=False)
+    width = Column(Integer, nullable=True)
+    height = Column(Integer, nullable=True)
+    is_default = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class Comment(Base):
+    """Threaded comment on a content item"""
+    __tablename__ = "comments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    content_id = Column(Integer, ForeignKey("contents.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    parent_id = Column(Integer, ForeignKey("comments.id", ondelete="CASCADE"), nullable=True, index=True)
+    body = Column(Text, nullable=False)
+    is_edited = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class ReactionType(str, enum.Enum):
+    LIKE = "like"
+    LOVE = "love"
+    LAUGH = "laugh"
+    WOW = "wow"
+    SAD = "sad"
+    ANGRY = "angry"
+
+
+class Reaction(Base):
+    """One reaction per user per content item"""
+    __tablename__ = "reactions"
+    __table_args__ = (UniqueConstraint("user_id", "content_id", name="uq_reactions_user_content"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    content_id = Column(Integer, ForeignKey("contents.id", ondelete="CASCADE"), nullable=False, index=True)
+    reaction_type = Column(Enum(ReactionType, native_enum=False, length=20), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

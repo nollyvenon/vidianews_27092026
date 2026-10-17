@@ -89,7 +89,7 @@ class GraphQLMutation(Base):
 # ==================== MODULE 43: WEBHOOKS ====================
 
 class Webhook(Base):
-    __tablename__ = "webhooks"
+    __tablename__ = "api_monitoring_webhooks"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     url = Column(String(500), nullable=False)
@@ -103,9 +103,9 @@ class Webhook(Base):
 
 
 class WebhookEvent(Base):
-    __tablename__ = "webhook_events"
+    __tablename__ = "api_monitoring_webhook_events"
     id = Column(Integer, primary_key=True, index=True)
-    webhook_id = Column(Integer, ForeignKey("webhooks.id", ondelete="CASCADE"), nullable=False, index=True)
+    webhook_id = Column(Integer, ForeignKey("api_monitoring_webhooks.id", ondelete="CASCADE"), nullable=False, index=True)
     event_type = Column(SQLEnum(EventType), nullable=False)
     payload = Column(JSON, nullable=False)
     sent_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
@@ -113,7 +113,7 @@ class WebhookEvent(Base):
     response_body = Column(Text, nullable=True)
     retry_count = Column(Integer, default=0)
 
-    webhook = relationship("Webhook", backref="events")
+    webhook = relationship("app.models.api_monitoring.Webhook", backref="events")
 
 
 # ==================== MODULE 44: TESTING ====================

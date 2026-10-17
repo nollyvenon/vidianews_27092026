@@ -3,11 +3,10 @@ from sqlalchemy import (
     Enum, UniqueConstraint, Index, JSON, ARRAY, func, Numeric, BigInteger
 )
 from sqlalchemy.orm import relationship
-from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 import enum
 
-Base = declarative_base()
+from app.db.base import Base
 
 
 class InteractionType(str, enum.Enum):
@@ -50,19 +49,19 @@ class UserInteraction(Base):
     target_id = Column(Integer, nullable=False)
     target_type = Column(String(50), nullable=False)
     content = Column(Text)
-    metadata = Column(JSON, default={})
+    extra_metadata = Column("metadata", JSON, default={})
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_user_id", "user_id"),
+        Index("idx_user_id_user_interactions", "user_id"),
         Index("idx_interaction_type", "interaction_type"),
         Index("idx_target_id", "target_id"),
-        Index("idx_created_at", "created_at"),
+        Index("idx_created_at_user_interactions", "created_at"),
     )
 
 
 class UserFollow(Base):
-    __tablename__ = "user_follows"
+    __tablename__ = "platform_user_follows"
 
     id = Column(Integer, primary_key=True)
     follower_id = Column(Integer, nullable=False)
@@ -90,8 +89,8 @@ class ContentComment(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_content_id", "content_id"),
-        Index("idx_user_id", "user_id"),
+        Index("idx_content_id_content_comments", "content_id"),
+        Index("idx_user_id_content_comments", "user_id"),
         Index("idx_parent_comment_id", "parent_comment_id"),
     )
 
@@ -112,7 +111,7 @@ class UserMessage(Base):
     __table_args__ = (
         Index("idx_sender_id", "sender_id"),
         Index("idx_recipient_id", "recipient_id"),
-        Index("idx_read", "read"),
+        Index("idx_read_user_messages", "read"),
     )
 
 
@@ -126,12 +125,12 @@ class SearchIndex(Base):
     description = Column(Text)
     keywords = Column(ARRAY(String), default=[])
     embedding_vector = Column(ARRAY(Float))
-    metadata = Column(JSON, default={})
+    extra_metadata = Column("metadata", JSON, default={})
     indexed_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
         Index("idx_index_type", "index_type"),
-        Index("idx_target_id", "target_id"),
+        Index("idx_target_id_search_indexes", "target_id"),
         Index("idx_keywords", "keywords"),
     )
 
@@ -148,7 +147,7 @@ class SavedSearch(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_user_id", "user_id"),
+        Index("idx_user_id_saved_searches", "user_id"),
     )
 
 
@@ -167,7 +166,7 @@ class PushNotificationConfig(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_user_id", "user_id"),
+        Index("idx_user_id_push_notification_configs", "user_id"),
         Index("idx_device_token", "device_token"),
     )
 
@@ -187,9 +186,9 @@ class PushNotificationLog(Base):
     status = Column(String(50), default="sent")
 
     __table_args__ = (
-        Index("idx_user_id", "user_id"),
-        Index("idx_notification_type", "notification_type"),
-        Index("idx_status", "status"),
+        Index("idx_user_id_push_notification_logs", "user_id"),
+        Index("idx_notification_type_push_notification_logs", "notification_type"),
+        Index("idx_status_push_notification_logs", "status"),
     )
 
 
@@ -203,8 +202,8 @@ class AdminUser(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_user_id", "user_id"),
-        Index("idx_role", "role"),
+        Index("idx_user_id_admin_users", "user_id"),
+        Index("idx_role_admin_users", "role"),
     )
 
 
@@ -223,7 +222,7 @@ class AdminActionLog(Base):
     __table_args__ = (
         Index("idx_admin_id", "admin_id"),
         Index("idx_action_type", "action_type"),
-        Index("idx_created_at", "created_at"),
+        Index("idx_created_at_admin_action_logs", "created_at"),
     )
 
 
@@ -242,8 +241,8 @@ class SystemNotification(Base):
     expires_at = Column(DateTime)
 
     __table_args__ = (
-        Index("idx_severity", "severity"),
-        Index("idx_created_at", "created_at"),
+        Index("idx_severity_system_notifications", "severity"),
+        Index("idx_created_at_system_notifications", "created_at"),
     )
 
 
@@ -260,5 +259,23 @@ class PlatformStatistics(Base):
     measured_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_measured_at", "measured_at"),
+        Index("idx_measured_at_platform_statistics", "measured_at"),
     )
+
+
+# ==================== SOCIAL & NOTIFICATION ENUMS ====================
+
+
+class SocialFeature(str, enum.Enum):
+    FOLLOW = "follow"
+    COMMENT = "comment"
+    LIKE = "like"
+    SHARE = "share"
+    MESSAGE = "message"
+
+
+class NotificationStatus(str, enum.Enum):
+    PENDING = "pending"
+    SENT = "sent"
+    FAILED = "failed"
+    READ = "read"

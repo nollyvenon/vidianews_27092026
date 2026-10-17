@@ -1,13 +1,13 @@
 from sqlalchemy import (
     Column, Integer, String, DateTime, Boolean, Float, Text, ForeignKey,
-    Enum, UniqueConstraint, Index, JSON, ARRAY, func, Numeric
+    Enum, UniqueConstraint, Index, JSON, func, Numeric
 )
 from sqlalchemy.orm import relationship
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.dialects.postgresql import ARRAY
 from datetime import datetime
 import enum
 
-Base = declarative_base()
+from app.db.base import Base
 
 
 class ReportType(str, enum.Enum):
@@ -35,7 +35,7 @@ class AnalyticsReport(Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(String(255), nullable=False)
-    report_type = Column(Enum(ReportType), nullable=False)
+    report_type = Column(Enum(ReportType, name="analytics_report_type"), nullable=False)
     period_start = Column(DateTime, nullable=False)
     period_end = Column(DateTime, nullable=False)
     total_pageviews = Column(Integer, default=0)
@@ -138,7 +138,7 @@ class SearchIndex(Base):
 
 
 class SearchQuery(Base):
-    __tablename__ = "search_queries"
+    __tablename__ = "analytics_search_queries"
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer)
@@ -156,7 +156,7 @@ class SearchQuery(Base):
 
 
 class CacheEntry(Base):
-    __tablename__ = "cache_entries"
+    __tablename__ = "analytics_cache_entries"
 
     id = Column(Integer, primary_key=True)
     key = Column(String(512), nullable=False, unique=True)
@@ -168,7 +168,7 @@ class CacheEntry(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_cache_key", "key"),
+        Index("idx_cache_key_analytics_cache_entries", "key"),
         Index("idx_cache_level", "cache_level"),
         Index("idx_cache_last_accessed", "last_accessed"),
     )
@@ -201,7 +201,7 @@ class SystemLog(Base):
     level = Column(String(20), nullable=False)  # INFO, WARNING, ERROR, CRITICAL
     component = Column(String(100), nullable=False)
     message = Column(Text, nullable=False)
-    metadata = Column(JSON, default={})
+    extra_metadata = Column("metadata", JSON, default={})
     timestamp = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
@@ -225,7 +225,7 @@ class AdminAuditLog(Base):
 
     __table_args__ = (
         Index("idx_audit_admin", "admin_id"),
-        Index("idx_audit_action", "action"),
+        Index("idx_audit_action_admin_audit_logs", "action"),
         Index("idx_audit_resource_type", "resource_type"),
         Index("idx_audit_timestamp", "timestamp"),
     )
@@ -266,7 +266,7 @@ class ConfigurationSetting(Base):
 
 
 class FeatureFlag(Base):
-    __tablename__ = "feature_flags"
+    __tablename__ = "analytics_feature_flags"
 
     id = Column(Integer, primary_key=True)
     name = Column(String(255), nullable=False, unique=True)
@@ -281,3 +281,62 @@ class FeatureFlag(Base):
         Index("idx_feature_flag_name", "name"),
         Index("idx_feature_flag_enabled", "enabled"),
     )
+
+
+# ==================== CUSTOM REPORTING & TRACKING ====================
+
+
+class VisualizationType(str, enum.Enum):
+    BAR = "bar"
+    LINE = "line"
+    PIE = "pie"
+    HEATMAP = "heatmap"
+    TABLE = "table"
+
+
+class TrackingPixel(Base):
+    """Tracking pixel issued for an external destination"""
+    __tablename__ = "tracking_pixels"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    pixel_key = Column(String(64), unique=True, nullable=False, index=True)
+    destination_url = Column(String(1000), nullable=True)
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ConversionFunnel(Base):
+    """Ordered funnel steps used for conversion analysis"""
+    __tablename__ = "conversion_funnels"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False, index=True)
+    steps = Column(JSON, default=list)
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class CustomReport(Base):
+    """User-defined analytics report"""
+    __tablename__ = "custom_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False, index=True)
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    query_config = Column(JSON, default=dict)
+    visualization = Column(Enum(VisualizationType, native_enum=False, length=20), nullable=False, default=VisualizationType.TABLE)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class DataVisualization(Base):
+    """Chart configuration attached to a custom report"""
+    __tablename__ = "data_visualizations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    report_id = Column(Integer, ForeignKey("custom_reports.id", ondelete="CASCADE"), nullable=False, index=True)
+    chart_config = Column(JSON, default=dict)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

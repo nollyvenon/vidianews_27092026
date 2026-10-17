@@ -78,7 +78,7 @@ class Badge(Base):
 
 
 class UserBadge(Base):
-    __tablename__ = "user_badges"
+    __tablename__ = "community_user_badges"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     badge_id = Column(Integer, ForeignKey("badges.id", ondelete="CASCADE"), nullable=False)
@@ -104,7 +104,7 @@ class Leaderboard(Base):
 # ==================== MODULE 63: REPORTS & EXPORTS ====================
 
 class Report(Base):
-    __tablename__ = "reports"
+    __tablename__ = "community_reports"
     id = Column(Integer, primary_key=True, index=True)
     creator_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     report_type = Column(SQLEnum(ReportType), nullable=False)
@@ -118,7 +118,7 @@ class Report(Base):
 
 
 class DataExport(Base):
-    __tablename__ = "data_exports"
+    __tablename__ = "community_data_exports"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     export_type = Column(String(100), nullable=False)
@@ -157,7 +157,7 @@ class UserCompliance(Base):
 
 
 class AuditLog(Base):
-    __tablename__ = "audit_logs"
+    __tablename__ = "community_audit_logs"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     action = Column(String(255), nullable=False)

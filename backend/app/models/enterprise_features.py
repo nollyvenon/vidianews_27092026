@@ -3,11 +3,10 @@ from sqlalchemy import (
     Enum, UniqueConstraint, Index, JSON, ARRAY, func, Numeric, BigInteger
 )
 from sqlalchemy.orm import relationship
-from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 import enum
 
-Base = declarative_base()
+from app.db.base import Base
 
 
 class AccessLevel(str, enum.Enum):
@@ -64,9 +63,9 @@ class SecurityAuditLog(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_user_id", "user_id"),
+        Index("idx_user_id_security_audit_logs", "user_id"),
         Index("idx_action", "action"),
-        Index("idx_created_at", "created_at"),
+        Index("idx_created_at_security_audit_logs", "created_at"),
         Index("idx_severity", "severity"),
     )
 
@@ -87,7 +86,7 @@ class AccessControl(Base):
 
     __table_args__ = (
         UniqueConstraint("user_id", "resource_type", "resource_id", name="uq_access"),
-        Index("idx_user_id", "user_id"),
+        Index("idx_user_id_access_controls", "user_id"),
         Index("idx_resource", "resource_type", "resource_id"),
     )
 
@@ -108,7 +107,7 @@ class RoleBasedAccess(Base):
     updated_at = Column(DateTime, onupdate=func.now())
 
     __table_args__ = (
-        Index("idx_user_id", "user_id"),
+        Index("idx_user_id_role_based_access", "user_id"),
         Index("idx_role", "role"),
     )
 
@@ -130,8 +129,8 @@ class ModerationQueue(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_status", "status"),
-        Index("idx_content_id", "content_id"),
+        Index("idx_status_moderation_queues", "status"),
+        Index("idx_content_id_moderation_queues", "content_id"),
         Index("idx_assigned_to", "assigned_to"),
         Index("idx_confidence_score", "confidence_score"),
     )
@@ -152,8 +151,8 @@ class ComplianceRule(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_name", "name"),
-        Index("idx_enabled", "enabled"),
+        Index("idx_name_compliance_rules", "name"),
+        Index("idx_enabled_compliance_rules", "enabled"),
     )
 
 
@@ -172,9 +171,9 @@ class RateLimitConfig(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_user_id", "user_id"),
+        Index("idx_user_id_rate_limit_configs", "user_id"),
         Index("idx_ip_address", "ip_address"),
-        Index("idx_endpoint", "endpoint"),
+        Index("idx_endpoint_rate_limit_configs", "endpoint"),
     )
 
 
@@ -190,14 +189,14 @@ class ThrottleLog(Base):
     throttled_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_user_id", "user_id"),
-        Index("idx_ip_address", "ip_address"),
+        Index("idx_user_id_throttle_logs", "user_id"),
+        Index("idx_ip_address_throttle_logs", "ip_address"),
         Index("idx_throttled_at", "throttled_at"),
     )
 
 
 class NotificationPreference(Base):
-    __tablename__ = "notification_preferences"
+    __tablename__ = "enterprise_notification_preferences"
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, nullable=False, unique=True)
@@ -211,7 +210,7 @@ class NotificationPreference(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_user_id", "user_id"),
+        Index("idx_user_id_enterprise_notification_preferences", "user_id"),
     )
 
 
@@ -231,10 +230,10 @@ class RealTimeNotification(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_user_id", "user_id"),
+        Index("idx_user_id_real_time_notifications", "user_id"),
         Index("idx_notification_type", "notification_type"),
         Index("idx_read", "read"),
-        Index("idx_created_at", "created_at"),
+        Index("idx_created_at_real_time_notifications", "created_at"),
     )
 
 
@@ -251,7 +250,7 @@ class AlertConfiguration(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_user_id", "user_id"),
+        Index("idx_user_id_alert_configurations", "user_id"),
         Index("idx_alert_type", "alert_type"),
     )
 
@@ -274,9 +273,9 @@ class AdvancedReport(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_user_id", "user_id"),
+        Index("idx_user_id_advanced_reports", "user_id"),
         Index("idx_report_type", "report_type"),
-        Index("idx_status", "status"),
+        Index("idx_status_advanced_reports", "status"),
     )
 
 
@@ -293,8 +292,8 @@ class ReportTemplate(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_name", "name"),
-        Index("idx_report_type", "report_type"),
+        Index("idx_name_report_templates", "name"),
+        Index("idx_report_type_report_templates", "report_type"),
     )
 
 
@@ -313,8 +312,8 @@ class ReportSchedule(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_user_id", "user_id"),
-        Index("idx_enabled", "enabled"),
+        Index("idx_user_id_report_schedules", "user_id"),
+        Index("idx_enabled_report_schedules", "enabled"),
     )
 
 
@@ -335,7 +334,74 @@ class ExportJob(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_user_id", "user_id"),
-        Index("idx_status", "status"),
+        Index("idx_user_id_export_jobs", "user_id"),
+        Index("idx_status_export_jobs", "status"),
         Index("idx_export_type", "export_type"),
     )
+
+
+# ==================== SECURITY, MODERATION & RATE LIMITS ====================
+
+
+class SecurityLevel(str, enum.Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+class ModerationAction(str, enum.Enum):
+    WARN = "warn"
+    HIDE = "hide"
+    REMOVE = "remove"
+    SUSPEND = "suspend"
+    BAN = "ban"
+
+
+class SecurityPolicy(Base):
+    """Named security policy with its configuration"""
+    __tablename__ = "security_policies"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), unique=True, nullable=False, index=True)
+    description = Column(Text, nullable=True)
+    level = Column(Enum(SecurityLevel, native_enum=False, length=20), nullable=False, default=SecurityLevel.MEDIUM)
+    policy_config = Column(JSON, default=dict)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class ModerationRule(Base):
+    """Pattern-based moderation rule and the action it triggers"""
+    __tablename__ = "moderation_rules"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False, index=True)
+    pattern = Column(Text, nullable=False)
+    action = Column(Enum(ModerationAction, native_enum=False, length=20), nullable=False, default=ModerationAction.WARN)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class RateLimiterConfig(Base):
+    """Per-endpoint rate limit"""
+    __tablename__ = "rate_limiter_configs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    endpoint = Column(String(255), unique=True, nullable=False, index=True)
+    requests_per_window = Column(Integer, nullable=False)
+    window_seconds = Column(Integer, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+
+
+class NotificationConfig(Base):
+    """Configuration for a notification channel"""
+    __tablename__ = "notification_configs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    channel = Column(String(50), unique=True, nullable=False, index=True)
+    config = Column(JSON, default=dict)
+    is_enabled = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

@@ -87,7 +87,7 @@ class NotificationPreference(Base):
 
 class PrivacySetting(Base):
     """User privacy settings"""
-    __tablename__ = "privacy_settings"
+    __tablename__ = "settings_privacy_settings"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)

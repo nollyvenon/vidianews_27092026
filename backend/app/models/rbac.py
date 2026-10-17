@@ -10,17 +10,17 @@ from app.db.base import Base
 role_permissions = Table(
     "role_permissions",
     Base.metadata,
-    Column("role_id", Integer, ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True),
+    Column("role_id", Integer, ForeignKey("rbac_roles.id", ondelete="CASCADE"), primary_key=True),
     Column("permission_id", Integer, ForeignKey("permissions.id", ondelete="CASCADE"), primary_key=True),
     Index("idx_role_id", "role_id"),
     Index("idx_permission_id", "permission_id"),
 )
 
 user_roles = Table(
-    "user_roles",
+    "rbac_user_roles",
     Base.metadata,
     Column("user_id", Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
-    Column("role_id", Integer, ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True),
+    Column("role_id", Integer, ForeignKey("rbac_roles.id", ondelete="CASCADE"), primary_key=True),
     Index("idx_user_id_role", "user_id"),
     Index("idx_role_id_user", "role_id"),
 )
@@ -39,7 +39,7 @@ class Permission(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
-    roles = relationship("Role", secondary=role_permissions, back_populates="permissions")
+    roles = relationship("app.models.rbac.Role", secondary=role_permissions, back_populates="permissions")
 
     __table_args__ = (
         Index("idx_resource_action", "resource", "action"),
@@ -48,7 +48,7 @@ class Permission(Base):
 
 class Role(Base):
     """Role model - groups permissions together"""
-    __tablename__ = "roles"
+    __tablename__ = "rbac_roles"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), unique=True, nullable=False, index=True)
@@ -59,7 +59,7 @@ class Role(Base):
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     permissions = relationship("Permission", secondary=role_permissions, back_populates="roles")
-    users = relationship("User", secondary=user_roles, back_populates="roles")
+    users = relationship("User", secondary=user_roles, backref="rbac_roles")
 
 
 class ResourcePermission(Base):
@@ -76,14 +76,14 @@ class ResourcePermission(Base):
     expires_at = Column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
-        Index("idx_resource", "resource_type", "resource_id"),
+        Index("idx_resource_resource_permissions", "resource_type", "resource_id"),
         Index("idx_user_resource", "user_id", "resource_type", "resource_id"),
     )
 
 
 class AuditLog(Base):
     """Audit log for permission changes"""
-    __tablename__ = "audit_logs"
+    __tablename__ = "rbac_audit_logs"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)

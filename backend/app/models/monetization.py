@@ -37,7 +37,7 @@ class NotificationChannel(str, enum.Enum):
 # ==================== MODULE 31: REAL-TIME UPDATES ====================
 
 class WebSocketConnection(Base):
-    __tablename__ = "websocket_connections"
+    __tablename__ = "monetization_websocket_connections"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     connection_id = Column(String(255), nullable=False, unique=True)
@@ -49,7 +49,7 @@ class WebSocketConnection(Base):
 
 
 class RealtimeEvent(Base):
-    __tablename__ = "realtime_events"
+    __tablename__ = "monetization_realtime_events"
     id = Column(Integer, primary_key=True, index=True)
     event_type = Column(String(100), nullable=False, index=True)
     channel = Column(String(100), nullable=False, index=True)
@@ -164,13 +164,13 @@ class DataExport(Base):
     status = Column(String(50), default="processing")
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
-    user = relationship("User", backref="data_exports")
+    user = relationship("User", backref="monetization_data_exports")
 
 
 # ==================== MODULE 35: EMAIL CAMPAIGNS ====================
 
 class EmailCampaign(Base):
-    __tablename__ = "email_campaigns"
+    __tablename__ = "monetization_email_campaigns"
     id = Column(Integer, primary_key=True, index=True)
     creator_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(255), nullable=False)
@@ -189,7 +189,7 @@ class EmailCampaign(Base):
 class CampaignMetric(Base):
     __tablename__ = "campaign_metrics"
     id = Column(Integer, primary_key=True, index=True)
-    campaign_id = Column(Integer, ForeignKey("email_campaigns.id", ondelete="CASCADE"), nullable=False)
+    campaign_id = Column(Integer, ForeignKey("monetization_email_campaigns.id", ondelete="CASCADE"), nullable=False)
     sent = Column(Integer, default=0)
     opened = Column(Integer, default=0)
     clicked = Column(Integer, default=0)
@@ -197,4 +197,4 @@ class CampaignMetric(Base):
     unsubscribed = Column(Integer, default=0)
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
-    campaign = relationship("EmailCampaign", backref="metrics")
+    campaign = relationship("app.models.monetization.EmailCampaign", backref="metrics")

@@ -45,7 +45,7 @@ class AuditAction(str, enum.Enum):
 # ==================== MODULE 21: ADVANCED ANALYTICS ====================
 
 class AnalyticsReport(Base):
-    __tablename__ = "analytics_reports"
+    __tablename__ = "integration_analytics_reports"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -133,13 +133,13 @@ class WebhookEvent(Base):
     attempts = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
-    webhook = relationship("Webhook", backref="events")
+    webhook = relationship("app.models.integrations.Webhook", backref="events")
 
 
 # ==================== MODULE 23: NOTIFICATIONS ====================
 
 class NotificationPreference(Base):
-    __tablename__ = "notification_preferences"
+    __tablename__ = "integration_notification_preferences"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
     email_enabled = Column(Boolean, default=True)
@@ -152,7 +152,7 @@ class NotificationPreference(Base):
 
 
 class Notification(Base):
-    __tablename__ = "notifications"
+    __tablename__ = "integration_notifications"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     notification_type = Column(SQLEnum(NotificationType), nullable=False, index=True)
@@ -203,7 +203,7 @@ class ComplianceReport(Base):
 # ==================== MODULE 25: SEARCH & DISCOVERY ====================
 
 class SearchIndex(Base):
-    __tablename__ = "search_indexes"
+    __tablename__ = "integration_search_indexes"
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
     resource_type = Column(String(100), nullable=False, index=True)

@@ -3,11 +3,10 @@ from sqlalchemy import (
     Enum, UniqueConstraint, Index, JSON, ARRAY, func
 )
 from sqlalchemy.orm import relationship
-from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 import enum
 
-Base = declarative_base()
+from app.db.base import Base
 
 
 class UserSegmentType(str, enum.Enum):
@@ -38,7 +37,7 @@ class CampaignStatus(str, enum.Enum):
 
 
 class EmailTemplate(Base):
-    __tablename__ = "email_templates"
+    __tablename__ = "user_management_email_templates"
 
     id = Column(Integer, primary_key=True)
     name = Column(String(255), nullable=False, unique=True)
@@ -54,11 +53,11 @@ class EmailTemplate(Base):
 
 
 class EmailCampaign(Base):
-    __tablename__ = "email_campaigns"
+    __tablename__ = "user_management_email_campaigns"
 
     id = Column(Integer, primary_key=True)
     name = Column(String(255), nullable=False)
-    template_id = Column(Integer, ForeignKey("email_templates.id"), nullable=False)
+    template_id = Column(Integer, ForeignKey("user_management_email_templates.id"), nullable=False)
     subject = Column(String(255), nullable=False)
     from_email = Column(String(255), nullable=False)
     recipient_count = Column(Integer, default=0)
@@ -84,7 +83,7 @@ class CampaignRecipient(Base):
     __tablename__ = "campaign_recipients"
 
     id = Column(Integer, primary_key=True)
-    campaign_id = Column(Integer, ForeignKey("email_campaigns.id"), nullable=False)
+    campaign_id = Column(Integer, ForeignKey("user_management_email_campaigns.id"), nullable=False)
     user_id = Column(Integer, nullable=False)
     email = Column(String(255), nullable=False)
     status = Column(String(50), default="pending")  # pending, sent, opened, clicked, bounced
@@ -128,7 +127,7 @@ class UserSegmentMembership(Base):
 
     __table_args__ = (
         UniqueConstraint("segment_id", "user_id", name="uq_segment_user"),
-        Index("idx_segment_membership_segment", "segment_id"),
+        Index("idx_segment_membership_segment_user_segment_memberships", "segment_id"),
         Index("idx_segment_membership_user", "user_id"),
     )
 
@@ -153,7 +152,7 @@ class UserPreferenceProfile(Base):
 
 
 class NotificationLog(Base):
-    __tablename__ = "notification_logs"
+    __tablename__ = "user_management_notification_logs"
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, nullable=False)
@@ -205,7 +204,7 @@ class SubscriberActivity(Base):
     subscriber_id = Column(Integer, ForeignKey("subscriber_profiles.id"), nullable=False)
     activity_type = Column(String(50), nullable=False)  # login, read, share, comment, subscribe
     content_id = Column(Integer)
-    metadata = Column(JSON, default={})
+    extra_metadata = Column("metadata", JSON, default={})
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
@@ -277,7 +276,7 @@ class WebhookLog(Base):
 
 
 class APIKey(Base):
-    __tablename__ = "api_keys"
+    __tablename__ = "user_management_api_keys"
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, nullable=False)
@@ -312,3 +311,39 @@ class PersonalizationProfile(Base):
     __table_args__ = (
         Index("idx_personalization_user_id", "user_id"),
     )
+
+
+# ==================== SUBSCRIBERS & PREFERENCES ====================
+
+
+class SegmentType(str, enum.Enum):
+    STATIC = "static"
+    DYNAMIC = "dynamic"
+    BEHAVIORAL = "behavioral"
+
+
+class SubscriberList(Base):
+    """Named list of subscribers used for campaigns"""
+    __tablename__ = "subscriber_lists"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False, index=True)
+    description = Column(Text, nullable=True)
+    segment_type = Column(Enum(SegmentType, native_enum=False, length=20), nullable=False, default=SegmentType.STATIC)
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class PreferenceCenter(Base):
+    """Per-user communication preferences"""
+    __tablename__ = "preference_centers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False, index=True)
+    email_opt_in = Column(Boolean, default=True, nullable=False)
+    sms_opt_in = Column(Boolean, default=False, nullable=False)
+    push_opt_in = Column(Boolean, default=True, nullable=False)
+    frequency = Column(String(20), default="daily", nullable=False)
+    preferences = Column(JSON, default=dict)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

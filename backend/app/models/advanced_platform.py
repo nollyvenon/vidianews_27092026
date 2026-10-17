@@ -3,11 +3,10 @@ from sqlalchemy import (
     Enum, UniqueConstraint, Index, JSON, ARRAY, func, Numeric, BigInteger
 )
 from sqlalchemy.orm import relationship
-from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 import enum
 
-Base = declarative_base()
+from app.db.base import Base
 
 
 class WebSocketConnectionStatus(str, enum.Enum):
@@ -62,9 +61,9 @@ class WebSocketConnection(Base):
     disconnected_at = Column(DateTime)
 
     __table_args__ = (
-        Index("idx_user_id", "user_id"),
+        Index("idx_user_id_websocket_connections", "user_id"),
         Index("idx_connection_id", "connection_id"),
-        Index("idx_status", "status"),
+        Index("idx_status_websocket_connections", "status"),
     )
 
 
@@ -85,8 +84,8 @@ class RealtimeEvent(Base):
 
     __table_args__ = (
         Index("idx_event_type", "event_type"),
-        Index("idx_status", "status"),
-        Index("idx_created_at", "created_at"),
+        Index("idx_status_realtime_events", "status"),
+        Index("idx_created_at_realtime_events", "created_at"),
     )
 
 
@@ -110,8 +109,8 @@ class BackgroundJob(Base):
 
     __table_args__ = (
         Index("idx_job_type", "job_type"),
-        Index("idx_status", "status"),
-        Index("idx_user_id", "user_id"),
+        Index("idx_status_background_jobs", "status"),
+        Index("idx_user_id_background_jobs", "user_id"),
         Index("idx_priority", "priority"),
         Index("idx_scheduled_at", "scheduled_at"),
     )
@@ -131,7 +130,7 @@ class JobSchedule(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_job_type", "job_type"),
+        Index("idx_job_type_job_schedules", "job_type"),
         Index("idx_enabled", "enabled"),
     )
 
@@ -155,8 +154,8 @@ class DataPipeline(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_name", "name"),
-        Index("idx_status", "status"),
+        Index("idx_name_data_pipelines", "name"),
+        Index("idx_status_data_pipelines", "status"),
         Index("idx_is_active", "is_active"),
     )
 
@@ -176,7 +175,7 @@ class PipelineExecution(Base):
 
     __table_args__ = (
         Index("idx_pipeline_id", "pipeline_id"),
-        Index("idx_status", "status"),
+        Index("idx_status_pipeline_executions", "status"),
         Index("idx_started_at", "started_at"),
     )
 
@@ -194,7 +193,7 @@ class PipelineStage(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index("idx_pipeline_id", "pipeline_id"),
+        Index("idx_pipeline_id_pipeline_stages", "pipeline_id"),
         Index("idx_stage_order", "stage_order"),
     )
 
@@ -253,7 +252,7 @@ class APIDocumentation(Base):
     updated_at = Column(DateTime, onupdate=func.now())
 
     __table_args__ = (
-        Index("idx_name", "name"),
+        Index("idx_name_api_documentations", "name"),
         Index("idx_format", "format"),
     )
 
@@ -295,5 +294,22 @@ class APIUsageMetrics(Base):
 
     __table_args__ = (
         Index("idx_endpoint", "endpoint"),
-        Index("idx_measured_at", "measured_at"),
+        Index("idx_measured_at_api_usage_metrics", "measured_at"),
     )
+
+
+# ==================== REAL-TIME SESSIONS ====================
+
+
+class WebSocketSession(Base):
+    """Live WebSocket connection tracked for a user"""
+    __tablename__ = "websocket_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    connection_id = Column(String(64), unique=True, nullable=False, index=True)
+    channel = Column(String(100), nullable=True)
+    connected_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_seen_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    disconnected_at = Column(DateTime(timezone=True), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
