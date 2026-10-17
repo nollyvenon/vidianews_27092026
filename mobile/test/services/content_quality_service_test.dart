@@ -3,8 +3,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:dio/dio.dart';
-import 'package:vidianews_content_quality/services/content_quality_service.dart';
-import 'package:vidianews_content_quality/models/content_quality_models.dart';
+import 'package:aether_cms/services/content_quality_service.dart';
 
 class MockDio extends Mock implements Dio {}
 

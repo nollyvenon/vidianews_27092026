@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Mock implementations
 class MockDio extends Mock implements Dio {}
@@ -33,7 +32,7 @@ void main() {
         )).thenAnswer((_) async => response);
 
         expect(response.statusCode, 201);
-        expect(response.data['title'], 'Test Article');
+        expect(response.data!['title'], 'Test Article');
       });
 
       test('handles network error when creating job', () async {
@@ -53,7 +52,6 @@ void main() {
 
       test('validates required fields before creation', () {
         final title = '';
-        final scheduledTime = DateTime.now();
         final channels = <String>[];
 
         expect(title.isEmpty, true);
@@ -77,8 +75,8 @@ void main() {
           data: any(named: 'data'),
         )).thenAnswer((_) async => response);
 
-        expect(response.data['channel_count'], 4);
-        expect(response.data['distribution_channels'], channels);
+        expect(response.data!['channel_count'], 4);
+        expect(response.data!['distribution_channels'], channels);
       });
 
       test('handles timezone correctly in scheduling', () {
@@ -109,8 +107,8 @@ void main() {
           data: any(named: 'data'),
         )).thenAnswer((_) async => response);
 
-        expect(response.data['action_type'], 'click');
-        expect(response.data['engagement_score'], 75.5);
+        expect(response.data!['action_type'], 'click');
+        expect(response.data!['engagement_score'], 75.5);
       });
 
       test('tracks multiple engagement types', () async {
@@ -123,7 +121,7 @@ void main() {
             requestOptions: RequestOptions(path: ''),
           );
 
-          expect(response.data['action_type'], action);
+          expect(response.data!['action_type'], action);
         }
       });
 
@@ -137,7 +135,7 @@ void main() {
             requestOptions: RequestOptions(path: ''),
           );
 
-          expect(response.data['device_type'], deviceType);
+          expect(response.data!['device_type'], deviceType);
         }
       });
 
@@ -174,8 +172,8 @@ void main() {
 
         when(() => mockDio.get(any())).thenAnswer((_) async => response);
 
-        expect(response.data['views'], 1000);
-        expect(response.data['ctr'], 15.0);
+        expect(response.data!['views'], 1000);
+        expect(response.data!['ctr'], 15.0);
       });
 
       test('calculates engagement metrics correctly', () {
@@ -205,7 +203,7 @@ void main() {
         );
 
         expect(response.statusCode, 404);
-        expect(response.data.isEmpty, true);
+        expect(response.data!.isEmpty, true);
       });
     });
 
@@ -228,8 +226,8 @@ void main() {
           data: any(named: 'data'),
         )).thenAnswer((_) async => response);
 
-        expect(response.data['name'], 'Homepage CTR Test');
-        expect(response.data['status'], 'active');
+        expect(response.data!['name'], 'Homepage CTR Test');
+        expect(response.data!['status'], 'active');
       });
 
       test('validates test hypothesis is provided', () {
@@ -247,7 +245,7 @@ void main() {
             requestOptions: RequestOptions(path: ''),
           );
 
-          expect(response.data['test_metric'], metric);
+          expect(response.data!['test_metric'], metric);
         }
       });
 
@@ -265,7 +263,7 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['variant_count'], greaterThanOrEqualTo(2));
+        expect(response.data!['variant_count'], greaterThanOrEqualTo(2));
       });
     });
 
@@ -286,7 +284,7 @@ void main() {
         )).thenAnswer((_) async => response);
 
         final recommendations =
-            List<int>.from(response.data['recommended_content_ids']);
+            List<int>.from(response.data!['recommended_content_ids'] as List);
         expect(recommendations.length, 5);
         expect(recommendations.contains(5), true);
       });
@@ -299,7 +297,7 @@ void main() {
         );
 
         final recommendations =
-            List<int>.from(response.data['recommended_content_ids']);
+            List<int>.from(response.data!['recommended_content_ids'] as List);
         expect(recommendations.isEmpty, true);
       });
 
@@ -320,7 +318,7 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['diversity_score'], greaterThan(0.8));
+        expect(response.data!['diversity_score'], greaterThan(0.8));
       });
 
       test('handles large user ID without error', () async {
@@ -331,7 +329,7 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['user_id'], userId);
+        expect(response.data!['user_id'], userId);
       });
     });
 
@@ -387,8 +385,8 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(createResponse.data['status'], 'active');
-        expect(performanceResponse.data['conversion_rate'], 4.8);
+        expect(createResponse.data!['status'], 'active');
+        expect(performanceResponse.data!['conversion_rate'], 4.8);
       });
 
       test('recommendation workflow: generate → track clicks → measure performance',
@@ -407,8 +405,8 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(genResponse.data['recommended_content_ids'].length, 5);
-        expect(clickResponse.data['clicked'], true);
+        expect((genResponse.data!['recommended_content_ids'] as List).length, 5);
+        expect(clickResponse.data!['clicked'], true);
       });
     });
 

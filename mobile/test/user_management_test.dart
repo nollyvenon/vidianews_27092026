@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:dio/dio.dart';
+import 'package:aether_cms/services/webhook_signature.dart';
 
 class MockDio extends Mock implements Dio {}
 
@@ -31,7 +32,7 @@ void main() {
           data: any(named: 'data'),
         )).thenAnswer((_) async => response);
 
-        expect(response.data['subscription_tier'], 'premium');
+        expect(response.data!['subscription_tier'], 'premium');
       });
 
       test('records subscriber activity correctly', () async {
@@ -45,7 +46,7 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['activity_type'], 'read');
+        expect(response.data!['activity_type'], 'read');
       });
 
       test('retrieves engagement score', () async {
@@ -55,7 +56,7 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['engagement_score'], 75.5);
+        expect(response.data!['engagement_score'], 75.5);
       });
 
       test('calculates churn risk score', () async {
@@ -65,7 +66,7 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        final risk = response.data['churn_risk_score'];
+        final risk = response.data!['churn_risk_score'] as num;
         expect(risk >= 0.0 && risk <= 1.0, true);
       });
 
@@ -79,7 +80,7 @@ void main() {
             requestOptions: RequestOptions(path: ''),
           );
 
-          expect(response.data['activity_type'], type);
+          expect(response.data!['activity_type'], type);
         }
       });
 
@@ -112,8 +113,8 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['name'], 'Weekly Newsletter');
-        expect(response.data['status'], 'draft');
+        expect(response.data!['name'], 'Weekly Newsletter');
+        expect(response.data!['status'], 'draft');
       });
 
       test('sends campaign with scheduling', () async {
@@ -128,7 +129,7 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['status'], 'scheduled');
+        expect(response.data!['status'], 'scheduled');
       });
 
       test('updates campaign metrics', () async {
@@ -142,8 +143,8 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['open_rate'], 25.5);
-        expect(response.data['click_rate'], 5.2);
+        expect(response.data!['open_rate'], 25.5);
+        expect(response.data!['click_rate'], 5.2);
       });
 
       test('retrieves campaign metrics', () async {
@@ -159,8 +160,8 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['recipient_count'], 1000);
-        expect(response.data['sent_count'], 950);
+        expect(response.data!['recipient_count'], 1000);
+        expect(response.data!['sent_count'], 950);
       });
 
       test('validates campaign before sending', () {
@@ -182,8 +183,8 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['name'], 'Premium Users');
-        expect(response.data['segment_type'], 'vip');
+        expect(response.data!['name'], 'Premium Users');
+        expect(response.data!['segment_type'], 'vip');
       });
 
       test('adds users to segment', () async {
@@ -196,7 +197,7 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['user_count'], 500);
+        expect(response.data!['user_count'], 500);
       });
 
       test('retrieves segment users', () async {
@@ -206,7 +207,7 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        final userIds = List<int>.from(response.data['user_ids']);
+        final userIds = List<int>.from(response.data!['user_ids'] as List);
         expect(userIds.length, 5);
       });
 
@@ -220,7 +221,7 @@ void main() {
             requestOptions: RequestOptions(path: ''),
           );
 
-          expect(response.data['segment_type'], type);
+          expect(response.data!['segment_type'], type);
         }
       });
 
@@ -234,7 +235,7 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['user_count'], 10000);
+        expect(response.data!['user_count'], 10000);
       });
     });
 
@@ -251,8 +252,8 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['channel'], 'email');
-        expect(response.data['status'], 'pending');
+        expect(response.data!['channel'], 'email');
+        expect(response.data!['status'], 'pending');
       });
 
       test('marks notification as read', () async {
@@ -265,7 +266,7 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['status'], 'read');
+        expect(response.data!['status'], 'read');
       });
 
       test('supports multiple notification channels', () async {
@@ -278,7 +279,7 @@ void main() {
             requestOptions: RequestOptions(path: ''),
           );
 
-          expect(response.data['channel'], channel);
+          expect(response.data!['channel'], channel);
         }
       });
 
@@ -292,7 +293,7 @@ void main() {
             requestOptions: RequestOptions(path: ''),
           );
 
-          expect(response.data['status'], isIn(statuses));
+          expect(response.data!['status'], isIn(statuses));
         }
       });
     });
@@ -309,8 +310,8 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['reading_level'], 'advanced');
-        expect(response.data['timezone'], 'America/New_York');
+        expect(response.data!['reading_level'], 'advanced');
+        expect(response.data!['timezone'], 'America/New_York');
       });
 
       test('updates user interests', () async {
@@ -323,7 +324,7 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['keyword_interests'].length, 3);
+        expect((response.data!['keyword_interests'] as List).length, 3);
       });
 
       test('calculates personalization score', () async {
@@ -336,7 +337,7 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        final score = response.data['personalization_score'];
+        final score = response.data!['personalization_score'] as num;
         expect(score >= 0.0 && score <= 100.0, true);
       });
 
@@ -350,7 +351,7 @@ void main() {
             requestOptions: RequestOptions(path: ''),
           );
 
-          expect(response.data['reading_level'], level);
+          expect(response.data!['reading_level'], level);
         }
       });
 
@@ -370,7 +371,7 @@ void main() {
             requestOptions: RequestOptions(path: ''),
           );
 
-          expect(response.data['timezone'], tz);
+          expect(response.data!['timezone'], tz);
         }
       });
     });
@@ -388,8 +389,8 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['name'], 'Production API Key');
-        expect(response.data['permissions'].length, 2);
+        expect(response.data!['name'], 'Production API Key');
+        expect((response.data!['permissions'] as List).length, 2);
       });
 
       test('validates API key', () async {
@@ -403,7 +404,7 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['user_id'], 1);
+        expect(response.data!['user_id'], 1);
       });
 
       test('rejects invalid API key', () async {
@@ -436,8 +437,8 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['name'], 'User Events Webhook');
-        expect(response.data['events'].length, 2);
+        expect(response.data!['name'], 'User Events Webhook');
+        expect((response.data!['events'] as List).length, 2);
       });
 
       test('triggers webhook with payload', () async {
@@ -451,15 +452,48 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['event_type'], 'user.created');
+        expect(response.data!['event_type'], 'user.created');
       });
 
-      test('validates webhook signature', () {
-        final payload = '{"test": "data"}';
-        final signature =
-            'a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6';
+      test('generates the HMAC-SHA256 signature the backend produces', () {
+        // Reference value computed with Python: hmac.new(key, payload, sha256).hexdigest()
+        const payload = '{"test": "data"}';
+        const secret = 'webhook-secret';
 
-        expect(signature.length, 56);
+        expect(
+          WebhookSignature.generate(payload, secret),
+          '9cd02d8db2c8f9f3f69a7b7d6401520d16adad2a6a2ece6b414ab1dd5f553fc9',
+        );
+      });
+
+      test('accepts a signature that matches the payload and secret', () {
+        const payload = '{"test": "data"}';
+        const secret = 'webhook-secret';
+        final signature = WebhookSignature.generate(payload, secret);
+
+        expect(WebhookSignature.verify(payload, signature, secret), isTrue);
+      });
+
+      test('rejects a tampered payload', () {
+        const secret = 'webhook-secret';
+        final signature = WebhookSignature.generate('{"test": "data"}', secret);
+
+        expect(WebhookSignature.verify('{"test": "evil"}', signature, secret), isFalse);
+      });
+
+      test('rejects a signature made with a different secret', () {
+        const payload = '{"test": "data"}';
+        final signature = WebhookSignature.generate(payload, 'other-secret');
+
+        expect(WebhookSignature.verify(payload, signature, 'webhook-secret'), isFalse);
+      });
+
+      test('rejects a truncated signature', () {
+        const payload = '{"test": "data"}';
+        const secret = 'webhook-secret';
+        final signature = WebhookSignature.generate(payload, secret);
+
+        expect(WebhookSignature.verify(payload, signature.substring(0, 52), secret), isFalse);
       });
     });
 
@@ -580,7 +614,7 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['user_count'], 1000);
+        expect(response.data!['user_count'], 1000);
       });
 
       test('processes large campaign with 100k recipients', () async {
@@ -593,7 +627,7 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['recipient_count'], 100000);
+        expect(response.data!['recipient_count'], 100000);
       });
 
       test('calculates metrics for 10k activities', () {

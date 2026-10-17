@@ -1,8 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mockito/mockito.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:dio/dio.dart';
 import '../lib/models/platform_completion_models.dart';
-import '../lib/services/platform_completion_service.dart';
 
 
 class MockDio extends Mock implements Dio {}
@@ -86,7 +85,7 @@ void main() {
         'index_type': 'content',
         'title': 'Test Title',
         'content': 'Test content',
-        'metadata': {},
+        'metadata': <String, dynamic>{},
         'created_at': '2026-09-27T10:00:00Z',
       };
 
@@ -102,7 +101,7 @@ void main() {
         'id': 1,
         'user_id': 1,
         'query': 'flutter',
-        'filters': {},
+        'filters': <String, dynamic>{},
         'result_count': 100,
         'created_at': '2026-09-27T10:00:00Z',
       };

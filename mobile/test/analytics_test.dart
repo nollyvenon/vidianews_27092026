@@ -34,8 +34,8 @@ void main() {
           data: any(named: 'data'),
         )).thenAnswer((_) async => response);
 
-        expect(response.data['name'], 'Daily Report');
-        expect(response.data['total_pageviews'], 5000);
+        expect(response.data!['name'], 'Daily Report');
+        expect(response.data!['total_pageviews'], 5000);
       });
 
       test('retrieves analytics report', () async {
@@ -52,7 +52,7 @@ void main() {
 
         when(() => mockDio.get(any())).thenAnswer((_) async => response);
 
-        expect(response.data['name'], 'Weekly Report');
+        expect(response.data!['name'], 'Weekly Report');
       });
 
       test('gets daily analytics', () async {
@@ -99,7 +99,7 @@ void main() {
         );
 
         expect((response.data as List).length, 2);
-        expect(response.data[0]['pageviews'], 5000);
+        expect(response.data![0]['pageviews'], 5000);
       });
     });
 
@@ -116,7 +116,7 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['event_type'], 'click');
+        expect(response.data!['event_type'], 'click');
       });
 
       test('records scroll event', () async {
@@ -131,7 +131,7 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['event_type'], 'scroll');
+        expect(response.data!['event_type'], 'scroll');
       });
 
       test('records hover event', () async {
@@ -146,7 +146,7 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['event_type'], 'hover');
+        expect(response.data!['event_type'], 'hover');
       });
 
       test('gets user behavior summary', () async {
@@ -161,8 +161,8 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['user_id'], 1);
-        expect(response.data['total_events'], 150);
+        expect(response.data!['user_id'], 1);
+        expect(response.data!['total_events'], 150);
       });
 
       test('retrieves user events', () async {
@@ -198,7 +198,7 @@ void main() {
             requestOptions: RequestOptions(path: ''),
           );
 
-          expect(response.data['event_type'], type);
+          expect(response.data!['event_type'], type);
         }
       });
 
@@ -214,8 +214,8 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['device_type'], 'mobile');
-        expect(response.data['browser'], 'Chrome');
+        expect(response.data!['device_type'], 'mobile');
+        expect(response.data!['browser'], 'Chrome');
       });
     });
 
@@ -231,8 +231,8 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['content_id'], 100);
-        expect(response.data['exit_rate'], 0.15);
+        expect(response.data!['content_id'], 100);
+        expect(response.data!['exit_rate'], 0.15);
       });
 
       test('retrieves heatmap data', () async {
@@ -247,8 +247,8 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['content_id'], 100);
-        expect(response.data['scroll_depth_percentiles']['25'], 80);
+        expect(response.data!['content_id'], 100);
+        expect((response.data!['scroll_depth_percentiles'] as Map<String, dynamic>)['25'], 80);
       });
     });
 
@@ -265,7 +265,7 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['title'], 'Test Article');
+        expect(response.data!['title'], 'Test Article');
       });
 
       test('searches content', () async {
@@ -287,7 +287,7 @@ void main() {
         );
 
         expect((response.data as List).length, 2);
-        expect(response.data[0]['relevance_score'], 0.95);
+        expect(response.data![0]['relevance_score'], 0.95);
       });
 
       test('gets trending searches', () async {
@@ -324,7 +324,7 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        final result = response.data[0];
+        final result = response.data![0] as Map<String, dynamic>;
         expect(result['relevance_score'] >= 0.0, true);
         expect(result['relevance_score'] <= 1.0, true);
       });
@@ -343,8 +343,8 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['key'], 'test_key');
-        expect(response.data['ttl_seconds'], 3600);
+        expect(response.data!['key'], 'test_key');
+        expect(response.data!['ttl_seconds'], 3600);
       });
 
       test('retrieves cache entry', () async {
@@ -359,8 +359,8 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['value'], 'test_value');
-        expect(response.data['hits'], 5);
+        expect(response.data!['value'], 'test_value');
+        expect(response.data!['hits'], 5);
       });
 
       test('gets cache statistics', () async {
@@ -377,8 +377,8 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['total_entries'], 1000);
-        expect(response.data['hit_rate'], 0.85);
+        expect(response.data!['total_entries'], 1000);
+        expect(response.data!['hit_rate'], 0.85);
       });
 
       test('supports different cache levels', () async {
@@ -391,7 +391,7 @@ void main() {
             requestOptions: RequestOptions(path: ''),
           );
 
-          expect(response.data['cache_level'], level);
+          expect(response.data!['cache_level'], level);
         }
       });
     });
@@ -410,8 +410,8 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['endpoint'], '/api/articles');
-        expect(response.data['response_time_ms'], 150);
+        expect(response.data!['endpoint'], '/api/articles');
+        expect(response.data!['response_time_ms'], 150);
       });
 
       test('gets endpoint statistics', () async {
@@ -428,8 +428,8 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['request_count'], 1000);
-        expect(response.data['error_rate'], 0.01);
+        expect(response.data!['request_count'], 1000);
+        expect(response.data!['error_rate'], 0.01);
       });
 
       test('calculates performance summary', () async {
@@ -446,7 +446,7 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['uptime'], 99);
+        expect(response.data!['uptime'], 99);
       });
     });
 
@@ -464,7 +464,7 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['action'], 'delete_article');
+        expect(response.data!['action'], 'delete_article');
       });
 
       test('retrieves audit logs', () async {
@@ -512,8 +512,8 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['overall_status'], 'healthy');
-        expect((response.data['services'] as List).length, 2);
+        expect(response.data!['overall_status'], 'healthy');
+        expect((response.data!['services'] as List).length, 2);
       });
     });
 
@@ -530,8 +530,8 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['name'], 'new_dashboard');
-        expect(response.data['enabled'], false);
+        expect(response.data!['name'], 'new_dashboard');
+        expect(response.data!['enabled'], false);
       });
 
       test('checks feature enabled status', () async {
@@ -541,7 +541,7 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['enabled'], true);
+        expect(response.data!['enabled'], true);
       });
 
       test('lists feature flags', () async {
@@ -579,9 +579,9 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['rollout_percentage'], 50);
-        expect(response.data['rollout_percentage'] >= 0, true);
-        expect(response.data['rollout_percentage'] <= 100, true);
+        expect(response.data!['rollout_percentage'], 50);
+        expect((response.data!['rollout_percentage'] as num) >= 0, true);
+        expect((response.data!['rollout_percentage'] as num) <= 100, true);
       });
     });
 
@@ -707,7 +707,7 @@ void main() {
           requestOptions: RequestOptions(path: ''),
         );
 
-        expect(response.data['total_entries'], 10000);
+        expect(response.data!['total_entries'], 10000);
       });
     });
   });

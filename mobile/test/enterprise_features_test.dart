@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import '../lib/models/enterprise_features_models.dart';
-import '../lib/providers/enterprise_features_providers.dart';
 
 void main() {
   group('Enterprise Features Models', () {
