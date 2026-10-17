@@ -1,10 +1,13 @@
+from app.core.security import get_current_user
+from app.models.user import User
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime, timedelta
+from app.db.session import get_db
+from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from app.models.analytics_reporting import (
-    ReportType, SearchIndexStatus, CacheLevel
+    ReportType, SearchIndexStatus, CacheLevel, SearchQuery
 )
 from app.services.analytics_reporting_service import (
     AnalyticsReportService,
@@ -17,6 +20,15 @@ from app.services.analytics_reporting_service import (
     FeatureFlagService
 )
 
+def _service(service_cls):
+    """Dependency that builds a service with the request's database session."""
+
+    async def provide(db: AsyncSession = Depends(get_db)):
+        return service_cls(db)
+
+    return provide
+
+
 # Request/Response Schemas
 
 class AnalyticsReportRequest(BaseModel):
@@ -26,6 +38,8 @@ class AnalyticsReportRequest(BaseModel):
     period_end: datetime
 
 class AnalyticsReportResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
     report_type: ReportType
@@ -42,6 +56,8 @@ class AnalyticsReportResponse(BaseModel):
     updated_at: datetime
 
 class DailyAnalyticsResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     date: datetime
     pageviews: int
     sessions: int
@@ -49,6 +65,8 @@ class DailyAnalyticsResponse(BaseModel):
     bounce_rate: float
 
 class TopContentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     content_id: int
     pageviews: int
     unique_visitors: int
@@ -67,6 +85,8 @@ class UserEventRequest(BaseModel):
     os: Optional[str] = None
 
 class UserEventResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     user_id: int
     content_id: Optional[int]
@@ -76,6 +96,8 @@ class UserEventResponse(BaseModel):
     timestamp: datetime
 
 class UserBehaviorSummaryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     user_id: int
     total_events: int
     event_breakdown: dict
@@ -90,6 +112,8 @@ class HeatmapRequest(BaseModel):
     exit_rate: float = 0.0
 
 class HeatmapResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     content_id: int
     heatmap_json: dict
@@ -108,6 +132,8 @@ class SearchIndexRequest(BaseModel):
     keywords: List[str] = []
 
 class SearchIndexResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     content_id: int
     title: str
@@ -117,6 +143,8 @@ class SearchIndexResponse(BaseModel):
     created_at: datetime
 
 class SearchResultResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     content_id: int
     title: str
     summary: Optional[str]
@@ -124,6 +152,8 @@ class SearchResultResponse(BaseModel):
     tags: List[str]
 
 class TrendingSearchResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     query: str
     count: int
     result_count_avg: int
@@ -136,6 +166,8 @@ class CacheEntryRequest(BaseModel):
     ttl_seconds: int = 3600
 
 class CacheEntryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     key: str
     cache_level: CacheLevel
@@ -145,6 +177,8 @@ class CacheEntryResponse(BaseModel):
     created_at: datetime
 
 class CacheStatsResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     total_entries: int
     hot_entries: int
     warm_entries: int
@@ -162,6 +196,8 @@ class PerformanceMetricRequest(BaseModel):
     response_size: int = 0
 
 class PerformanceMetricResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     endpoint: str
     method: str
@@ -170,6 +206,8 @@ class PerformanceMetricResponse(BaseModel):
     timestamp: datetime
 
 class EndpointStatsResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     endpoint: str
     method: str
     request_count: int
@@ -188,6 +226,8 @@ class AdminActionRequest(BaseModel):
     ip_address: Optional[str] = None
 
 class AdminActionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     admin_id: int
     action: str
@@ -198,6 +238,8 @@ class AdminActionResponse(BaseModel):
     timestamp: datetime
 
 class AuditLogResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     admin_id: int
     action: str
@@ -206,6 +248,8 @@ class AuditLogResponse(BaseModel):
     timestamp: datetime
 
 class HealthCheckResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     service_name: str
     status: str
     response_time_ms: Optional[int]
@@ -214,6 +258,8 @@ class HealthCheckResponse(BaseModel):
     last_check: datetime
 
 class SystemHealthResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     overall_status: str
     timestamp: datetime
     services: List[HealthCheckResponse]
@@ -226,6 +272,8 @@ class ConfigurationSettingRequest(BaseModel):
     description: Optional[str] = None
 
 class ConfigurationSettingResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     key: str
     value: str
@@ -241,6 +289,8 @@ class FeatureFlagRequest(BaseModel):
     target_segments: List[str] = []
 
 class FeatureFlagResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
     description: Optional[str]
@@ -259,14 +309,16 @@ search_router = APIRouter(prefix="/search", tags=["search"])
 cache_router = APIRouter(prefix="/cache", tags=["cache"])
 performance_router = APIRouter(prefix="/performance", tags=["performance"])
 admin_router = APIRouter(prefix="/admin", tags=["admin"])
-featureflag_router = APIRouter(prefix="/feature-flags", tags=["feature-flags"])
+featureflag_router = APIRouter(prefix="/analytics/feature-flags", tags=["feature-flags"])
+# Legacy mount kept so existing clients (e.g. mobile analytics providers) keep working.
+legacy_featureflag_router = APIRouter(prefix="/feature-flags", tags=["feature-flags"])
 
 # Analytics Endpoints
 
 @analytics_router.post("/reports", response_model=AnalyticsReportResponse)
 async def create_analytics_report(
     request: AnalyticsReportRequest,
-    service: AnalyticsReportService = Depends()
+    service: AnalyticsReportService = Depends(_service(AnalyticsReportService)), current_user: User = Depends(get_current_user)
 ):
     """Create analytics report for period"""
     return await service.generate_report(
@@ -279,7 +331,7 @@ async def create_analytics_report(
 @analytics_router.get("/reports/{report_id}", response_model=AnalyticsReportResponse)
 async def get_analytics_report(
     report_id: int,
-    service: AnalyticsReportService = Depends()
+    service: AnalyticsReportService = Depends(_service(AnalyticsReportService))
 ):
     """Get analytics report by ID"""
     report = await service.get_analytics_report(report_id)
@@ -287,11 +339,11 @@ async def get_analytics_report(
         raise HTTPException(status_code=404, detail="Report not found")
     return report
 
-@analytics_router.get("/daily", response_model=List[DailyAnalyticsResponse])
+@analytics_router.get("/reporting/daily", response_model=List[DailyAnalyticsResponse])
 async def get_daily_analytics(
     start_date: datetime = Query(...),
     end_date: datetime = Query(...),
-    service: AnalyticsReportService = Depends()
+    service: AnalyticsReportService = Depends(_service(AnalyticsReportService))
 ):
     """Get daily analytics for date range"""
     return await service.get_daily_analytics(start_date, end_date)
@@ -301,7 +353,7 @@ async def get_top_content(
     limit: int = Query(10, ge=1, le=100),
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
-    service: AnalyticsReportService = Depends()
+    service: AnalyticsReportService = Depends(_service(AnalyticsReportService))
 ):
     """Get top content by pageviews"""
     return await service.get_top_content(
@@ -315,7 +367,7 @@ async def get_top_content(
 @behavior_router.post("/events", response_model=UserEventResponse)
 async def record_user_event(
     request: UserEventRequest,
-    service: UserBehaviorService = Depends()
+    service: UserBehaviorService = Depends(_service(UserBehaviorService)), current_user: User = Depends(get_current_user)
 ):
     """Record user behavior event"""
     return await service.record_event(
@@ -333,7 +385,7 @@ async def record_user_event(
 @behavior_router.get("/users/{user_id}/summary", response_model=UserBehaviorSummaryResponse)
 async def get_user_behavior_summary(
     user_id: int,
-    service: UserBehaviorService = Depends()
+    service: UserBehaviorService = Depends(_service(UserBehaviorService))
 ):
     """Get user behavior summary"""
     summary = await service.get_user_behavior_summary(user_id)
@@ -345,7 +397,7 @@ async def get_user_behavior_summary(
 async def get_user_events(
     user_id: int,
     limit: int = Query(100, ge=1, le=1000),
-    service: UserBehaviorService = Depends()
+    service: UserBehaviorService = Depends(_service(UserBehaviorService))
 ):
     """Get user events"""
     return await service.get_user_events(user_id, limit)
@@ -355,7 +407,7 @@ async def get_user_events(
 @heatmap_router.post("", response_model=HeatmapResponse)
 async def create_heatmap(
     request: HeatmapRequest,
-    service: HeatmapService = Depends()
+    service: HeatmapService = Depends(_service(HeatmapService)), current_user: User = Depends(get_current_user)
 ):
     """Create or update heatmap for content"""
     return await service.create_heatmap(
@@ -369,7 +421,7 @@ async def create_heatmap(
 @heatmap_router.get("/{content_id}", response_model=HeatmapResponse)
 async def get_heatmap(
     content_id: int,
-    service: HeatmapService = Depends()
+    service: HeatmapService = Depends(_service(HeatmapService))
 ):
     """Get heatmap for content"""
     heatmap = await service.get_heatmap(content_id)
@@ -382,7 +434,7 @@ async def get_heatmap(
 @search_router.post("/index", response_model=SearchIndexResponse)
 async def index_content(
     request: SearchIndexRequest,
-    service: SearchService = Depends()
+    service: SearchService = Depends(_service(SearchService)), current_user: User = Depends(get_current_user)
 ):
     """Index content for search"""
     return await service.index_content(
@@ -399,7 +451,7 @@ async def index_content(
 async def search_content(
     query: str = Query(..., min_length=1, max_length=255),
     limit: int = Query(20, ge=1, le=100),
-    service: SearchService = Depends()
+    service: SearchService = Depends(_service(SearchService))
 ):
     """Search indexed content"""
     return await service.search(query, limit)
@@ -407,19 +459,19 @@ async def search_content(
 @search_router.get("/queries/{query_id}", response_model=dict)
 async def get_search_query(
     query_id: int,
-    service: SearchService = Depends()
+    service: SearchService = Depends(_service(SearchService))
 ):
     """Get search query details"""
     query = await service.get_search_query(query_id)
     if not query:
         raise HTTPException(status_code=404, detail="Search query not found")
-    return query
+    return {column.name: getattr(query, column.name) for column in SearchQuery.__table__.columns}
 
 @search_router.get("/trending", response_model=List[TrendingSearchResponse])
 async def get_trending_searches(
     days: int = Query(7, ge=1, le=90),
     limit: int = Query(10, ge=1, le=100),
-    service: SearchService = Depends()
+    service: SearchService = Depends(_service(SearchService))
 ):
     """Get trending searches"""
     return await service.get_trending_searches(days, limit)
@@ -427,7 +479,7 @@ async def get_trending_searches(
 @search_router.get("/indexed/{content_id}", response_model=SearchIndexResponse)
 async def get_indexed_content(
     content_id: int,
-    service: SearchService = Depends()
+    service: SearchService = Depends(_service(SearchService))
 ):
     """Get indexed content status"""
     indexed = await service.get_indexed_content(content_id)
@@ -440,7 +492,7 @@ async def get_indexed_content(
 @cache_router.post("", response_model=CacheEntryResponse)
 async def set_cache(
     request: CacheEntryRequest,
-    service: CacheService = Depends()
+    service: CacheService = Depends(_service(CacheService)), current_user: User = Depends(get_current_user)
 ):
     """Set cache entry"""
     return await service.set_cache(
@@ -453,7 +505,7 @@ async def set_cache(
 @cache_router.get("/{cache_key}", response_model=CacheEntryResponse)
 async def get_cache(
     cache_key: str,
-    service: CacheService = Depends()
+    service: CacheService = Depends(_service(CacheService))
 ):
     """Get cache entry"""
     entry = await service.get_cache(cache_key)
@@ -464,7 +516,7 @@ async def get_cache(
 @cache_router.delete("/{cache_key}")
 async def delete_cache(
     cache_key: str,
-    service: CacheService = Depends()
+    service: CacheService = Depends(_service(CacheService)), current_user: User = Depends(get_current_user)
 ):
     """Clear cache entry"""
     await service.delete_cache(cache_key)
@@ -472,7 +524,7 @@ async def delete_cache(
 
 @cache_router.post("/clear-all")
 async def clear_all_cache(
-    service: CacheService = Depends()
+    service: CacheService = Depends(_service(CacheService)), current_user: User = Depends(get_current_user)
 ):
     """Clear all cache"""
     await service.clear_cache()
@@ -480,7 +532,7 @@ async def clear_all_cache(
 
 @cache_router.get("/stats/summary", response_model=CacheStatsResponse)
 async def get_cache_stats(
-    service: CacheService = Depends()
+    service: CacheService = Depends(_service(CacheService))
 ):
     """Get cache statistics"""
     return await service.get_cache_stats()
@@ -490,7 +542,7 @@ async def get_cache_stats(
 @performance_router.post("/metrics", response_model=PerformanceMetricResponse)
 async def record_performance_metric(
     request: PerformanceMetricRequest,
-    service: PerformanceService = Depends()
+    service: PerformanceService = Depends(_service(PerformanceService)), current_user: User = Depends(get_current_user)
 ):
     """Record endpoint performance metric"""
     return await service.record_metric(
@@ -506,7 +558,7 @@ async def record_performance_metric(
 async def get_endpoint_stats(
     endpoint_path: str,
     method: str = Query(..., min_length=3, max_length=10),
-    service: PerformanceService = Depends()
+    service: PerformanceService = Depends(_service(PerformanceService))
 ):
     """Get endpoint performance statistics"""
     stats = await service.get_endpoint_stats(endpoint_path, method)
@@ -516,7 +568,7 @@ async def get_endpoint_stats(
 
 @performance_router.get("/summary", response_model=dict)
 async def get_performance_summary(
-    service: PerformanceService = Depends()
+    service: PerformanceService = Depends(_service(PerformanceService))
 ):
     """Get overall performance summary"""
     return await service.get_performance_summary()
@@ -526,7 +578,7 @@ async def get_performance_summary(
 @admin_router.post("/actions", response_model=AdminActionResponse)
 async def log_admin_action(
     request: AdminActionRequest,
-    service: AdminService = Depends()
+    service: AdminService = Depends(_service(AdminService)), current_user: User = Depends(get_current_user)
 ):
     """Log admin action"""
     return await service.log_admin_action(
@@ -543,7 +595,7 @@ async def get_audit_logs(
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     admin_id: Optional[int] = None,
-    service: AdminService = Depends()
+    service: AdminService = Depends(_service(AdminService))
 ):
     """Get audit logs"""
     return await service.get_audit_logs(limit, offset, admin_id)
@@ -551,7 +603,7 @@ async def get_audit_logs(
 @admin_router.get("/audit-logs/{log_id}", response_model=AuditLogResponse)
 async def get_audit_log(
     log_id: int,
-    service: AdminService = Depends()
+    service: AdminService = Depends(_service(AdminService))
 ):
     """Get specific audit log"""
     log = await service.get_audit_log(log_id)
@@ -561,7 +613,7 @@ async def get_audit_log(
 
 @admin_router.get("/health", response_model=SystemHealthResponse)
 async def check_system_health(
-    service: AdminService = Depends()
+    service: AdminService = Depends(_service(AdminService))
 ):
     """Check overall system health"""
     return await service.check_system_health()
@@ -569,7 +621,7 @@ async def check_system_health(
 @admin_router.get("/health/{service_name}", response_model=HealthCheckResponse)
 async def check_service_health(
     service_name: str,
-    service: AdminService = Depends()
+    service: AdminService = Depends(_service(AdminService))
 ):
     """Check specific service health"""
     health = await service.get_service_health(service_name)
@@ -583,19 +635,26 @@ async def update_service_health(
     status: str = Query(..., regex="^(healthy|degraded|unhealthy)$"),
     response_time_ms: Optional[int] = None,
     error_count: int = 0,
-    service: AdminService = Depends()
+    service: AdminService = Depends(_service(AdminService)), current_user: User = Depends(get_current_user)
 ):
     """Update service health status"""
-    return await service.update_service_health(
+    check = await service.update_service_health(
         service_name, status, response_time_ms, error_count
     )
+    return {
+        "service_name": check.service_name,
+        "status": check.status,
+        "response_time_ms": check.response_time_ms,
+        "error_count": check.error_count,
+        "last_check": check.last_check,
+    }
 
 # Configuration Endpoints
 
 @admin_router.post("/config", response_model=ConfigurationSettingResponse)
 async def set_configuration(
     request: ConfigurationSettingRequest,
-    service: AdminService = Depends()
+    service: AdminService = Depends(_service(AdminService)), current_user: User = Depends(get_current_user)
 ):
     """Set configuration setting"""
     return await service.set_configuration(
@@ -608,7 +667,7 @@ async def set_configuration(
 @admin_router.get("/config/{config_key}", response_model=ConfigurationSettingResponse)
 async def get_configuration(
     config_key: str,
-    service: AdminService = Depends()
+    service: AdminService = Depends(_service(AdminService))
 ):
     """Get configuration setting"""
     config = await service.get_configuration(config_key)
@@ -618,7 +677,7 @@ async def get_configuration(
 
 @admin_router.get("/config", response_model=List[ConfigurationSettingResponse])
 async def list_configurations(
-    service: AdminService = Depends()
+    service: AdminService = Depends(_service(AdminService))
 ):
     """List all configurations"""
     return await service.list_configurations()
@@ -626,7 +685,7 @@ async def list_configurations(
 @admin_router.delete("/config/{config_key}")
 async def delete_configuration(
     config_key: str,
-    service: AdminService = Depends()
+    service: AdminService = Depends(_service(AdminService)), current_user: User = Depends(get_current_user)
 ):
     """Delete configuration setting"""
     await service.delete_configuration(config_key)
@@ -634,10 +693,11 @@ async def delete_configuration(
 
 # Feature Flag Endpoints
 
+@legacy_featureflag_router.post("", response_model=FeatureFlagResponse)
 @featureflag_router.post("", response_model=FeatureFlagResponse)
 async def create_feature_flag(
     request: FeatureFlagRequest,
-    service: FeatureFlagService = Depends()
+    service: FeatureFlagService = Depends(_service(FeatureFlagService)), current_user: User = Depends(get_current_user)
 ):
     """Create feature flag"""
     return await service.create_feature_flag(
@@ -648,10 +708,11 @@ async def create_feature_flag(
         target_segments=request.target_segments
     )
 
+@legacy_featureflag_router.get("/{flag_name}", response_model=FeatureFlagResponse)
 @featureflag_router.get("/{flag_name}", response_model=FeatureFlagResponse)
 async def get_feature_flag(
     flag_name: str,
-    service: FeatureFlagService = Depends()
+    service: FeatureFlagService = Depends(_service(FeatureFlagService))
 ):
     """Get feature flag"""
     flag = await service.get_feature_flag(flag_name)
@@ -659,21 +720,23 @@ async def get_feature_flag(
         raise HTTPException(status_code=404, detail="Feature flag not found")
     return flag
 
+@legacy_featureflag_router.get("/{flag_name}/enabled", response_model=dict)
 @featureflag_router.get("/{flag_name}/enabled", response_model=dict)
 async def is_feature_enabled(
     flag_name: str,
     user_id: Optional[int] = None,
-    service: FeatureFlagService = Depends()
+    service: FeatureFlagService = Depends(_service(FeatureFlagService))
 ):
     """Check if feature is enabled for user"""
     enabled = await service.is_feature_enabled(flag_name, user_id)
     return {"flag_name": flag_name, "enabled": enabled}
 
+@legacy_featureflag_router.patch("/{flag_id}", response_model=FeatureFlagResponse)
 @featureflag_router.patch("/{flag_id}", response_model=FeatureFlagResponse)
 async def update_feature_flag(
     flag_id: int,
     request: FeatureFlagRequest,
-    service: FeatureFlagService = Depends()
+    service: FeatureFlagService = Depends(_service(FeatureFlagService)), current_user: User = Depends(get_current_user)
 ):
     """Update feature flag"""
     return await service.update_feature_flag(
@@ -685,18 +748,20 @@ async def update_feature_flag(
         target_segments=request.target_segments
     )
 
+@legacy_featureflag_router.delete("/{flag_id}")
 @featureflag_router.delete("/{flag_id}")
 async def delete_feature_flag(
     flag_id: int,
-    service: FeatureFlagService = Depends()
+    service: FeatureFlagService = Depends(_service(FeatureFlagService)), current_user: User = Depends(get_current_user)
 ):
     """Delete feature flag"""
     await service.delete_feature_flag(flag_id)
     return {"status": "deleted"}
 
+@legacy_featureflag_router.get("", response_model=List[FeatureFlagResponse])
 @featureflag_router.get("", response_model=List[FeatureFlagResponse])
 async def list_feature_flags(
-    service: FeatureFlagService = Depends()
+    service: FeatureFlagService = Depends(_service(FeatureFlagService))
 ):
     """List all feature flags"""
     return await service.list_feature_flags()

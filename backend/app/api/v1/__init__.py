@@ -3,7 +3,7 @@
 from fastapi import APIRouter
 
 # Import endpoints
-from app.api.v1 import auth, health, tenants, organizations, profiles, settings, notifications, activity, content, ai_providers, ai_core, ai_advanced, integrations, advanced_features, monetization, security_performance, api_monitoring, logging_analytics, social_messaging, streaming_premium, community_compliance, content_quality, publishing_distribution, user_management, enterprise_features, analytics_reporting, platform_completion, advanced_platform, ecommerce, ecommerce_extended, marketing, memberships, courses, analytics_admin
+from app.api.v1 import auth, health, tenants, organizations, profiles, settings, notifications, activity, content, ai_providers, ai_core, ai_advanced, integrations, advanced_features, monetization, security_performance, api_monitoring, logging_analytics, social_messaging, streaming_premium, community_compliance, content_quality, publishing_distribution, user_management, enterprise_features, analytics_reporting, platform_completion, advanced_platform, ecommerce, ecommerce_extended, marketing, memberships, courses, analytics_admin, social_auth, billing_admin
 
 api_router = APIRouter()
 
@@ -49,6 +49,7 @@ for _sub_router in (
     analytics_reporting.heatmap_router, analytics_reporting.search_router,
     analytics_reporting.cache_router, analytics_reporting.performance_router,
     analytics_reporting.admin_router, analytics_reporting.featureflag_router,
+    analytics_reporting.legacy_featureflag_router,
 ):
     api_router.include_router(_sub_router)
 api_router.include_router(platform_completion.router, tags=["platform-completion"])
@@ -66,3 +67,6 @@ api_router.include_router(courses.router, tags=["courses"])
 api_router.include_router(analytics_admin.router, tags=["analytics-admin"])
 
 __all__ = ["api_router"]
+api_router.include_router(social_auth.router, tags=["social-auth"])
+api_router.include_router(social_auth.admin_router, tags=["social-auth-admin"])
+api_router.include_router(billing_admin.router, tags=["billing-admin"])

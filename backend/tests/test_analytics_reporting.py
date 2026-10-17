@@ -14,8 +14,8 @@ from app.services.analytics_reporting_service import (
 
 class TestAnalyticsReportService:
     @pytest.mark.asyncio
-    async def test_generate_daily_report(self):
-        service = AnalyticsReportService()
+    async def test_generate_daily_report(self, db):
+        service = AnalyticsReportService(db)
         report = await service.generate_report(
             name="Daily Report",
             report_type=ReportType.DAILY,
@@ -26,8 +26,8 @@ class TestAnalyticsReportService:
         assert report.report_type == ReportType.DAILY
 
     @pytest.mark.asyncio
-    async def test_generate_weekly_report(self):
-        service = AnalyticsReportService()
+    async def test_generate_weekly_report(self, db):
+        service = AnalyticsReportService(db)
         report = await service.generate_report(
             name="Weekly Report",
             report_type=ReportType.WEEKLY,
@@ -37,8 +37,8 @@ class TestAnalyticsReportService:
         assert report.report_type == ReportType.WEEKLY
 
     @pytest.mark.asyncio
-    async def test_generate_monthly_report(self):
-        service = AnalyticsReportService()
+    async def test_generate_monthly_report(self, db):
+        service = AnalyticsReportService(db)
         report = await service.generate_report(
             name="Monthly Report",
             report_type=ReportType.MONTHLY,
@@ -48,23 +48,23 @@ class TestAnalyticsReportService:
         assert report.report_type == ReportType.MONTHLY
 
     @pytest.mark.asyncio
-    async def test_get_daily_analytics(self):
-        service = AnalyticsReportService()
+    async def test_get_daily_analytics(self, db):
+        service = AnalyticsReportService(db)
         start = datetime.now() - timedelta(days=7)
         end = datetime.now()
         analytics = await service.get_daily_analytics(start, end)
         assert isinstance(analytics, list)
 
     @pytest.mark.asyncio
-    async def test_get_top_content(self):
-        service = AnalyticsReportService()
+    async def test_get_top_content(self, db):
+        service = AnalyticsReportService(db)
         top_content = await service.get_top_content(limit=10)
         assert isinstance(top_content, list)
         assert len(top_content) <= 10
 
     @pytest.mark.asyncio
-    async def test_get_top_content_with_date_range(self):
-        service = AnalyticsReportService()
+    async def test_get_top_content_with_date_range(self, db):
+        service = AnalyticsReportService(db)
         start = datetime.now() - timedelta(days=30)
         end = datetime.now()
         top_content = await service.get_top_content(
@@ -73,8 +73,8 @@ class TestAnalyticsReportService:
         assert isinstance(top_content, list)
 
     @pytest.mark.asyncio
-    async def test_report_includes_correct_metrics(self):
-        service = AnalyticsReportService()
+    async def test_report_includes_correct_metrics(self, db):
+        service = AnalyticsReportService(db)
         report = await service.generate_report(
             name="Metrics Test",
             report_type=ReportType.DAILY,
@@ -90,8 +90,8 @@ class TestAnalyticsReportService:
 
 class TestUserBehaviorService:
     @pytest.mark.asyncio
-    async def test_record_click_event(self):
-        service = UserBehaviorService()
+    async def test_record_click_event(self, db):
+        service = UserBehaviorService(db)
         event = await service.record_event(
             user_id=1,
             content_id=100,
@@ -102,8 +102,8 @@ class TestUserBehaviorService:
         assert event.user_id == 1
 
     @pytest.mark.asyncio
-    async def test_record_scroll_event(self):
-        service = UserBehaviorService()
+    async def test_record_scroll_event(self, db):
+        service = UserBehaviorService(db)
         event = await service.record_event(
             user_id=1,
             event_type='scroll',
@@ -112,8 +112,8 @@ class TestUserBehaviorService:
         assert event.event_type == 'scroll'
 
     @pytest.mark.asyncio
-    async def test_record_hover_event(self):
-        service = UserBehaviorService()
+    async def test_record_hover_event(self, db):
+        service = UserBehaviorService(db)
         event = await service.record_event(
             user_id=1,
             event_type='hover',
@@ -122,8 +122,8 @@ class TestUserBehaviorService:
         assert event.event_type == 'hover'
 
     @pytest.mark.asyncio
-    async def test_record_exit_event(self):
-        service = UserBehaviorService()
+    async def test_record_exit_event(self, db):
+        service = UserBehaviorService(db)
         event = await service.record_event(
             user_id=1,
             event_type='exit'
@@ -131,23 +131,23 @@ class TestUserBehaviorService:
         assert event.event_type == 'exit'
 
     @pytest.mark.asyncio
-    async def test_get_user_behavior_summary(self):
-        service = UserBehaviorService()
+    async def test_get_user_behavior_summary(self, db):
+        service = UserBehaviorService(db)
         summary = await service.get_user_behavior_summary(user_id=1)
         assert summary.user_id == 1
         assert isinstance(summary.event_breakdown, dict)
 
     @pytest.mark.asyncio
-    async def test_behavior_summary_includes_event_types(self):
-        service = UserBehaviorService()
+    async def test_behavior_summary_includes_event_types(self, db):
+        service = UserBehaviorService(db)
         summary = await service.get_user_behavior_summary(user_id=1)
         assert hasattr(summary, 'total_events')
         assert hasattr(summary, 'event_breakdown')
         assert hasattr(summary, 'most_common_event')
 
     @pytest.mark.asyncio
-    async def test_record_event_with_page_context(self):
-        service = UserBehaviorService()
+    async def test_record_event_with_page_context(self, db):
+        service = UserBehaviorService(db)
         event = await service.record_event(
             user_id=1,
             content_id=100,
@@ -159,8 +159,8 @@ class TestUserBehaviorService:
         assert event.referrer == 'https://google.com'
 
     @pytest.mark.asyncio
-    async def test_record_event_with_device_info(self):
-        service = UserBehaviorService()
+    async def test_record_event_with_device_info(self, db):
+        service = UserBehaviorService(db)
         event = await service.record_event(
             user_id=1,
             event_type='click',
@@ -175,8 +175,8 @@ class TestUserBehaviorService:
 
 class TestHeatmapService:
     @pytest.mark.asyncio
-    async def test_create_heatmap(self):
-        service = HeatmapService()
+    async def test_create_heatmap(self, db):
+        service = HeatmapService(db)
         heatmap = await service.create_heatmap(
             content_id=100,
             heatmap_json={'zones': [{'x': 0, 'y': 0, 'clicks': 10}]},
@@ -186,8 +186,8 @@ class TestHeatmapService:
         assert heatmap.exit_rate == 0.15
 
     @pytest.mark.asyncio
-    async def test_create_heatmap_with_scroll_depth(self):
-        service = HeatmapService()
+    async def test_create_heatmap_with_scroll_depth(self, db):
+        service = HeatmapService(db)
         heatmap = await service.create_heatmap(
             content_id=100,
             heatmap_json={'zones': []},
@@ -196,8 +196,8 @@ class TestHeatmapService:
         assert '25' in heatmap.scroll_depth_percentiles
 
     @pytest.mark.asyncio
-    async def test_create_heatmap_with_click_zones(self):
-        service = HeatmapService()
+    async def test_create_heatmap_with_click_zones(self, db):
+        service = HeatmapService(db)
         click_zones = {'button': 150, 'link': 300, 'image': 50}
         heatmap = await service.create_heatmap(
             content_id=100,
@@ -207,14 +207,15 @@ class TestHeatmapService:
         assert 'button' in heatmap.click_zones
 
     @pytest.mark.asyncio
-    async def test_get_heatmap(self):
-        service = HeatmapService()
+    async def test_get_heatmap(self, db):
+        service = HeatmapService(db)
+        await service.create_heatmap(content_id=100, heatmap_json={'zones': []})
         heatmap = await service.get_heatmap(content_id=100)
         assert heatmap.content_id == 100
 
     @pytest.mark.asyncio
-    async def test_heatmap_updates_existing(self):
-        service = HeatmapService()
+    async def test_heatmap_updates_existing(self, db):
+        service = HeatmapService(db)
         heatmap1 = await service.create_heatmap(
             content_id=100,
             heatmap_json={'version': 1}
@@ -228,8 +229,8 @@ class TestHeatmapService:
 
 class TestSearchService:
     @pytest.mark.asyncio
-    async def test_index_content(self):
-        service = SearchService()
+    async def test_index_content(self, db):
+        service = SearchService(db)
         indexed = await service.index_content(
             content_id=100,
             title="Test Article",
@@ -240,8 +241,8 @@ class TestSearchService:
         assert indexed.status == SearchIndexStatus.PENDING or indexed.status == SearchIndexStatus.INDEXED
 
     @pytest.mark.asyncio
-    async def test_index_with_categories(self):
-        service = SearchService()
+    async def test_index_with_categories(self, db):
+        service = SearchService(db)
         indexed = await service.index_content(
             content_id=100,
             title="Article",
@@ -250,36 +251,36 @@ class TestSearchService:
         assert 'technology' in indexed.categories
 
     @pytest.mark.asyncio
-    async def test_search_content(self):
-        service = SearchService()
+    async def test_search_content(self, db):
+        service = SearchService(db)
         results = await service.search(query="test", limit=10)
         assert isinstance(results, list)
         assert len(results) <= 10
 
     @pytest.mark.asyncio
-    async def test_search_with_limit(self):
-        service = SearchService()
+    async def test_search_with_limit(self, db):
+        service = SearchService(db)
         results = await service.search(query="technology", limit=5)
         assert len(results) <= 5
 
     @pytest.mark.asyncio
-    async def test_search_results_have_relevance(self):
-        service = SearchService()
+    async def test_search_results_have_relevance(self, db):
+        service = SearchService(db)
         results = await service.search(query="test")
         for result in results:
             assert hasattr(result, 'relevance_score')
             assert 0 <= result.relevance_score <= 1.0
 
     @pytest.mark.asyncio
-    async def test_get_trending_searches(self):
-        service = SearchService()
+    async def test_get_trending_searches(self, db):
+        service = SearchService(db)
         trending = await service.get_trending_searches(days=7, limit=10)
         assert isinstance(trending, list)
         assert len(trending) <= 10
 
     @pytest.mark.asyncio
-    async def test_trending_searches_sorted_by_count(self):
-        service = SearchService()
+    async def test_trending_searches_sorted_by_count(self, db):
+        service = SearchService(db)
         trending = await service.get_trending_searches(days=7, limit=100)
         if len(trending) > 1:
             counts = [t.count for t in trending]
@@ -288,8 +289,8 @@ class TestSearchService:
 
 class TestCacheService:
     @pytest.mark.asyncio
-    async def test_set_cache_warm(self):
-        service = CacheService()
+    async def test_set_cache_warm(self, db):
+        service = CacheService(db)
         entry = await service.set_cache(
             key="test_key",
             value="test_value",
@@ -299,8 +300,8 @@ class TestCacheService:
         assert entry.cache_level == CacheLevel.WARM
 
     @pytest.mark.asyncio
-    async def test_set_cache_hot(self):
-        service = CacheService()
+    async def test_set_cache_hot(self, db):
+        service = CacheService(db)
         entry = await service.set_cache(
             key="hot_key",
             value="hot_value",
@@ -311,8 +312,8 @@ class TestCacheService:
         assert entry.ttl_seconds == 60
 
     @pytest.mark.asyncio
-    async def test_set_cache_cold(self):
-        service = CacheService()
+    async def test_set_cache_cold(self, db):
+        service = CacheService(db)
         entry = await service.set_cache(
             key="cold_key",
             value="cold_value",
@@ -322,32 +323,32 @@ class TestCacheService:
         assert entry.cache_level == CacheLevel.COLD
 
     @pytest.mark.asyncio
-    async def test_get_cache(self):
-        service = CacheService()
+    async def test_get_cache(self, db):
+        service = CacheService(db)
         await service.set_cache("key1", "value1")
         entry = await service.get_cache("key1")
         assert entry.value == "value1"
         assert entry.hits >= 1
 
     @pytest.mark.asyncio
-    async def test_get_cache_increments_hits(self):
-        service = CacheService()
+    async def test_get_cache_increments_hits(self, db):
+        service = CacheService(db)
         await service.set_cache("key_hits", "value")
         await service.get_cache("key_hits")
         entry = await service.get_cache("key_hits")
         assert entry.hits >= 1
 
     @pytest.mark.asyncio
-    async def test_delete_cache(self):
-        service = CacheService()
+    async def test_delete_cache(self, db):
+        service = CacheService(db)
         await service.set_cache("key_delete", "value")
         await service.delete_cache("key_delete")
         deleted = await service.get_cache("key_delete")
         assert deleted is None
 
     @pytest.mark.asyncio
-    async def test_clear_cache(self):
-        service = CacheService()
+    async def test_clear_cache(self, db):
+        service = CacheService(db)
         await service.set_cache("key1", "value1")
         await service.set_cache("key2", "value2")
         await service.clear_cache()
@@ -355,8 +356,8 @@ class TestCacheService:
         assert stats.total_entries == 0
 
     @pytest.mark.asyncio
-    async def test_get_cache_stats(self):
-        service = CacheService()
+    async def test_get_cache_stats(self, db):
+        service = CacheService(db)
         await service.set_cache("stat_key", "value")
         stats = await service.get_cache_stats()
         assert stats.total_entries >= 1
@@ -366,8 +367,8 @@ class TestCacheService:
 
 class TestPerformanceService:
     @pytest.mark.asyncio
-    async def test_record_metric(self):
-        service = PerformanceService()
+    async def test_record_metric(self, db):
+        service = PerformanceService(db)
         metric = await service.record_metric(
             endpoint="/api/articles",
             method="GET",
@@ -378,8 +379,8 @@ class TestPerformanceService:
         assert metric.response_time_ms == 150
 
     @pytest.mark.asyncio
-    async def test_record_metric_post(self):
-        service = PerformanceService()
+    async def test_record_metric_post(self, db):
+        service = PerformanceService(db)
         metric = await service.record_metric(
             endpoint="/api/subscribers",
             method="POST",
@@ -390,8 +391,8 @@ class TestPerformanceService:
         assert metric.status_code == 201
 
     @pytest.mark.asyncio
-    async def test_record_metric_with_sizes(self):
-        service = PerformanceService()
+    async def test_record_metric_with_sizes(self, db):
+        service = PerformanceService(db)
         metric = await service.record_metric(
             endpoint="/api/data",
             method="GET",
@@ -403,8 +404,8 @@ class TestPerformanceService:
         assert metric.response_size == 4096
 
     @pytest.mark.asyncio
-    async def test_get_endpoint_stats(self):
-        service = PerformanceService()
+    async def test_get_endpoint_stats(self, db):
+        service = PerformanceService(db)
         for _ in range(5):
             await service.record_metric(
                 endpoint="/api/test",
@@ -417,8 +418,8 @@ class TestPerformanceService:
         assert stats.request_count >= 5
 
     @pytest.mark.asyncio
-    async def test_endpoint_stats_p95_latency(self):
-        service = PerformanceService()
+    async def test_endpoint_stats_p95_latency(self, db):
+        service = PerformanceService(db)
         for i in range(100):
             await service.record_metric(
                 endpoint="/api/load",
@@ -430,8 +431,8 @@ class TestPerformanceService:
         assert stats.p95_response_time_ms > 0
 
     @pytest.mark.asyncio
-    async def test_endpoint_stats_error_rate(self):
-        service = PerformanceService()
+    async def test_endpoint_stats_error_rate(self, db):
+        service = PerformanceService(db)
         for i in range(10):
             await service.record_metric(
                 endpoint="/api/errors",
@@ -445,8 +446,8 @@ class TestPerformanceService:
 
 class TestAdminService:
     @pytest.mark.asyncio
-    async def test_log_admin_action(self):
-        service = AdminService()
+    async def test_log_admin_action(self, db):
+        service = AdminService(db)
         log = await service.log_admin_action(
             admin_id=1,
             action="delete_article",
@@ -458,8 +459,8 @@ class TestAdminService:
         assert log.action == "delete_article"
 
     @pytest.mark.asyncio
-    async def test_log_admin_action_with_ip(self):
-        service = AdminService()
+    async def test_log_admin_action_with_ip(self, db):
+        service = AdminService(db)
         log = await service.log_admin_action(
             admin_id=1,
             action="login",
@@ -469,29 +470,31 @@ class TestAdminService:
         assert log.ip_address == "192.168.1.1"
 
     @pytest.mark.asyncio
-    async def test_get_audit_logs(self):
-        service = AdminService()
+    async def test_get_audit_logs(self, db):
+        service = AdminService(db)
         logs = await service.get_audit_logs(limit=10)
         assert isinstance(logs, list)
         assert len(logs) <= 10
 
     @pytest.mark.asyncio
-    async def test_get_audit_logs_by_admin(self):
-        service = AdminService()
+    async def test_get_audit_logs_by_admin(self, db):
+        service = AdminService(db)
         logs = await service.get_audit_logs(limit=10, admin_id=1)
         for log in logs:
             assert log.admin_id == 1
 
     @pytest.mark.asyncio
-    async def test_check_system_health(self):
-        service = AdminService()
+    async def test_check_system_health(self, db):
+        service = AdminService(db)
+        await service.update_service_health(service_name="api_server", status="healthy", response_time_ms=25)
         health = await service.check_system_health()
         assert health.overall_status in ['healthy', 'degraded', 'unhealthy']
         assert len(health.services) > 0
 
     @pytest.mark.asyncio
-    async def test_system_health_includes_services(self):
-        service = AdminService()
+    async def test_system_health_includes_services(self, db):
+        service = AdminService(db)
+        await service.update_service_health(service_name="api_server", status="healthy", response_time_ms=25)
         health = await service.check_system_health()
         for svc in health.services:
             assert hasattr(svc, 'service_name')
@@ -499,14 +502,15 @@ class TestAdminService:
             assert hasattr(svc, 'uptime_percentage')
 
     @pytest.mark.asyncio
-    async def test_get_service_health(self):
-        service = AdminService()
+    async def test_get_service_health(self, db):
+        service = AdminService(db)
+        await service.update_service_health(service_name="api_server", status="healthy", response_time_ms=25)
         health = await service.get_service_health("api_server")
         assert health.service_name == "api_server"
 
     @pytest.mark.asyncio
-    async def test_update_service_health(self):
-        service = AdminService()
+    async def test_update_service_health(self, db):
+        service = AdminService(db)
         result = await service.update_service_health(
             service_name="cache_service",
             status="healthy",
@@ -515,8 +519,8 @@ class TestAdminService:
         assert result.service_name == "cache_service"
 
     @pytest.mark.asyncio
-    async def test_configuration_setting(self):
-        service = AdminService()
+    async def test_configuration_setting(self, db):
+        service = AdminService(db)
         config = await service.set_configuration(
             key="max_cache_size",
             value="1000000",
@@ -525,8 +529,8 @@ class TestAdminService:
         assert config.key == "max_cache_size"
 
     @pytest.mark.asyncio
-    async def test_get_configuration(self):
-        service = AdminService()
+    async def test_get_configuration(self, db):
+        service = AdminService(db)
         await service.set_configuration("test_key", "test_value")
         config = await service.get_configuration("test_key")
         assert config.value == "test_value"
@@ -534,8 +538,8 @@ class TestAdminService:
 
 class TestFeatureFlagService:
     @pytest.mark.asyncio
-    async def test_create_feature_flag(self):
-        service = FeatureFlagService()
+    async def test_create_feature_flag(self, db):
+        service = FeatureFlagService(db)
         flag = await service.create_feature_flag(
             name="new_dashboard",
             description="New dashboard UI",
@@ -546,8 +550,8 @@ class TestFeatureFlagService:
         assert flag.enabled is False
 
     @pytest.mark.asyncio
-    async def test_create_flag_with_rollout(self):
-        service = FeatureFlagService()
+    async def test_create_flag_with_rollout(self, db):
+        service = FeatureFlagService(db)
         flag = await service.create_feature_flag(
             name="partial_rollout",
             enabled=True,
@@ -556,22 +560,22 @@ class TestFeatureFlagService:
         assert flag.rollout_percentage == 50
 
     @pytest.mark.asyncio
-    async def test_is_feature_enabled_always_true(self):
-        service = FeatureFlagService()
+    async def test_is_feature_enabled_always_true(self, db):
+        service = FeatureFlagService(db)
         await service.create_feature_flag("feature_on", enabled=True)
         enabled = await service.is_feature_enabled("feature_on")
         assert enabled is True
 
     @pytest.mark.asyncio
-    async def test_is_feature_enabled_always_false(self):
-        service = FeatureFlagService()
+    async def test_is_feature_enabled_always_false(self, db):
+        service = FeatureFlagService(db)
         await service.create_feature_flag("feature_off", enabled=False)
         enabled = await service.is_feature_enabled("feature_off")
         assert enabled is False
 
     @pytest.mark.asyncio
-    async def test_is_feature_enabled_with_rollout(self):
-        service = FeatureFlagService()
+    async def test_is_feature_enabled_with_rollout(self, db):
+        service = FeatureFlagService(db)
         await service.create_feature_flag(
             "rollout_feature",
             enabled=True,
@@ -581,8 +585,8 @@ class TestFeatureFlagService:
         assert isinstance(enabled, bool)
 
     @pytest.mark.asyncio
-    async def test_is_feature_enabled_consistent_for_user(self):
-        service = FeatureFlagService()
+    async def test_is_feature_enabled_consistent_for_user(self, db):
+        service = FeatureFlagService(db)
         await service.create_feature_flag(
             "consistent_feature",
             enabled=True,
@@ -593,8 +597,8 @@ class TestFeatureFlagService:
         assert enabled1 == enabled2
 
     @pytest.mark.asyncio
-    async def test_update_feature_flag(self):
-        service = FeatureFlagService()
+    async def test_update_feature_flag(self, db):
+        service = FeatureFlagService(db)
         flag = await service.create_feature_flag("update_test", enabled=False)
         updated = await service.update_feature_flag(
             flag.id,
@@ -605,23 +609,23 @@ class TestFeatureFlagService:
         assert updated.enabled is True
 
     @pytest.mark.asyncio
-    async def test_get_feature_flag(self):
-        service = FeatureFlagService()
+    async def test_get_feature_flag(self, db):
+        service = FeatureFlagService(db)
         await service.create_feature_flag("get_test", enabled=True)
         flag = await service.get_feature_flag("get_test")
         assert flag.name == "get_test"
 
     @pytest.mark.asyncio
-    async def test_list_feature_flags(self):
-        service = FeatureFlagService()
+    async def test_list_feature_flags(self, db):
+        service = FeatureFlagService(db)
         for i in range(5):
             await service.create_feature_flag(f"flag_{i}", enabled=True)
         flags = await service.list_feature_flags()
         assert len(flags) >= 5
 
     @pytest.mark.asyncio
-    async def test_delete_feature_flag(self):
-        service = FeatureFlagService()
+    async def test_delete_feature_flag(self, db):
+        service = FeatureFlagService(db)
         flag = await service.create_feature_flag("delete_test", enabled=True)
         await service.delete_feature_flag(flag.id)
         deleted = await service.get_feature_flag("delete_test")
@@ -630,9 +634,9 @@ class TestFeatureFlagService:
 
 class TestIntegrationScenarios:
     @pytest.mark.asyncio
-    async def test_full_analytics_workflow(self):
-        analytics_service = AnalyticsReportService()
-        behavior_service = UserBehaviorService()
+    async def test_full_analytics_workflow(self, db):
+        analytics_service = AnalyticsReportService(db)
+        behavior_service = UserBehaviorService(db)
 
         await behavior_service.record_event(1, 100, "read", {})
         await behavior_service.record_event(1, 100, "click", {"x": 50})
@@ -646,9 +650,9 @@ class TestIntegrationScenarios:
         assert report.name == "integration_test"
 
     @pytest.mark.asyncio
-    async def test_search_and_heatmap_workflow(self):
-        search_service = SearchService()
-        heatmap_service = HeatmapService()
+    async def test_search_and_heatmap_workflow(self, db):
+        search_service = SearchService(db)
+        heatmap_service = HeatmapService(db)
 
         await search_service.index_content(
             100, "Article", keywords=["test"]
@@ -661,9 +665,9 @@ class TestIntegrationScenarios:
         assert len(results) >= 0
 
     @pytest.mark.asyncio
-    async def test_cache_and_performance_tracking(self):
-        cache_service = CacheService()
-        perf_service = PerformanceService()
+    async def test_cache_and_performance_tracking(self, db):
+        cache_service = CacheService(db)
+        perf_service = PerformanceService(db)
 
         await cache_service.set_cache("perf_key", "value")
         await perf_service.record_metric(
@@ -676,32 +680,32 @@ class TestIntegrationScenarios:
 
 class TestErrorHandling:
     @pytest.mark.asyncio
-    async def test_invalid_date_range(self):
-        service = AnalyticsReportService()
+    async def test_invalid_date_range(self, db):
+        service = AnalyticsReportService(db)
         with pytest.raises(ValueError):
             await service.get_daily_analytics(
                 datetime.now(), datetime.now() - timedelta(days=1)
             )
 
     @pytest.mark.asyncio
-    async def test_invalid_percentage(self):
-        service = FeatureFlagService()
+    async def test_invalid_percentage(self, db):
+        service = FeatureFlagService(db)
         with pytest.raises(ValueError):
             await service.create_feature_flag(
                 "invalid", enabled=True, rollout_percentage=150
             )
 
     @pytest.mark.asyncio
-    async def test_cache_ttl_negative(self):
-        service = CacheService()
+    async def test_cache_ttl_negative(self, db):
+        service = CacheService(db)
         with pytest.raises(ValueError):
             await service.set_cache("key", "value", ttl_seconds=-1)
 
 
 class TestPerformance:
     @pytest.mark.asyncio
-    async def test_performance_with_large_dataset(self):
-        service = UserBehaviorService()
+    async def test_performance_with_large_dataset(self, db):
+        service = UserBehaviorService(db)
         for i in range(100):
             await service.record_event(
                 user_id=1, content_id=i, event_type="click"
@@ -710,16 +714,16 @@ class TestPerformance:
         assert summary.total_events >= 100
 
     @pytest.mark.asyncio
-    async def test_cache_with_many_entries(self):
-        service = CacheService()
+    async def test_cache_with_many_entries(self, db):
+        service = CacheService(db)
         for i in range(100):
             await service.set_cache(f"key_{i}", f"value_{i}")
         stats = await service.get_cache_stats()
         assert stats.total_entries >= 100
 
     @pytest.mark.asyncio
-    async def test_search_performance(self):
-        service = SearchService()
+    async def test_search_performance(self, db):
+        service = SearchService(db)
         for i in range(50):
             await service.index_content(i, f"Article {i}")
         results = await service.search("article", limit=100)
