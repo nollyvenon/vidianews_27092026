@@ -1,5 +1,8 @@
 import '@testing-library/jest-dom'
 
+// next.config.js inlines this at build time; tests need a fixed value to assert request URLs.
+process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://api.test'
+
 // Next.js App Router hooks only exist inside a running Next app. Replace them with
 // stable mocks so every page test shares one router object that tests can assert on.
 const mockRouter = {
