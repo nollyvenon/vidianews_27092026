@@ -56,6 +56,9 @@ export default function DashboardPage() {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
+      }).catch((error) => {
+        // Logout must still clear the local session when the server cannot be reached.
+        console.error('Logout request failed:', error);
       }).finally(() => {
         localStorage.removeItem('token');
         localStorage.removeItem('refresh_token');
