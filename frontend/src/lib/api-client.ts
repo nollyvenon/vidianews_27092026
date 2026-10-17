@@ -1,3 +1,5 @@
+import { ApiError, messageFromDetail } from '@/lib/api-error'
+
 // Same-origin base: next.config.js rewrites /api/v1/* to the backend (NEXT_PUBLIC_API_URL).
 const BASE_URL = '/api/v1'
 
@@ -29,10 +31,12 @@ class ApiClientClass {
     const response = await fetch(`${BASE_URL}${endpoint}`, options)
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({}))
-      throw new Error(error.detail || `API Error: ${response.status}`)
+      const body = await response.json().catch(() => ({}))
+      throw new ApiError(messageFromDetail(body?.detail) ?? `API Error: ${response.status}`)
     }
 
+    // 204 No Content (for example DELETE) has no body to parse.
+    if (response.status === 204) return null
     return response.json()
   }
 

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
+import { SocialLoginButtons } from '@/components/social-login-buttons'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -76,6 +77,8 @@ export default function LoginPage() {
             {loading ? 'Signing in...' : 'Sign in'}
           </button>
         </form>
+
+        <SocialLoginButtons />
 
         <div className="mt-6 text-center text-sm">
           <p className="text-gray-600">
