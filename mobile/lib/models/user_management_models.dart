@@ -55,6 +55,7 @@ class EmailCampaign with _$EmailCampaign {
     required String status,
     DateTime? scheduledAt,
     DateTime? sentAt,
+    DateTime? createdAt,
   }) = _EmailCampaign;
 
   factory EmailCampaign.fromJson(Map<String, dynamic> json) =>

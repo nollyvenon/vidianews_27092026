@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(const AetherCMSApp());
@@ -51,7 +52,8 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (response.statusCode == 200) {
-        final tokens = response.data;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('auth_token', response.data['access_token'] as String);
         if (mounted) {
           Navigator.of(context).pushReplacementNamed('/dashboard');
         }

@@ -139,7 +139,7 @@ class AdvancedFeaturesService {
   }
 
   Future<List<UserCohort>> getCohorts({String? cohortType}) async {
-    final response = await dio.get('/api/v1/cohorts', queryParameters: if (cohortType != null) {'cohort_type': cohortType});
+    final response = await dio.get('/api/v1/cohorts', queryParameters: cohortType != null ? {'cohort_type': cohortType} : null);
     final data = response.data as List;
     return data.map((e) => UserCohort.fromJson(e)).toList();
   }

@@ -9,7 +9,7 @@ const String baseUrl = 'http://localhost:8000/api/v1';
 class EnterpriseService {
   final String _baseUrl;
 
-  EnterpriseService({String? baseUrl}) : _baseUrl = baseUrl ?? baseUrl;
+  EnterpriseService({String? baseUrl}) : _baseUrl = baseUrl ?? 'http://localhost:8000/api/v1';
 
   // Security endpoints
   Future<List<AuditLog>> getAuditLogs({

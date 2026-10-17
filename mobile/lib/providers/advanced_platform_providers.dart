@@ -11,7 +11,7 @@ class AdvancedPlatformService {
   final String _baseUrl;
   late WebSocketChannel _webSocketChannel;
 
-  AdvancedPlatformService({String? baseUrl}) : _baseUrl = baseUrl ?? baseUrl;
+  AdvancedPlatformService({String? baseUrl}) : _baseUrl = baseUrl ?? 'http://localhost:8000/api/v1';
 
   // WebSocket Methods
   Future<void> connectWebSocket(int userId, String connectionId) async {
@@ -184,6 +184,7 @@ class AdvancedPlatformService {
         name: data['name'],
         format: data['format'],
         version: data['version'] ?? '1.0.0',
+        servers: List<String>.from(data['servers'] ?? const []),
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );

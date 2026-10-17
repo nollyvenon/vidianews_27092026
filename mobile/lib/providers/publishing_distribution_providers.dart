@@ -60,7 +60,7 @@ class PublishingDistributionService {
     return response.data;
   }
 
-  Future<List<Map<String, dynamic>>> generateRecommendations({
+  Future<List<int>> generateRecommendations({
     required int userId,
     required List<int> contentPool,
   }) async {
@@ -68,7 +68,7 @@ class PublishingDistributionService {
       'user_id': userId,
       'content_pool': contentPool,
     });
-    return List<Map<String, dynamic>>.from(response.data['recommended_content_ids']);
+    return List<int>.from(response.data['recommended_content_ids']);
   }
 }
 
