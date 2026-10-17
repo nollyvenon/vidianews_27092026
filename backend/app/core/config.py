@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@postgres:5432/aether_cms"
     DB_POOL_SIZE: int = 20
     DB_MAX_OVERFLOW: int = 10
+    # Disable connection pooling (set by the test harness). Connections then
+    # are never shared across event loops, e.g. TestClient's loop vs pytest's.
+    DB_NULL_POOL: bool = False
 
     # Redis
     REDIS_URL: str = "redis://redis:6379/0"

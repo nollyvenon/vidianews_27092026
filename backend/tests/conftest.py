@@ -1,17 +1,26 @@
 """Pytest configuration and fixtures"""
 
 import asyncio
+import os
+
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
+from sqlalchemy.pool import NullPool
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from app.core.config import settings
-from app.db.base import Base
-from app.main import app
 from fastapi.testclient import TestClient
 
+from tests.db_config import TEST_DATABASE_URL, TEST_SYNC_DATABASE_URL, truncate_all_tables
 
-# Test database URL (use in-memory SQLite)
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+# app.core.config reads DATABASE_URL at import time. Point it at the test
+# database before any app module is imported so the suite never touches dev data.
+os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+# Never pool connections across event loops (TestClient runs the app on its own loop).
+os.environ["DB_NULL_POOL"] = "true"
+
+from app.db.base import Base  # noqa: E402
+from app.main import app  # noqa: E402
 
 
 @pytest.fixture(scope="session")
@@ -22,22 +31,61 @@ def event_loop():
     loop.close()
 
 
+@pytest.fixture(scope="session", autouse=True)
+def reset_test_database():
+    """Recreate this run's PostgreSQL test database from the current models.
+
+    Dropping and recreating the whole database (rather than its schema) takes no
+    per-table locks, so parallel workers cannot exhaust the server's lock table.
+    Refuses to touch any database whose name does not end in ``_test``.
+    """
+    url = make_url(TEST_SYNC_DATABASE_URL)
+    database = url.database or ""
+    if not database.endswith("_test"):
+        raise RuntimeError(f"Refusing to reset non-test database {database!r}")
+
+    admin_engine = create_engine(url.set(database="postgres"), isolation_level="AUTOCOMMIT")
+    with admin_engine.connect() as conn:
+        conn.execute(text(f'DROP DATABASE IF EXISTS "{database}" WITH (FORCE)'))
+        conn.execute(text(f'CREATE DATABASE "{database}"'))
+    admin_engine.dispose()
+
+    engine = create_engine(TEST_SYNC_DATABASE_URL, isolation_level="AUTOCOMMIT")
+    with engine.connect() as conn:
+        Base.metadata.create_all(conn)
+    yield engine
+    engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def isolate_database(reset_test_database):
+    """Empty every table before each test so no test sees another test's rows."""
+    with reset_test_database.connect() as conn:
+        truncate_all_tables(conn)
+    yield
+
+
+@pytest.fixture
+def reference_data(isolate_database, reset_test_database):
+    """Commit the reference rows (users 1-2, tenant, organization, content 1) for this test."""
+    from sqlalchemy.orm import Session
+
+    from tests.seed import seed_reference_data
+
+    with Session(reset_test_database) as session:
+        seed_reference_data(session)
+    yield
+
+
 @pytest.fixture
 async def test_engine():
     """Create test database engine"""
-    engine = create_async_engine(
-        TEST_DATABASE_URL,
-        connect_args={"check_same_thread": False},
-        poolclass=None,
-    )
+    engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
     yield engine
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
 
     await engine.dispose()
 
@@ -72,6 +120,20 @@ async def async_client(test_session):
         yield client
 
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+async def session(test_engine):
+    """Async session on the per-test database"""
+    factory = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as db_session:
+        yield db_session
+
+
+@pytest.fixture
+async def db(session):
+    """Alias of `session` for tests that name the async session `db`"""
+    yield session
 
 
 @pytest.fixture

@@ -56,6 +56,22 @@ npm test
 flutter test
 ```
 
+### Backend test database
+
+The backend suite runs against **PostgreSQL**, never SQLite. Point it at a
+server with `TEST_DATABASE_URL` (default:
+`postgresql+asyncpg://postgres:postgres@localhost:5432/vidianews_test`).
+
+- The database name must end in `_test`. The test session drops and
+  recreates it on every run, and refuses any other name.
+- The role must be a superuser. The per-test isolation step sets
+  `session_replication_role` to empty tables in any order.
+- With `pytest-xdist`, each worker gets its own database
+  (`vidianews_gw0_test`, `vidianews_gw1_test`, ...). Run in parallel with
+  `pytest tests/ -n 8`, and lower `-n` if the server's lock table is small.
+- Each test starts from an empty database. A shared `autouse` fixture in
+  `backend/tests/conftest.py` deletes all rows before every test.
+
 ## Module Development
 
 Each module must include:
