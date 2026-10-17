@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
+from tests.db_config import TEST_SYNC_DATABASE_URL
 from app.database import Base
 from app.main import app
 from app.models.platform_completion import (
@@ -18,7 +19,7 @@ from app.services.platform_completion_service import (
 
 @pytest.fixture
 def db_session():
-    engine = create_engine("sqlite:///:memory:")
+    engine = create_engine(TEST_SYNC_DATABASE_URL)
     Base.metadata.create_all(engine)
     SessionLocal = sessionmaker(bind=engine)
     db = SessionLocal()

@@ -3,6 +3,8 @@
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from tests.db_config import TEST_DATABASE_URL
+from sqlalchemy.pool import NullPool
 from app.main import app
 from app.db.base import Base
 from app.db.session import get_session
@@ -13,7 +15,7 @@ from app.core.security import hash_password
 @pytest.fixture
 async def test_db():
     """Setup test database"""
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -27,9 +29,6 @@ async def test_db():
     app.dependency_overrides[get_session] = override_get_session
 
     yield engine
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
 
     await engine.dispose()
 

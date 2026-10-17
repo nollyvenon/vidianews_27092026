@@ -13,6 +13,12 @@ from app.services.content_quality_service import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _seed_reference(reference_data):
+    """Users 1-2, tenant, organization and content 1 exist for every test in this module."""
+    yield
+
+
 class TestContentCalendarService:
     """Module 61: Content Calendar Integration Tests"""
 

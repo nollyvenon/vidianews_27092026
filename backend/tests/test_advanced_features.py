@@ -1,8 +1,9 @@
 import pytest
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.pool import StaticPool
 
+from tests.db_config import TEST_DATABASE_URL
+from sqlalchemy.pool import NullPool
 from app.models.advanced_features import (
     AdvancedPersonalizationProfile,
     ContentEmbedding,
@@ -36,11 +37,7 @@ from app.services.advanced_features_service import (
 
 @pytest.fixture
 async def db():
-    engine = create_async_engine(
-        "sqlite+aiosqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
+    engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

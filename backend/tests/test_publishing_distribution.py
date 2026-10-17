@@ -5,6 +5,7 @@ from datetime import datetime, timezone, timedelta
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
+from tests.db_config import TEST_DATABASE_URL
 from app.db.base import Base
 from app.services.publishing_distribution_service import (
     PublishingService, DistributionService, AnalyticsService,
@@ -16,10 +17,16 @@ from app.models.publishing_distribution import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _seed_reference(reference_data):
+    """Users 1-2, tenant, organization and content 1 exist for every test in this module."""
+    yield
+
+
 @pytest.fixture
 async def async_session():
     """Create async test database session"""
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

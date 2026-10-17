@@ -2,7 +2,7 @@
 
 import pytest
 from datetime import datetime, timezone, timedelta
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 from app.models.analytics_admin import (
     AnalyticsEvent, UserMetric, RevenueMetric, EngagementMetric,
     Report, AdminLog, SystemHealth, UserBehavior,
@@ -10,10 +10,26 @@ from app.models.analytics_admin import (
 )
 from app.services.analytics_admin_service import (
     AnalyticsEventService, UserMetricService, RevenueMetricService,
+
+
     EngagementMetricService, ReportService, AdminLogService,
     SystemHealthService, UserBehaviorService, NotificationPreferenceService,
     PermissionPolicyService, SystemAlertService
 )
+
+
+@pytest.fixture(autouse=True)
+def _seed_reference(reference_data):
+    """Users 1-2, tenant, organization and content 1 exist for every test in this module."""
+    yield
+
+
+@pytest.fixture
+def db(reset_test_database) -> Session:
+    """Blocking session on the per-test database (these services are synchronous)"""
+    db_session = sessionmaker(bind=reset_test_database, expire_on_commit=False)()
+    yield db_session
+    db_session.close()
 
 
 class TestAnalyticsEventService:

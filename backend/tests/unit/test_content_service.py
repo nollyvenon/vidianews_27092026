@@ -3,6 +3,8 @@
 import pytest
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from tests.db_config import TEST_DATABASE_URL
+from sqlalchemy.pool import NullPool
 from app.models.content import (
     Content, Video, MediaFile, ContentEngagement, ContentCategory, ContentTag,
     ContentType, ContentStatus, ContentAccessLevel
@@ -13,10 +15,16 @@ from app.services.content_service import ContentService
 from app.db.base import Base
 
 
+@pytest.fixture(autouse=True)
+def _seed_reference(reference_data):
+    """Users 1-2, tenant, organization and content 1 exist for every test in this module."""
+    yield
+
+
 @pytest.fixture
 async def db_session():
     """Create test database session"""
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -27,9 +35,7 @@ async def db_session():
         # Create test user
         user = User(
             email="test@example.com",
-            hashed_password="hashedpass",
-            is_active=True,
-            is_verified=True
+            password_hash="hashedpass",
         )
         session.add(user)
         await session.commit()

@@ -1,14 +1,14 @@
 """Tests for ecommerce services"""
 
 import pytest
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 from decimal import Decimal
 from app.models.ecommerce import (
     Product, ProductReview, Cart, CartItem, CheckoutSession, PaymentDetail,
     Refund, Order, OrderItem, ProductStatus, CartItemStatus, CheckoutStatus,
     PaymentStatus, OrderStatus, ShippingStatus, PaymentMethod
 )
-from app.models.auth import User
+from app.models.user import User
 from app.services.ecommerce_service import (
     ProductService, CartService, CheckoutService, PaymentService, OrderService
 )
@@ -231,6 +231,14 @@ class TestOrderService:
 # Fixtures
 
 @pytest.fixture
+def db(reset_test_database) -> Session:
+    """Blocking session on the per-test database (ecommerce services are synchronous)"""
+    db_session = sessionmaker(bind=reset_test_database, expire_on_commit=False)()
+    yield db_session
+    db_session.close()
+
+
+@pytest.fixture
 def sample_product(db: Session) -> Product:
     """Create sample product"""
     product = Product(
@@ -253,7 +261,7 @@ def sample_user(db: Session) -> User:
     user = User(
         email="test@example.com",
         username="testuser",
-        hashed_password="hashed_password"
+        password_hash="password_hash"
     )
     db.add(user)
     db.commit()

@@ -2,11 +2,12 @@
 
 import pytest
 from datetime import datetime, timezone, timedelta
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 from app.models.memberships import (
     MembershipType, MembershipSubscription, MembershipInvoice, MembershipPaymentMethod,
     MembershipTier, SubscriptionStatus, BillingCycle
 )
+from app.models.user import User
 from app.models.courses import (
     Course, Lesson, CourseSection, CourseEnrollment, StudentLessonProgress,
     CourseReview, Assignment, AssignmentSubmission, Certificate,
@@ -18,9 +19,25 @@ from app.services.memberships_service import (
 )
 from app.services.courses_service import (
     CourseService, LessonService, CourseSectionService, EnrollmentService,
+
+
     StudentLessonProgressService, CourseReviewService, AssignmentService,
     AssignmentSubmissionService, CertificateService
 )
+
+
+@pytest.fixture(autouse=True)
+def _seed_reference(reference_data):
+    """Users 1-2, tenant, organization and content 1 exist for every test in this module."""
+    yield
+
+
+@pytest.fixture
+def db(reset_test_database) -> Session:
+    """Blocking session on the per-test database (these services are synchronous)"""
+    db_session = sessionmaker(bind=reset_test_database, expire_on_commit=False)()
+    yield db_session
+    db_session.close()
 
 
 @pytest.fixture
@@ -38,8 +55,17 @@ def test_membership_type(db):
 
 
 @pytest.fixture
-def test_course(db):
-    return CourseService.create_course(db, 1, 1, {
+def instructor(db):
+    user = User(email="instructor@example.com", password_hash="hashed", first_name="Ada", last_name="Lovelace")
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@pytest.fixture
+def test_course(db, instructor):
+    return CourseService.create_course(db, 1, instructor.id, {
         "title": "Python Basics",
         "description": "Learn Python fundamentals",
         "category": "Programming",

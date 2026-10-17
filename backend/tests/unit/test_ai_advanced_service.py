@@ -6,6 +6,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
+from tests.db_config import TEST_DATABASE_URL
+from sqlalchemy.pool import NullPool
 from app.db.base import Base
 from app.models.ai_advanced import (
     Memory, ConversationMemory, AITemplate, Chat, ChatMessage,
@@ -19,9 +21,15 @@ from app.services.ai_advanced_service import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _seed_reference(reference_data):
+    """Users 1-2, tenant, organization and content 1 exist for every test in this module."""
+    yield
+
+
 @pytest.fixture
 async def test_db():
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
@@ -354,7 +362,7 @@ async def test_full_chat_workflow(test_db):
     # Retrieve with history
     retrieved = await chat_service.get_chat(chat.id)
     assert retrieved.total_tokens >= 55
-    assert len(retrieved.messages) >= 2
+    assert len(retrieved.chat_messages) >= 2
 
 
 @pytest.mark.asyncio
