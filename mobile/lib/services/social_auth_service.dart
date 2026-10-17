@@ -15,9 +15,21 @@ class SocialAuthService {
         .toList();
   }
 
-  Future<Uri> authorizationUrl(String provider) async {
-    final response = await _dio.get<dynamic>('/auth/social/$provider/authorize');
+  /// Consent URL for [provider]. Pass the app's [ticket] to hand the tokens back through [claimHandoff].
+  Future<Uri> authorizationUrl(String provider, {String? ticket}) async {
+    final response = await _dio.get<dynamic>(
+      '/auth/social/$provider/authorize',
+      queryParameters: ticket == null ? null : {'ticket': ticket},
+    );
     return Uri.parse((response.data as Map<String, dynamic>)['authorization_url'] as String);
+  }
+
+  /// Tokens for a mobile sign-in, or null while the browser step is still pending.
+  /// Throws a DioException (404) when the ticket is unknown or has expired.
+  Future<Map<String, dynamic>?> claimHandoff(String ticket) async {
+    final response = await _dio.get<dynamic>('/auth/social/handoff/$ticket');
+    if (response.statusCode == 202) return null;
+    return response.data as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> exchangeCode({

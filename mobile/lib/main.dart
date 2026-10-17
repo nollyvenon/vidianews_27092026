@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'services/authenticated_dio.dart';
+import 'services/social_auth_service.dart';
+import 'services/social_sign_in_flow.dart';
+import 'widgets/social_login_buttons.dart';
 
 void main() {
   runApp(const AetherCMSApp());
@@ -33,8 +38,19 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _dio = Dio(BaseOptions(baseUrl: 'http://localhost:8000'));
+  late final SocialAuthService _socialService = SocialAuthService(createAuthenticatedDio());
+  late final SocialSignInFlow _socialFlow = SocialSignInFlow(
+    service: _socialService,
+    launch: (url) => launchUrl(url, mode: LaunchMode.externalApplication),
+    saveSession: _saveSession,
+  );
   bool _isLoading = false;
   String _error = '';
+
+  Future<void> _saveSession(String accessToken) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(kAuthTokenKey, accessToken);
+  }
 
   void _handleLogin() async {
     setState(() {
@@ -127,6 +143,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   minimumSize: const Size(double.infinity, 48),
                 ),
                 child: Text(_isLoading ? 'Logging in...' : 'Login'),
+              ),
+              SocialLoginButtons(
+                service: _socialService,
+                flow: _socialFlow,
+                onSignedIn: () => Navigator.of(context).pushReplacementNamed('/dashboard'),
               ),
             ],
           ),
