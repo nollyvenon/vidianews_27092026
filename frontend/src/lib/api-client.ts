@@ -1,4 +1,5 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'
+// Same-origin base: next.config.js rewrites /api/v1/* to the backend (NEXT_PUBLIC_API_URL).
+const BASE_URL = '/api/v1'
 
 class ApiClientClass {
   private token: string | null = null
