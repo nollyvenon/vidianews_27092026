@@ -12,7 +12,7 @@ class LoggingService:
         self.session = session
 
     async def log_message(self, level: str, service: str, message: str, user_id: int = None, metadata: dict = {}) -> LogEntry:
-        entry = LogEntry(level=level, service=service, message=message, user_id=user_id, metadata=metadata)
+        entry = LogEntry(level=level, service=service, message=message, user_id=user_id, extra_metadata=metadata)
         self.session.add(entry)
         await self.session.commit()
         await self.session.refresh(entry)

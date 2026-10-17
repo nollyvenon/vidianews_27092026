@@ -7,7 +7,7 @@ from app.models.ecommerce import (
     Refund, Order, OrderItem, ProductStatus, CartItemStatus, CheckoutStatus,
     PaymentStatus, OrderStatus, ShippingStatus, PaymentMethod
 )
-from app.models.auth import User
+from app.models.user import User
 from decimal import Decimal
 from datetime import datetime, timezone, timedelta
 import uuid

@@ -8,7 +8,7 @@ from app.models.platform_completion import (
     UserInteraction, UserFollow, ContentComment, UserMessage,
     SearchIndex, SavedSearch, PushNotificationConfig, PushNotificationLog,
     AdminUser, AdminActionLog, SystemNotification, PlatformStatistics,
-    InteractionType, ModerationStatus, PushNotificationType, AdminActionType
+    InteractionType, PushNotificationType, AdminActionType
 )
 
 
@@ -38,7 +38,7 @@ class SocialService:
             user_id=user_id,
             content_id=content_id,
             interaction_type=interaction_type,
-            metadata=metadata or {}
+            extra_metadata=metadata or {}
         )
         db.add(interaction)
         db.commit()
@@ -280,7 +280,7 @@ class SearchService:
             index_type=index_type,
             title=title,
             content=content,
-            metadata=metadata or {},
+            extra_metadata=metadata or {},
             embeddings=embeddings or []
         )
         db.add(search_index)
@@ -372,7 +372,7 @@ class SearchService:
         if content:
             search_index.content = content
         if metadata:
-            search_index.metadata = metadata
+            search_index.extra_metadata = metadata
 
         search_index.updated_at = datetime.utcnow()
         db.commit()
@@ -615,7 +615,7 @@ class SystemService:
             message=message,
             notification_type=notification_type,
             target_users=target_users or [],
-            metadata=metadata or {}
+            extra_metadata=metadata or {}
         )
         db.add(notification)
         db.commit()

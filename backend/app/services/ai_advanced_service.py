@@ -100,7 +100,7 @@ class ChatService:
         return message
 
     async def get_chat(self, chat_id: int) -> Optional[Chat]:
-        stmt = select(Chat).where(Chat.id == chat_id).options(selectinload(Chat.messages))
+        stmt = select(Chat).where(Chat.id == chat_id).options(selectinload(Chat.chat_messages))
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
