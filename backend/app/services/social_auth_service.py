@@ -15,6 +15,7 @@ client secrets unreadable; they must then be re-entered in the admin panel.
 
 import base64
 import hashlib
+import json
 import secrets
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -30,7 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.security import create_access_token, create_refresh_token, hash_password
 from app.models.security_performance import AuthProvider, OAuthProvider
-from app.models.social_auth import SocialLoginProvider
+from app.models.social_auth import SocialLoginHandoff, SocialLoginProvider
 from app.models.user import User
 from app.utils.logger import logger
 
@@ -125,6 +126,16 @@ def decrypt_client_secret(ciphertext: str) -> str:
         raise SocialAuthError("Social login credentials are unreadable; ask an administrator to re-enter them", 500) from exc
 
 
+def hash_ticket(ticket: str) -> str:
+    """Hash of a mobile handoff ticket. Only the hash is stored or placed in the OAuth state."""
+    return hashlib.sha256(ticket.encode()).hexdigest()
+
+
+def _as_utc(value: datetime) -> datetime:
+    """Some database drivers return naive datetimes; treat them as UTC."""
+    return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+
+
 def get_provider_spec(provider: str) -> ProviderSpec:
     spec = PROVIDER_SPECS.get(provider)
     if spec is None:
@@ -217,19 +228,21 @@ class SocialAuthService:
 
     # ----- OAuth flow ------------------------------------------------------------
 
-    async def build_authorization_url(self, provider: str) -> str:
+    async def build_authorization_url(self, provider: str, ticket: Optional[str] = None) -> str:
+        """Consent URL. With a ``ticket`` (mobile flow) the tokens are parked for ``claim_handoff``."""
         spec = get_provider_spec(provider)
         config = await self._enabled_config(provider)
-        state = jwt.encode(
-            {
-                "provider": provider,
-                "nonce": secrets.token_urlsafe(16),
-                "type": STATE_TOKEN_TYPE,
-                "exp": datetime.now(timezone.utc) + STATE_TTL,
-            },
-            settings.SECRET_KEY,
-            algorithm=settings.ALGORITHM,
-        )
+        claims = {
+            "provider": provider,
+            "nonce": secrets.token_urlsafe(16),
+            "type": STATE_TOKEN_TYPE,
+            "exp": datetime.now(timezone.utc) + STATE_TTL,
+        }
+        if ticket:
+            ticket_hash = hash_ticket(ticket)
+            await self._create_pending_handoff(ticket_hash)
+            claims["ticket_hash"] = ticket_hash
+        state = jwt.encode(claims, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
         params = {
             "client_id": config.client_id,
             "redirect_uri": config.redirect_uri,
@@ -239,9 +252,10 @@ class SocialAuthService:
         }
         return f"{spec.authorize_url}?{urlencode(params)}"
 
-    async def exchange_code(self, provider: str, code: str, state: str) -> Tuple[str, str, User]:
+    async def exchange_code(self, provider: str, code: str, state: str) -> Tuple[Optional[str], Optional[str], User]:
+        """Complete the login. Returns (None, None, user) when the tokens were parked for a mobile ticket."""
         spec = get_provider_spec(provider)
-        self._verify_state(provider, state)
+        claims = self._verify_state(provider, state)
         config = await self._enabled_config(provider)
         client_secret = decrypt_client_secret(config.client_secret_encrypted)
 
@@ -258,15 +272,61 @@ class SocialAuthService:
         access = create_access_token({"sub": user.email, "user_id": user.id})
         refresh = create_refresh_token({"sub": user.email, "user_id": user.id})
         logger.info(f"Social login via {provider} for user {user.id}")
+        if claims.get("ticket_hash"):
+            await self._park_tokens(claims["ticket_hash"], access, refresh)
+            return None, None, user
         return access, refresh, user
 
-    def _verify_state(self, provider: str, state: str) -> None:
+    def _verify_state(self, provider: str, state: str) -> Dict:
         try:
             claims = jwt.decode(state, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         except JWTError as exc:
             raise SocialAuthError("Invalid or expired login state", 400) from exc
         if claims.get("type") != STATE_TOKEN_TYPE or claims.get("provider") != provider:
             raise SocialAuthError("Login state does not match this provider", 400)
+        return claims
+
+    # ----- mobile handoff --------------------------------------------------------
+
+    async def _create_pending_handoff(self, ticket_hash: str) -> None:
+        existing = (await self.session.execute(
+            select(SocialLoginHandoff).where(SocialLoginHandoff.ticket_hash == ticket_hash)
+        )).scalar_one_or_none()
+        if existing is not None:
+            await self.session.delete(existing)
+        self.session.add(SocialLoginHandoff(
+            ticket_hash=ticket_hash,
+            payload_encrypted=None,
+            expires_at=datetime.now(timezone.utc) + STATE_TTL,
+        ))
+        await self.session.commit()
+
+    async def _park_tokens(self, ticket_hash: str, access: str, refresh: str) -> None:
+        row = (await self.session.execute(
+            select(SocialLoginHandoff).where(SocialLoginHandoff.ticket_hash == ticket_hash)
+        )).scalar_one_or_none()
+        if row is None or _as_utc(row.expires_at) < datetime.now(timezone.utc):
+            raise SocialAuthError("This sign-in was not started by the app or has expired", 400)
+        row.payload_encrypted = encrypt_client_secret(json.dumps({"access_token": access, "refresh_token": refresh}))
+        await self.session.commit()
+
+    async def claim_handoff(self, ticket: str) -> Optional[Dict[str, str]]:
+        """Tokens for a finished mobile sign-in, handed over once. None while the browser step is pending."""
+        ticket_hash = hash_ticket(ticket)
+        row = (await self.session.execute(
+            select(SocialLoginHandoff).where(SocialLoginHandoff.ticket_hash == ticket_hash)
+        )).scalar_one_or_none()
+        if row is None or _as_utc(row.expires_at) < datetime.now(timezone.utc):
+            if row is not None:
+                await self.session.delete(row)
+                await self.session.commit()
+            raise SocialAuthError("Unknown or expired sign-in", 404)
+        if row.payload_encrypted is None:
+            return None
+        tokens = json.loads(decrypt_client_secret(row.payload_encrypted))
+        await self.session.delete(row)
+        await self.session.commit()
+        return tokens
 
     async def _enabled_config(self, provider: str) -> SocialLoginProvider:
         config = await self.get_config(provider)

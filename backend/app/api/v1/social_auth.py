@@ -3,7 +3,8 @@
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,9 +31,16 @@ class SocialExchangeRequest(BaseModel):
 
 
 class SocialTokenResponse(BaseModel):
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
+    """Local JWTs, or ``handoff=True`` when the tokens were parked for a mobile ticket."""
+
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
+    token_type: Optional[str] = None
+    handoff: bool = False
+
+
+class HandoffPendingResponse(BaseModel):
+    status: str = "pending"
 
 
 class SocialProviderUpdate(BaseModel):
@@ -67,29 +75,69 @@ async def list_enabled_providers(session: AsyncSession = Depends(get_db)):
     return await SocialAuthService(session).list_enabled_providers()
 
 
+TICKET_LENGTH = {"min_length": 32, "max_length": 128}
+
+
 @router.get("/{provider}/authorize", response_model=AuthorizationUrlResponse)
-async def get_authorization_url(provider: str, session: AsyncSession = Depends(get_db)):
-    """Consent URL the browser should be sent to for the given provider."""
+async def get_authorization_url(
+    provider: str,
+    ticket: Optional[str] = Query(None, **TICKET_LENGTH, description="Mobile handoff ticket chosen by the app"),
+    session: AsyncSession = Depends(get_db),
+):
+    """Consent URL the browser should be sent to for the given provider.
+
+    Mobile apps pass a random ``ticket`` they keep to themselves and later claim the
+    tokens with ``GET /auth/social/handoff/{ticket}``.
+    """
     try:
-        url = await SocialAuthService(session).build_authorization_url(provider)
+        url = await SocialAuthService(session).build_authorization_url(provider, ticket=ticket)
     except SocialAuthError as error:
         _raise(error)
     return {"authorization_url": url}
 
 
-@router.post("/{provider}/exchange", response_model=SocialTokenResponse)
+@router.get(
+    "/handoff/{ticket}",
+    response_model=SocialTokenResponse,
+    response_model_exclude_none=True,
+    responses={202: {"model": HandoffPendingResponse}},
+)
+async def claim_handoff(
+    ticket: str = Path(**TICKET_LENGTH),
+    session: AsyncSession = Depends(get_db),
+):
+    """Tokens for a mobile sign-in. 202 while the browser step is still pending; 404 if unknown or expired.
+
+    The tokens are returned once and then removed.
+    """
+    try:
+        tokens = await SocialAuthService(session).claim_handoff(ticket)
+    except SocialAuthError as error:
+        _raise(error)
+    if tokens is None:
+        return JSONResponse(status_code=202, content={"status": "pending"})
+    return {"access_token": tokens["access_token"], "refresh_token": tokens["refresh_token"], "token_type": "bearer"}
+
+
+@router.post("/{provider}/exchange", response_model=SocialTokenResponse, response_model_exclude_none=True)
 async def exchange_social_code(
     provider: str,
     payload: SocialExchangeRequest,
     session: AsyncSession = Depends(get_db),
 ):
-    """Complete the login: exchange the provider code and return local JWTs."""
+    """Complete the login: exchange the provider code and return local JWTs.
+
+    For a mobile sign-in (state carries a ticket) the JWTs are parked for the app and the
+    response only says ``handoff: true``.
+    """
     try:
         access, refresh, _user = await SocialAuthService(session).exchange_code(
             provider, payload.code, payload.state
         )
     except SocialAuthError as error:
         _raise(error)
+    if access is None:
+        return {"handoff": True}
     return {"access_token": access, "refresh_token": refresh, "token_type": "bearer"}
 
 
