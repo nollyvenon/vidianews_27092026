@@ -1,8 +1,14 @@
 'use client'
 import { useState, useEffect } from 'react'
 
+interface Thread {
+  id: number
+  title: string
+  replies?: number
+}
+
 export default function CommunityPage() {
-  const [threads, setThreads] = useState([])
+  const [threads, setThreads] = useState<Thread[]>([])
   const [title, setTitle] = useState('')
   const [category, setCategory] = useState('general')
 

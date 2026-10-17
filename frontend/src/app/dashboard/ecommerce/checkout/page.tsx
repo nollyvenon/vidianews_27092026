@@ -39,7 +39,7 @@ export default function CheckoutPage() {
       setCheckoutData((prev) => ({
         ...prev,
         [section]: {
-          ...prev[section as keyof typeof checkoutData],
+          ...(prev[section as keyof typeof checkoutData] as object),
           [field]: value,
         },
       }));

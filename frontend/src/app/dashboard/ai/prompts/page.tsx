@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { ApiClient } from '@/lib/api-client'
 
 interface Prompt {
@@ -18,11 +18,7 @@ export default function PromptsPage() {
   const [newPromptName, setNewPromptName] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('general')
 
-  useEffect(() => {
-    fetchPrompts()
-  }, [selectedCategory])
-
-  const fetchPrompts = async () => {
+  const fetchPrompts = useCallback(async () => {
     try {
       const data = await ApiClient.get(`/ai/templates?category=${selectedCategory}`)
       setPrompts(data)
@@ -31,7 +27,11 @@ export default function PromptsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [selectedCategory]);
+
+  useEffect(() => {
+    fetchPrompts()
+  }, [fetchPrompts, selectedCategory]);
 
   if (loading) {
     return <div>Loading...</div>

@@ -1,8 +1,14 @@
 'use client'
 import { useState, useEffect } from 'react'
 
+interface Report {
+  id: number
+  type: string
+  generated: string
+}
+
 export default function ReportsPage() {
-  const [reports, setReports] = useState([])
+  const [reports, setReports] = useState<Report[]>([])
   const [reportType, setReportType] = useState('views')
   const [loading, setLoading] = useState(false)
 

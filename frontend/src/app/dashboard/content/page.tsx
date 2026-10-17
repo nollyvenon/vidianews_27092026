@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -35,11 +36,7 @@ export default function ContentPage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
 
-  useEffect(() => {
-    fetchContent();
-  }, [page, statusFilter, typeFilter]);
-
-  const fetchContent = async () => {
+  const fetchContent = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams({
@@ -69,7 +66,11 @@ export default function ContentPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, statusFilter, typeFilter, toast]);
+
+  useEffect(() => {
+    fetchContent();
+  }, [fetchContent, page, statusFilter, typeFilter]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -247,9 +248,12 @@ export default function ContentPage() {
               <CardContent className="py-4">
                 <div className="flex gap-4">
                   {item.thumbnail_url && (
-                    <img
+                    <Image
                       src={item.thumbnail_url}
                       alt={item.title}
+                      width={96}
+                      height={96}
+                      unoptimized
                       className="w-24 h-24 object-cover rounded"
                     />
                   )}

@@ -1,8 +1,13 @@
 'use client'
 import { useState, useEffect } from 'react'
 
+interface Language {
+  code: string
+  name: string
+}
+
 export default function LocalizationPage() {
-  const [languages, setLanguages] = useState([])
+  const [languages, setLanguages] = useState<Language[]>([])
   const [selectedLanguage, setSelectedLanguage] = useState('en')
   const [loading, setLoading] = useState(false)
 
@@ -22,7 +27,7 @@ export default function LocalizationPage() {
     }
   }
 
-  const handleSetLanguage = async (langCode) => {
+  const handleSetLanguage = async (langCode: string) => {
     setLoading(true)
     try {
       const res = await fetch('/api/v1/localization/language', {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 
 interface Product {
@@ -21,11 +21,7 @@ export default function ProductsPage() {
   const [category, setCategory] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
 
-  useEffect(() => {
-    fetchProducts();
-  }, [category]);
-
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
       const params = category ? { category } : {};
@@ -36,7 +32,11 @@ export default function ProductsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [category]);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts, category]);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) {

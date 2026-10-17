@@ -1,9 +1,22 @@
 'use client'
 import { useState, useEffect } from 'react'
 
+interface LeaderboardEntry {
+  id: number
+  name: string
+  rank: number
+  points: number
+  views: number
+}
+
+interface UserBadge {
+  id: number
+  name: string
+}
+
 export default function GamificationPage() {
-  const [leaderboard, setLeaderboard] = useState([])
-  const [userBadges, setUserBadges] = useState([])
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
+  const [userBadges, setUserBadges] = useState<UserBadge[]>([])
 
   useEffect(() => {
     fetchLeaderboard()

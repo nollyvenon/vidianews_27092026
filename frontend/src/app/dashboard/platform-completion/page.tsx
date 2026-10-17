@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -56,11 +56,7 @@ export default function PlatformCompletionDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDays, setSelectedDays] = useState(7);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, [selectedDays]);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     setLoading(true);
     try {
       const [statsRes, platformStatsRes, notificationsRes] = await Promise.all([
@@ -83,7 +79,11 @@ export default function PlatformCompletionDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedDays]);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData, selectedDays]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();

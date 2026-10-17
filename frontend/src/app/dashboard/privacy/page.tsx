@@ -2,6 +2,12 @@
 
 import { useState } from 'react'
 
+interface DeletionRequest {
+  id: number
+  status: string
+  scheduledFor: string
+}
+
 export default function PrivacyPage() {
   const [settings, setSettings] = useState({
     profileVisibility: 'public',
@@ -9,7 +15,7 @@ export default function PrivacyPage() {
     allowAnalytics: true,
     allowMarketing: false
   })
-  const [deletionRequest, setDeletionRequest] = useState(null)
+  const [deletionRequest, setDeletionRequest] = useState<DeletionRequest | null>(null)
 
   const handleUpdateSettings = (key: string, value: any) => {
     setSettings({ ...settings, [key]: value })

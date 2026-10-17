@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -84,9 +85,12 @@ export default function CoursesPage() {
         {filteredCourses.map(course => (
           <Card key={course.id} className="overflow-hidden hover:shadow-lg transition">
             {course.thumbnail_url && (
-              <img
+              <Image
                 src={course.thumbnail_url}
                 alt={course.title}
+                width={400}
+                height={160}
+                unoptimized
                 className="w-full h-40 object-cover"
               />
             )}

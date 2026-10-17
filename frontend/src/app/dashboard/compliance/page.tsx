@@ -1,9 +1,22 @@
 'use client'
 import { useState, useEffect } from 'react'
 
+interface ComplianceStatus {
+  gdpr: boolean
+  ccpa: boolean
+  compliant: boolean
+}
+
+interface AuditLog {
+  id: number
+  action: string
+  resource: string
+  created_at: string
+}
+
 export default function CompliancePage() {
-  const [complianceStatus, setComplianceStatus] = useState(null)
-  const [auditLogs, setAuditLogs] = useState([])
+  const [complianceStatus, setComplianceStatus] = useState<ComplianceStatus | null>(null)
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
 
   useEffect(() => {
     fetchCompliance()

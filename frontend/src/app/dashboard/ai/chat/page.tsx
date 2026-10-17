@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { ApiClient } from '@/lib/api-client'
 
 interface ChatSession {
@@ -25,15 +25,17 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(false)
   const messagesEnd = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    fetchChats()
-  }, [])
+  const selectChat = useCallback(async (chat: ChatSession) => {
+    setSelectedChat(chat)
+    try {
+      const data = await ApiClient.get(`/ai/chats/${chat.id}`)
+      setMessages(data.messages || [])
+    } catch (err) {
+      console.error('Failed to load chat', err)
+    }
+  }, []);
 
-  useEffect(() => {
-    messagesEnd.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
-
-  const fetchChats = async () => {
+  const fetchChats = useCallback(async () => {
     try {
       const data = await ApiClient.get('/ai/chats')
       setChats(data)
@@ -43,17 +45,17 @@ export default function ChatPage() {
     } catch (err) {
       console.error('Failed to fetch chats', err)
     }
-  }
+  }, [selectChat]);
 
-  const selectChat = async (chat: ChatSession) => {
-    setSelectedChat(chat)
-    try {
-      const data = await ApiClient.get(`/ai/chats/${chat.id}`)
-      setMessages(data.messages || [])
-    } catch (err) {
-      console.error('Failed to load chat', err)
-    }
-  }
+  useEffect(() => {
+    fetchChats()
+  }, [fetchChats])
+
+  useEffect(() => {
+    messagesEnd.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+
 
   const createNewChat = async () => {
     try {

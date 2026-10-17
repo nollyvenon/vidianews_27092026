@@ -202,7 +202,7 @@ export default function PlagiarismTab() {
                               <Progress value={source.similarity_percent} className="h-1 w-24" />
                             </div>
                             <p className="text-xs text-gray-600 italic">
-                              "{source.matched_text.substring(0, 80)}..."
+                              &quot;{source.matched_text.substring(0, 80)}...&quot;
                             </p>
                           </div>
                         </div>

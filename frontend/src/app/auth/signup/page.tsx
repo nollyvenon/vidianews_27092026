@@ -20,7 +20,9 @@ export default function SignupPage() {
     setLoading(true)
 
     try {
-      await signup(email, password, name)
+      // The form collects one full-name field; the backend stores first and last name separately.
+      const [first_name, ...rest] = name.trim().split(/\s+/)
+      await signup({ email, password, first_name, last_name: rest.join(' ') })
       router.push('/dashboard')
     } catch (err: any) {
       setError(err.message || 'Signup failed')
