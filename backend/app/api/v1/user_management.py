@@ -4,7 +4,7 @@ from typing import List, Dict, Optional, Any
 from datetime import datetime
 from pydantic import BaseModel, EmailStr
 
-from app.db import get_db
+from app.db.session import get_db
 from app.services.user_management_service import (
     EmailTemplateService, EmailCampaignService, UserSegmentService,
     SubscriberService, NotificationService, WebhookService,

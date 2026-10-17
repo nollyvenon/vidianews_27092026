@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 from app.database import get_db
 from app.services.platform_completion_service import (
     SocialService, SearchService, PushNotificationService,
@@ -23,7 +23,7 @@ class InteractionResponse(BaseModel):
     user_id: int
     content_id: int
     interaction_type: str
-    metadata: Dict
+    metadata: Dict = Field(validation_alias=AliasChoices("extra_metadata", "metadata"))
     created_at: datetime
 
     class Config:
@@ -95,7 +95,7 @@ class SearchIndexResponse(BaseModel):
     index_type: str
     title: str
     content: str
-    metadata: Dict
+    metadata: Dict = Field(validation_alias=AliasChoices("extra_metadata", "metadata"))
     created_at: datetime
 
     class Config:

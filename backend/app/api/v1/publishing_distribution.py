@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 from pydantic import BaseModel
 
-from app.db.database import get_db
+from app.db.session import get_db
 from app.services.publishing_distribution_service import (
     PublishingService, DistributionService, AnalyticsService,
     ABTestingService, RecommendationService

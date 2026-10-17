@@ -31,11 +31,33 @@ api_router.include_router(streaming_premium.router, tags=["streaming-premium"])
 api_router.include_router(community_compliance.router, tags=["community-compliance"])
 api_router.include_router(content_quality.router, tags=["content-quality"])
 api_router.include_router(publishing_distribution.router, tags=["publishing-distribution"])
-api_router.include_router(user_management.router, tags=["user-management"])
-api_router.include_router(enterprise_features.router, tags=["enterprise-features"])
-api_router.include_router(analytics_reporting.router, tags=["analytics-reporting"])
+# These modules expose several named routers (each with its own tags) instead of one `router`.
+for _sub_router in (
+    user_management.email_router, user_management.segment_router, user_management.subscriber_router,
+    user_management.notification_router, user_management.webhook_router,
+    user_management.api_key_router, user_management.personalization_router,
+):
+    api_router.include_router(_sub_router)
+for _sub_router in (
+    enterprise_features.security_router, enterprise_features.moderation_router,
+    enterprise_features.rate_limit_router, enterprise_features.notification_router,
+    enterprise_features.reporting_router,
+):
+    api_router.include_router(_sub_router)
+for _sub_router in (
+    analytics_reporting.analytics_router, analytics_reporting.behavior_router,
+    analytics_reporting.heatmap_router, analytics_reporting.search_router,
+    analytics_reporting.cache_router, analytics_reporting.performance_router,
+    analytics_reporting.admin_router, analytics_reporting.featureflag_router,
+):
+    api_router.include_router(_sub_router)
 api_router.include_router(platform_completion.router, tags=["platform-completion"])
-api_router.include_router(advanced_platform.router, tags=["advanced-platform"])
+for _sub_router in (
+    advanced_platform.websocket_router, advanced_platform.jobs_router,
+    advanced_platform.pipeline_router, advanced_platform.cache_router,
+    advanced_platform.api_docs_router,
+):
+    api_router.include_router(_sub_router)
 api_router.include_router(ecommerce.router, tags=["ecommerce"])
 api_router.include_router(ecommerce_extended.router, tags=["ecommerce-extended"])
 api_router.include_router(marketing.router, tags=["marketing"])

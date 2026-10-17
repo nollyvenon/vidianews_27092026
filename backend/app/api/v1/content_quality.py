@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, List
 from datetime import datetime, timedelta
 from app.db.session import get_db
-from app.api.dependencies import get_current_user
+from app.core.security import get_current_user
 from app.models.user import User
 from app.models.content_quality import *
 from app.services.content_quality_service import (

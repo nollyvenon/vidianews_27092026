@@ -2,13 +2,13 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from app.db.session import get_db
+from app.database import get_db
 from app.core.security import get_current_user
 from app.services.marketing_service import (
     EmailCampaignService, SegmentationService, LeadScoringService,
     AutomationService, AnalyticsService, ABTestingService, LoyaltyService
 )
-from app.models.auth import User
+from app.models.user import User
 from pydantic import BaseModel
 from typing import List, Optional
 

@@ -3,10 +3,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
-from app.db.database import get_db
+from app.db.session import get_db
 from app.models.logging_analytics import *
 from app.services.logging_analytics_service import *
-from app.core.auth import get_current_user
+from app.core.security import get_current_user
 
 router = APIRouter(prefix="/api/v1", tags=["logging-analytics"])
 
