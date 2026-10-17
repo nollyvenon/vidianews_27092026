@@ -453,7 +453,7 @@ class _CreateTenantScreenState extends State<CreateTenantScreen> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: _selectedPlan,
+                initialValue: _selectedPlan,
                 decoration: const InputDecoration(
                   labelText: 'Plan',
                   border: OutlineInputBorder(),

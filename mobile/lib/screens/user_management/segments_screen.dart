@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../models/user_management_models.dart';
 import '../../providers/user_management_providers.dart';
 
 class SegmentsScreen extends ConsumerStatefulWidget {
@@ -49,11 +50,12 @@ class _SegmentsScreenState extends ConsumerState<SegmentsScreen> {
 
       ref.read(userSegmentsProvider.notifier).update((state) => [
         ...state,
-        {
-          'id': result['id'],
-          'name': _nameController.text,
-          'segment_type': _selectedSegmentType,
-        }
+        UserSegment(
+          id: result['id'] as int,
+          name: _nameController.text,
+          segmentType: _selectedSegmentType,
+          description: _descriptionController.text,
+        ),
       ]);
 
       _nameController.clear();
@@ -199,7 +201,7 @@ class _SegmentsScreenState extends ConsumerState<SegmentsScreen> {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    segment['name'] ?? 'Unnamed Segment',
+                                    segment.name,
                                     style: const TextStyle(
                                       fontWeight: FontWeight.w600,
                                       fontSize: 14,
@@ -216,7 +218,7 @@ class _SegmentsScreenState extends ConsumerState<SegmentsScreen> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Text(
-                                    segment['segment_type'] ?? 'active',
+                                    segment.segmentType,
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: Colors.blue[900],
@@ -228,7 +230,7 @@ class _SegmentsScreenState extends ConsumerState<SegmentsScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Users: ${segment['user_count'] ?? 0}',
+                              'Users: ${segment.userCount}',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey[600],

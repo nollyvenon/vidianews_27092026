@@ -155,7 +155,7 @@ class _SearchAnalyticsScreenState extends ConsumerState<SearchAnalyticsScreen> {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.blue.withOpacity(0.2),
+                            color: Colors.blue.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
@@ -268,7 +268,7 @@ class _SearchAnalyticsScreenState extends ConsumerState<SearchAnalyticsScreen> {
                                             vertical: 2,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: Colors.grey.withOpacity(0.2),
+                                            color: Colors.grey.withValues(alpha: 0.2),
                                             borderRadius:
                                                 BorderRadius.circular(3),
                                           ),

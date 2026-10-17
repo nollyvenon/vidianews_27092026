@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../models/enterprise_features_models.dart';
+import '../../models/enterprise_features_models.dart' as models;
 import '../../providers/enterprise_features_providers.dart';
 
 class NotificationsScreen extends ConsumerWidget {
@@ -39,7 +39,7 @@ class NotificationsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildNotificationsTab(AsyncValue<List<Notification>> notifs) {
+  Widget _buildNotificationsTab(AsyncValue<List<models.Notification>> notifs) {
     return notifs.when(
       data: (items) => _buildNotificationsList(items),
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -47,7 +47,7 @@ class NotificationsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildNotificationsList(List<Notification> items) {
+  Widget _buildNotificationsList(List<models.Notification> items) {
     if (items.isEmpty) {
       return const Center(child: Text('No notifications'));
     }
@@ -78,7 +78,7 @@ class NotificationsScreen extends ConsumerWidget {
   Widget _buildPreferencesTab(
     BuildContext context,
     WidgetRef ref,
-    AsyncValue<NotificationPreference> prefs,
+    AsyncValue<models.NotificationPreference> prefs,
     int userId,
   ) {
     return prefs.when(
@@ -88,7 +88,7 @@ class NotificationsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildPreferencesForm(NotificationPreference pref) {
+  Widget _buildPreferencesForm(models.NotificationPreference pref) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [

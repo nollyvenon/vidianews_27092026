@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../models/platform_completion_models.dart';
 import '../../providers/platform_completion_providers.dart';
 
 
@@ -90,7 +89,7 @@ class NotificationsScreen extends ConsumerWidget {
                 itemBuilder: (context, index) {
                   final log = data[index];
                   return ListTile(
-                    leading: _getNotificationIcon(log.notificationType),
+                    leading: Icon(_getNotificationIcon(log.notificationType)),
                     title: Text(log.title),
                     subtitle: Text(log.body),
                     trailing: _getStatusBadge(log.status),
@@ -136,7 +135,7 @@ class NotificationsScreen extends ConsumerWidget {
             return Card(
               margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: ListTile(
-                leading: _getSystemNotificationIcon(notification.notificationType),
+                leading: Icon(_getSystemNotificationIcon(notification.notificationType)),
                 title: Text(notification.title),
                 subtitle: Text(notification.message),
                 trailing: Text(notification.createdAt.toString()),
@@ -200,7 +199,7 @@ class NotificationsScreen extends ConsumerWidget {
 
     return Chip(
       label: Text(status),
-      backgroundColor: color.withOpacity(0.3),
+      backgroundColor: color.withValues(alpha: 0.3),
       labelStyle: TextStyle(color: color),
     );
   }

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart'
+import 'package:flutter/material.dart';
 
 class QuotaScreen extends StatelessWidget {
   const QuotaScreen({Key? key}) : super(key: key);

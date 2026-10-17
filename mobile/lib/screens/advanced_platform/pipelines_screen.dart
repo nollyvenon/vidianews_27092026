@@ -37,7 +37,7 @@ class PipelinesScreen extends ConsumerWidget {
                 label: Text(pipeline['status'] as String),
                 backgroundColor: pipeline['status'] == 'active'
                     ? Colors.green.shade200
-                    : Colors.gray.shade200,
+                    : Colors.grey.shade200,
               ),
             ),
           );

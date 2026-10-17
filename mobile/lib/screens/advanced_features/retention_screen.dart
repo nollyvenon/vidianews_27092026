@@ -68,7 +68,7 @@ class RetentionScreen extends ConsumerWidget {
                                         vertical: 4,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: churnColor.withOpacity(0.2),
+                                        color: churnColor.withValues(alpha: 0.2),
                                         border: Border.all(color: churnColor),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
@@ -114,7 +114,7 @@ class RetentionScreen extends ConsumerWidget {
                                     padding: const EdgeInsets.only(top: 8.0),
                                     child: Chip(
                                       label: Text(user.recommendedAction!),
-                                      backgroundColor: Colors.blue.withOpacity(0.2),
+                                      backgroundColor: Colors.blue.withValues(alpha: 0.2),
                                     ),
                                   ),
                               ],

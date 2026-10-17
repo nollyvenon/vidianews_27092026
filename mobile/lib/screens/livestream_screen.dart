@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart'
+import 'package:flutter/material.dart';
 
 class LivestreamScreen extends StatefulWidget {
   const LivestreamScreen({Key? key}) : super(key: key);

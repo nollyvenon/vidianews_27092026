@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart'
+import 'package:flutter/material.dart';
 
 class CacheScreen extends StatelessWidget {
   const CacheScreen({Key? key}) : super(key: key);

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart'
+import 'package:flutter/material.dart';
 
 class PartnershipsScreen extends StatelessWidget {
   const PartnershipsScreen({Key? key}) : super(key: key);

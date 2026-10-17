@@ -50,7 +50,7 @@ class ReadabilityScreen extends ConsumerWidget {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: content.trim().isEmpty ? null : () {
-                        ref.refresh(readabilityProvider(content));
+                        ref.invalidate(readabilityProvider(content));
                       },
                       child: const Padding(
                         padding: EdgeInsets.symmetric(vertical: 12),

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart'
+import 'package:flutter/material.dart';
 
 class IntegrationsScreen extends StatefulWidget {
   const IntegrationsScreen({Key? key}) : super(key: key);

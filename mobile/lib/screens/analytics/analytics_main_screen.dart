@@ -15,7 +15,7 @@ class _AnalyticsMainScreenState extends State<AnalyticsMainScreen> {
   int _currentTabIndex = 0;
 
   final List<Widget> _screens = [
-    const AnalyticsScreen(),
+    AnalyticsScreen(),
     const BehaviorTrackingScreen(),
     const SearchAnalyticsScreen(),
     const SystemHealthScreen(),

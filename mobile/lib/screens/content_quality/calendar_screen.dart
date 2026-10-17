@@ -246,7 +246,7 @@ class ContentCalendarScreen extends ConsumerWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         border: Border(left: BorderSide(color: color, width: 4)),
-        color: color.withOpacity(0.05),
+        color: color.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Column(

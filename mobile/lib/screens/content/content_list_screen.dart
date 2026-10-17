@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:vidianews/services/content_service.dart';
+import 'package:aether_cms/services/content_service.dart';
 import 'content_detail_screen.dart';
 
 class ContentListScreen extends StatefulWidget {
@@ -387,7 +387,7 @@ class ContentCard extends StatelessWidget {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: statusColor.withOpacity(0.2),
+                          color: statusColor.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(

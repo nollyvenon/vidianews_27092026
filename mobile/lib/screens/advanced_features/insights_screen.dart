@@ -71,7 +71,7 @@ class InsightsScreen extends ConsumerWidget {
                                         vertical: 4,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: typeColor.withOpacity(0.2),
+                                        color: typeColor.withValues(alpha: 0.2),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: Text(
@@ -109,7 +109,7 @@ class InsightsScreen extends ConsumerWidget {
                                     if (insight.trend != null)
                                       Chip(
                                         label: Text(insight.trend!),
-                                        backgroundColor: Colors.grey.withOpacity(0.2),
+                                        backgroundColor: Colors.grey.withValues(alpha: 0.2),
                                       ),
                                   ],
                                 ),
@@ -120,7 +120,7 @@ class InsightsScreen extends ConsumerWidget {
                                       width: double.infinity,
                                       padding: const EdgeInsets.all(8.0),
                                       decoration: BoxDecoration(
-                                        color: Colors.blue.withOpacity(0.1),
+                                        color: Colors.blue.withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: Text(

@@ -76,7 +76,7 @@ class APIDocsScreen extends ConsumerWidget {
         methodColor = Colors.red;
         break;
       default:
-        methodColor = Colors.gray;
+        methodColor = Colors.grey;
     }
 
     return Card(
@@ -86,7 +86,7 @@ class APIDocsScreen extends ConsumerWidget {
           width: 50,
           height: 50,
           decoration: BoxDecoration(
-            color: methodColor.withOpacity(0.2),
+            color: methodColor.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Center(

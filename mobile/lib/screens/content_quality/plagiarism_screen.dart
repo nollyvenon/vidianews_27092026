@@ -51,7 +51,7 @@ class PlagiarismScreen extends ConsumerWidget {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: content.trim().isEmpty ? null : () {
-                        ref.refresh(plagiarismProvider(content));
+                        ref.invalidate(plagiarismProvider(content));
                       },
                       child: const Padding(
                         padding: EdgeInsets.symmetric(vertical: 12),

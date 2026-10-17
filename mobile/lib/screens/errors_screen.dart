@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart'
+import 'package:flutter/material.dart';
 
 class ErrorsScreen extends StatelessWidget {
   const ErrorsScreen({Key? key}) : super(key: key);
@@ -40,7 +40,7 @@ class ErrorsScreen extends StatelessWidget {
                             Text(err['type']!, style: const TextStyle(fontWeight: FontWeight.bold)),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(color: bgColor.withOpacity(0.3), borderRadius: BorderRadius.circular(4)),
+                              decoration: BoxDecoration(color: bgColor.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(4)),
                               child: Text(err['severity']!, style: TextStyle(fontSize: 10, color: bgColor, fontWeight: FontWeight.bold)),
                             ),
                           ],

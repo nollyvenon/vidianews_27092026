@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../models/platform_completion_models.dart';
 import '../../providers/platform_completion_providers.dart';
 
 
@@ -50,7 +49,7 @@ class SocialScreen extends ConsumerWidget {
         itemBuilder: (context, index) {
           final interaction = data[index];
           return ListTile(
-            leading: _getInteractionIcon(interaction.interactionType),
+            leading: Icon(_getInteractionIcon(interaction.interactionType)),
             title: Text('${interaction.interactionType.toUpperCase()} - Content #${interaction.contentId}'),
             subtitle: Text(interaction.createdAt.toString()),
             trailing: IconButton(

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart'
+import 'package:flutter/material.dart';
 
 class VideoProcessingScreen extends StatelessWidget {
   const VideoProcessingScreen({Key? key}) : super(key: key);
@@ -27,8 +27,8 @@ class VideoProcessingScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(video['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                      Chip(label: Text(video['status']), backgroundColor: Colors.blue[100]),
+                      Text('${video['name']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Chip(label: Text('${video['status']}'), backgroundColor: Colors.blue[100]),
                     ],
                   ),
                   const SizedBox(height: 8),

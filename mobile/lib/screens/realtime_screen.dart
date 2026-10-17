@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart'
+import 'package:flutter/material.dart';
 
 class RealtimeScreen extends StatefulWidget {
   const RealtimeScreen({Key? key}) : super(key: key);

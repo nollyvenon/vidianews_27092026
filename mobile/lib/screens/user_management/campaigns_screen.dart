@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../models/user_management_models.dart';
 import '../../providers/user_management_providers.dart';
 
 class CampaignsScreen extends ConsumerStatefulWidget {
@@ -55,13 +56,19 @@ class _CampaignsScreenState extends ConsumerState<CampaignsScreen> {
 
       ref.read(emailCampaignsProvider.notifier).update((state) => [
         ...state,
-        {
-          'id': result['id'],
-          'name': _nameController.text,
-          'subject': _subjectController.text,
-          'status': 'draft',
-          'created_at': DateTime.now(),
-        }
+        EmailCampaign(
+          id: result['id'] as int,
+          name: _nameController.text,
+          templateId: 1,
+          subject: _subjectController.text,
+          fromEmail: _emailController.text,
+          recipientCount: 0,
+          sentCount: 0,
+          openCount: 0,
+          clickCount: 0,
+          status: 'draft',
+          createdAt: DateTime.now(),
+        ),
       ]);
 
       _nameController.clear();
@@ -197,7 +204,7 @@ class _CampaignsScreenState extends ConsumerState<CampaignsScreen> {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    campaign['name'] ?? 'Unnamed',
+                                    campaign.name,
                                     style: const TextStyle(
                                       fontWeight: FontWeight.w600,
                                       fontSize: 14,
@@ -214,7 +221,7 @@ class _CampaignsScreenState extends ConsumerState<CampaignsScreen> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Text(
-                                    campaign['status'] ?? 'draft',
+                                    campaign.status,
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: Colors.amber[900],
@@ -226,7 +233,7 @@ class _CampaignsScreenState extends ConsumerState<CampaignsScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              campaign['subject'] ?? '',
+                              campaign.subject,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey[600],
@@ -239,13 +246,12 @@ class _CampaignsScreenState extends ConsumerState<CampaignsScreen> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  'Recipients: ${campaign['recipient_count'] ?? 0}',
+                                  'Recipients: ${campaign.recipientCount}',
                                   style: const TextStyle(fontSize: 11),
                                 ),
                                 Text(
-                                  campaign['created_at'] != null
-                                      ? DateFormat('MMM d').format(
-                                          campaign['created_at'] as DateTime)
+                                  campaign.createdAt != null
+                                      ? DateFormat('MMM d').format(campaign.createdAt!)
                                       : 'Today',
                                   style: const TextStyle(fontSize: 11),
                                 ),

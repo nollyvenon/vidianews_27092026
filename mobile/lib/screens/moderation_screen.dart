@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart'
+import 'package:flutter/material.dart';
 
 class ModerationScreen extends StatelessWidget {
   const ModerationScreen({Key? key}) : super(key: key);

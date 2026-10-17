@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart'
+import 'package:flutter/material.dart';
 
 class GraphQLScreen extends StatelessWidget {
   const GraphQLScreen({Key? key}) : super(key: key);

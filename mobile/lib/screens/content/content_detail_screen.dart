@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:vidianews/services/content_service.dart';
+import 'package:aether_cms/services/content_service.dart';
 
 class ContentDetailScreen extends StatefulWidget {
   final int contentId;
@@ -124,7 +124,7 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
                             ),
                             decoration: BoxDecoration(
                               color: _getStatusColor(content['status'])
-                                  .withOpacity(0.2),
+                                  .withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
@@ -252,8 +252,7 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
           ),
           // Bottom action bar
           bottomNavigationBar: Container(
-            padding: MediaQuery.of(context).viewInsets.bottom +
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + MediaQuery.of(context).viewInsets.bottom),
             child: Row(
               children: [
                 Expanded(

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart'
+import 'package:flutter/material.dart';
 
 class AuditScreen extends StatefulWidget {
   const AuditScreen({Key? key}) : super(key: key);

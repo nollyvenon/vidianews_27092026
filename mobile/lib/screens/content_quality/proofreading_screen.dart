@@ -3,8 +3,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/content_quality_providers.dart';
-import 'widgets/quality_score_widget.dart';
-import 'widgets/issue_list_widget.dart';
+import 'package:aether_cms/widgets/quality_score_widget.dart';
+import 'package:aether_cms/widgets/issue_list_widget.dart';
 
 class ProofreadingScreen extends ConsumerWidget {
   const ProofreadingScreen({Key? key}) : super(key: key);
@@ -119,7 +119,7 @@ class ProofreadingScreen extends ConsumerWidget {
       width: double.infinity,
       child: ElevatedButton(
         onPressed: content.trim().isEmpty ? null : () {
-          ref.refresh(proofreadingProvider(content));
+          ref.invalidate(proofreadingProvider(content));
         },
         child: const Padding(
           padding: EdgeInsets.symmetric(vertical: 12),

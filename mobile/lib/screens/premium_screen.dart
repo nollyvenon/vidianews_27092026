@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart'
+import 'package:flutter/material.dart';
 
 class PremiumScreen extends StatelessWidget {
   const PremiumScreen({Key? key}) : super(key: key);

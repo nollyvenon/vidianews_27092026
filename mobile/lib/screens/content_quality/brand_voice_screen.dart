@@ -50,7 +50,7 @@ class BrandVoiceScreen extends ConsumerWidget {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: content.trim().isEmpty ? null : () {
-                        ref.refresh(brandVoiceProvider(content));
+                        ref.invalidate(brandVoiceProvider(content));
                       },
                       child: const Padding(
                         padding: EdgeInsets.symmetric(vertical: 12),
@@ -269,7 +269,7 @@ class BrandVoiceScreen extends ConsumerWidget {
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Text(

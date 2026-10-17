@@ -30,7 +30,7 @@ class SecurityScreen extends ConsumerWidget {
             userRole.when(
               data: (role) => _buildRoleCard(role),
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, stack) => ErrorWidget(error: err.toString()),
+              error: (err, stack) => Center(child: Text('Error: $err')),
             ),
             const SizedBox(height: 24),
             Text(
@@ -41,7 +41,7 @@ class SecurityScreen extends ConsumerWidget {
             auditLogs.when(
               data: (logs) => _buildAuditLogsList(logs),
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, stack) => ErrorWidget(error: err.toString()),
+              error: (err, stack) => Center(child: Text('Error: $err')),
             ),
           ],
         ),

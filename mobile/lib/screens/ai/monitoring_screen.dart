@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart'
+import 'package:flutter/material.dart';
 
 class MonitoringScreen extends StatefulWidget {
   const MonitoringScreen({Key? key}) : super(key: key);
@@ -133,7 +133,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8),
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
         ),
         child: Padding(
           padding: const EdgeInsets.all(16),

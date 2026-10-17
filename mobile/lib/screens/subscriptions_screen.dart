@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart'
+import 'package:flutter/material.dart';
 
 class SubscriptionsScreen extends StatelessWidget {
   const SubscriptionsScreen({Key? key}) : super(key: key);

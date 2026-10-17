@@ -83,7 +83,7 @@ class _LocalizationScreenState extends State<LocalizationScreen> {
                 const Text('Localization Settings', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: dateFormat,
+                  initialValue: dateFormat,
                   decoration: const InputDecoration(labelText: 'Date Format'),
                   items: ['MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD']
                       .map((f) => DropdownMenuItem(value: f, child: Text(f)))
@@ -92,7 +92,7 @@ class _LocalizationScreenState extends State<LocalizationScreen> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  value: timeZone,
+                  initialValue: timeZone,
                   decoration: const InputDecoration(labelText: 'Time Zone'),
                   items: ['UTC', 'EST', 'PST', 'GMT']
                       .map((z) => DropdownMenuItem(value: z, child: Text(z)))

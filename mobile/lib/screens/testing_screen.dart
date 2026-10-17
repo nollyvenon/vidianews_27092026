@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart'
+import 'package:flutter/material.dart';
 
 class TestingScreen extends StatelessWidget {
   const TestingScreen({Key? key}) : super(key: key);

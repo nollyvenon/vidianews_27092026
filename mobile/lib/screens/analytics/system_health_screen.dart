@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/analytics_providers.dart';
+import '../../models/analytics_models.dart';
 
 class SystemHealthScreen extends ConsumerWidget {
   const SystemHealthScreen({Key? key}) : super(key: key);
@@ -96,7 +97,7 @@ class SystemHealthScreen extends ConsumerWidget {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.2),
+                    color: statusColor.withValues(alpha: 0.2),
                     border: Border.all(color: statusColor),
                     borderRadius: BorderRadius.circular(20),
                   ),
@@ -210,7 +211,7 @@ class SystemHealthScreen extends ConsumerWidget {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.2),
+                        color: statusColor.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
@@ -301,10 +302,9 @@ class SystemHealthScreen extends ConsumerWidget {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: flag.enabled ? Colors.green : Colors.grey,
                         color: flag.enabled
-                            ? Colors.green.withOpacity(0.2)
-                            : Colors.grey.withOpacity(0.2),
+                            ? Colors.green.withValues(alpha: 0.2)
+                            : Colors.grey.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(

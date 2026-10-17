@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart'
+import 'package:flutter/material.dart';
 
 class FeaturesScreen extends StatelessWidget {
   const FeaturesScreen({Key? key}) : super(key: key);
@@ -38,7 +38,7 @@ class FeaturesScreen extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(flag['name']!, style: const TextStyle(fontWeight: FontWeight.bold)),
-                            Chip(label: Text(flag['status']!))
+                            Chip(label: Text(flag['status']!), backgroundColor: statusColor.withValues(alpha: 0.2))
                           ],
                         ),
                         const SizedBox(height: 8),

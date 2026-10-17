@@ -140,7 +140,7 @@ class RecommendationsScreen extends ConsumerWidget {
                                         vertical: 4,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: Colors.blue.withOpacity(0.2),
+                                        color: Colors.blue.withValues(alpha: 0.2),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: Text(
@@ -174,11 +174,11 @@ class RecommendationsScreen extends ConsumerWidget {
                                   children: [
                                     Chip(
                                       label: Text(rec.clicked ? 'Clicked' : 'Not clicked'),
-                                      backgroundColor: rec.clicked ? Colors.green.withOpacity(0.2) : Colors.grey.withOpacity(0.2),
+                                      backgroundColor: rec.clicked ? Colors.green.withValues(alpha: 0.2) : Colors.grey.withValues(alpha: 0.2),
                                     ),
                                     Chip(
                                       label: Text(rec.conversion ? 'Converted' : 'No conversion'),
-                                      backgroundColor: rec.conversion ? Colors.orange.withOpacity(0.2) : Colors.grey.withOpacity(0.2),
+                                      backgroundColor: rec.conversion ? Colors.orange.withValues(alpha: 0.2) : Colors.grey.withValues(alpha: 0.2),
                                     ),
                                   ],
                                 ),
