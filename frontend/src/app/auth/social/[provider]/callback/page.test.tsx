@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import SocialLoginCallbackPage from '@/app/auth/social/[provider]/callback/page'
 import { ApiClient } from '@/lib/api-client'
+import { ApiError } from '@/lib/api-error'
 
 jest.mock('@/lib/api-client', () => ({ ApiClient: { post: jest.fn() } }))
 jest.mock('next/navigation', () => ({
@@ -64,8 +65,25 @@ describe('/auth/social/[provider]/callback page', () => {
     expect(mockedPost).not.toHaveBeenCalled()
   })
 
+  it('confirms a mobile sign-in without storing tokens in the browser', async () => {
+    mockedPost.mockResolvedValueOnce({ handoff: true })
+    render(<SocialLoginCallbackPage />)
+
+    expect(await screen.findByText('You are signed in')).toBeInTheDocument()
+    expect(replace).not.toHaveBeenCalled()
+    expect(localStorage.getItem('token')).toBeNull()
+  })
+
+  it('treats a response with no tokens and no handoff as a failed sign-in', async () => {
+    mockedPost.mockResolvedValueOnce({})
+    render(<SocialLoginCallbackPage />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The sign-in response was incomplete')
+    expect(replace).not.toHaveBeenCalled()
+  })
+
   it('shows the server message and stores nothing when the exchange is rejected', async () => {
-    mockedPost.mockRejectedValueOnce(new Error('Login state does not match this provider'))
+    mockedPost.mockRejectedValueOnce(new ApiError('Login state does not match this provider'))
     render(<SocialLoginCallbackPage />)
     expect(await screen.findByRole('alert')).toHaveTextContent('Login state does not match this provider')
     expect(replace).not.toHaveBeenCalled()

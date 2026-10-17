@@ -4,17 +4,24 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { ApiClient } from '@/lib/api-client'
+import { errorMessage } from '@/lib/api-error'
 
 interface SocialTokenResponse {
-  access_token: string
-  refresh_token: string
-  token_type: string
+  access_token?: string
+  refresh_token?: string
+  token_type?: string
+  /** True for a mobile sign-in: the tokens belong to the app, not this browser. */
+  handoff?: boolean
 }
 
-/** Receives the provider redirect, exchanges the code for local tokens and enters the dashboard. */
+/**
+ * Receives the provider redirect, exchanges the code for local tokens and enters the dashboard.
+ * For a mobile sign-in it only confirms the sign-in; the app collects the tokens itself.
+ */
 export default function SocialLoginCallbackPage() {
   const params = useParams<{ provider: string }>()
   const [error, setError] = useState('')
+  const [signedInOnDevice, setSignedInOnDevice] = useState(false)
 
   useEffect(() => {
     const query = new URLSearchParams(window.location.search)
@@ -33,15 +40,34 @@ export default function SocialLoginCallbackPage() {
 
     ApiClient.post(`/auth/social/${params.provider}/exchange`, { code, state })
       .then((tokens: SocialTokenResponse) => {
+        if (tokens.handoff) {
+          setSignedInOnDevice(true)
+          return
+        }
+        if (!tokens.access_token || !tokens.refresh_token) {
+          setError('The sign-in response was incomplete. Please try again.')
+          return
+        }
         localStorage.setItem('token', tokens.access_token)
         localStorage.setItem('refresh_token', tokens.refresh_token)
         // Full navigation so the auth provider re-reads the stored session on load.
         window.location.replace('/dashboard')
       })
-      .catch((err: Error) => {
-        setError(err.message || 'Social sign-in failed')
+      .catch((err: unknown) => {
+        setError(errorMessage(err, 'Social sign-in failed'))
       })
   }, [params.provider])
+
+  if (signedInOnDevice) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="w-full max-w-md rounded-lg bg-white p-8 shadow">
+          <h1 className="text-xl font-semibold text-gray-900">You are signed in</h1>
+          <p className="mt-3 text-sm text-gray-700">Return to the app to continue. You can close this page.</p>
+        </div>
+      </div>
+    )
+  }
 
   if (error) {
     return (
