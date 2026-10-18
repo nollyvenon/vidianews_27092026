@@ -3,7 +3,7 @@
 from fastapi import APIRouter
 
 # Import endpoints
-from app.api.v1 import overview, auth, health, tenants, organizations, profiles, settings, notifications, activity, content, ai_providers, ai_core, ai_advanced, integrations, advanced_features, monetization, security_performance, api_monitoring, logging_analytics, social_messaging, streaming_premium, community_compliance, content_quality, publishing_distribution, user_management, enterprise_features, analytics_reporting, platform_completion, advanced_platform, ecommerce, ecommerce_extended, marketing, memberships, courses, analytics_admin, social_auth, billing_admin, outbound_webhooks, test_reports, rbac
+from app.api.v1 import overview, auth, health, tenants, organizations, profiles, settings, notifications, activity, content, ai_providers, ai_core, ai_advanced, integrations, advanced_features, monetization, security_performance, api_monitoring, logging_analytics, social_messaging, streaming_premium, community_compliance, content_quality, publishing_distribution, user_management, enterprise_features, analytics_reporting, platform_completion, advanced_platform, ecommerce, ecommerce_extended, marketing, memberships, courses, analytics_admin, social_auth, billing_admin, billing_account, outbound_webhooks, test_reports, rbac
 
 api_router = APIRouter()
 
@@ -75,3 +75,4 @@ api_router.include_router(billing_admin.router, tags=["billing-admin"])
 api_router.include_router(outbound_webhooks.router, tags=["outbound-webhooks"])
 api_router.include_router(test_reports.router, tags=["test-reports"])
 api_router.include_router(rbac.router, tags=["rbac"])
+api_router.include_router(billing_account.router, tags=["billing"])
