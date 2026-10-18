@@ -123,6 +123,8 @@ class WebhookService:
 
 
 class TestingService:
+    __test__ = False  # Not a pytest test class; prevents collection warnings.
+
     def __init__(self, session: AsyncSession):
         self.session = session
 
