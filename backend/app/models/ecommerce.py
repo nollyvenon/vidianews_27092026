@@ -2,13 +2,13 @@
 
 from sqlalchemy import (
     Column, Integer, String, DateTime, Boolean, ForeignKey, JSON, Text,
-    Enum as SQLEnum, Float, Index, Table, UniqueConstraint, Numeric, DECIMAL
+    Enum as SQLEnum, Float, Index, DECIMAL
 )
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
+from decimal import Decimal
 from app.db.base import Base
 import enum
-import uuid
 
 
 # ============================================================================
@@ -354,6 +354,30 @@ class PaymentDetail(Base):
         Index("idx_payment_status", "status"),
         Index("idx_payment_transaction", "transaction_id"),
     )
+
+
+class DiscountType(str, enum.Enum):
+    """How a coupon reduces the subtotal"""
+    PERCENT = "percent"
+    FIXED = "fixed"
+
+
+class Coupon(Base):
+    """Discount codes that customers apply at checkout and administrators manage"""
+    __tablename__ = "coupons"
+
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String(50), nullable=False, unique=True, index=True)
+    discount_type = Column(SQLEnum(DiscountType), nullable=False)
+    discount_value = Column(DECIMAL(12, 2), nullable=False)
+    min_subtotal = Column(DECIMAL(12, 2), nullable=False, default=Decimal("0.00"))
+    max_redemptions = Column(Integer, nullable=True)
+    redemption_count = Column(Integer, nullable=False, default=0)
+    valid_from = Column(DateTime(timezone=True), nullable=True)
+    valid_until = Column(DateTime(timezone=True), nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
 class Refund(Base):

@@ -6,6 +6,7 @@ import pytest
 
 from app.models.ecommerce import (
     CheckoutSession,
+    DiscountType,
     Order,
     OrderStatus,
     PaymentDetail,
@@ -14,6 +15,7 @@ from app.models.ecommerce import (
     ProductStatus,
 )
 from app.models.user import User
+from app.services.coupon_service import CouponService
 from app.services.ecommerce_service import (
     CartService,
     CheckoutService,
@@ -218,10 +220,20 @@ class TestCheckoutService:
         assert (await CheckoutService(session).get_checkout_session(sample_checkout.id)).id == sample_checkout.id
 
     async def test_apply_coupon(self, session, sample_checkout):
+        await CouponService.create_coupon(session, {
+            "code": "discount10", "discount_type": DiscountType.PERCENT, "discount_value": Decimal("10"),
+        })
         await CheckoutService(session).apply_coupon(sample_checkout.id, "DISCOUNT10")
         await session.refresh(sample_checkout)
         assert sample_checkout.coupon_code == "DISCOUNT10"
-        assert sample_checkout.discount > Decimal("0.00")
+        assert sample_checkout.discount == Decimal("10.00")
+        assert sample_checkout.total == sample_checkout.subtotal + sample_checkout.tax + sample_checkout.shipping_cost - Decimal("10.00")
+
+    async def test_unknown_coupon_is_refused(self, session, sample_checkout):
+        from app.utils.exceptions import ValidationError
+
+        with pytest.raises(ValidationError):
+            await CheckoutService(session).apply_coupon(sample_checkout.id, "NOPE")
 
 
 class TestPaymentService:

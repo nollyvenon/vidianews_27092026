@@ -317,3 +317,25 @@ class TestMissingRecordsAndListings:
         response = await async_client.get(f"/api/v1/orders/{order.id}/returns", headers=await _headers_for(session, 2))
         assert response.status_code == 200
         assert len(response.json()) == 1
+
+
+class TestOrderShipments:
+    async def test_owner_and_administrators_list_an_orders_shipments(
+        self, async_client, platform_admin, reference_data, session,
+    ):
+        order = await _order(session, 2)
+        await ShippingService.create_shipment(session, order.id, {
+            "carrier": ShippingCarrier.DHL, "tracking_number": "DHL-LIST-1", "base_rate": Decimal("3"), "total_cost": Decimal("4"),
+        })
+        owner = await async_client.get(f"/api/v1/orders/{order.id}/shipments", headers=await _headers_for(session, 2))
+        admin = await async_client.get(f"/api/v1/orders/{order.id}/shipments", headers=platform_admin)
+        assert owner.status_code == 200
+        assert [row["tracking_number"] for row in owner.json()] == ["DHL-LIST-1"]
+        assert admin.status_code == 200
+
+    async def test_other_customers_cannot_see_an_orders_shipments(self, async_client, reference_data, session):
+        order = await _order(session, 2)
+        stranger = await async_client.get(f"/api/v1/orders/{order.id}/shipments", headers=await _stranger_headers(session))
+        missing = await async_client.get("/api/v1/orders/999999/shipments", headers=await _headers_for(session, 2))
+        assert stranger.status_code == 404
+        assert missing.status_code == 404

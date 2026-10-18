@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import select
 
 from app.models.ecommerce import Order, OrderItem, PaymentMethod, Product, ProductCategory, ProductStatus
 from app.models.ecommerce_extended import InventoryStatus, Return, ReturnReason, ReturnStatus, ShippingCarrier
@@ -271,13 +272,13 @@ class TestReturns:
         request = await ReturnService.create_return_request(session, order.id, {
             "reason": ReturnReason.DEFECTIVE, "quantity_requested": 2,
         })
-        await ReturnService.approve_return(session, request.id, Decimal("35.00"))
+        await ReturnService.approve_return(session, request.id, Decimal("15.00"))
         await ReturnService.create_return_shipment(session, request.id, {"carrier": ShippingCarrier.USPS, "tracking_number": "RS-1"})
         await ReturnService.receive_return(session, request.id, 2)
         await ReturnService.process_refund(session, request.id)
         refreshed = await ReturnService.get_return_request(session, request.id)
         assert refreshed.status == ReturnStatus.REFUNDED
-        assert refreshed.refund_amount == Decimal("35.00")
+        assert refreshed.refund_amount == Decimal("15.00")
         assert refreshed.approved_at and refreshed.received_at and refreshed.refunded_at
 
     async def test_moves_out_of_order_are_refused(self, session, order):
@@ -348,3 +349,74 @@ class TestReturns:
         assert await return_order_owner_id(session, request.id) == owner.id
         assert await return_order_owner_id(session, 999999) is None
         assert isinstance(await ReturnService.get_return_request(session, request.id), Return)
+
+
+class TestReturnRefunds:
+    async def _received_return(self, session, order, order_item, quantity: int = 1, approved_amount=None):
+        request = await ReturnService.create_return_request(session, order.id, {
+            "reason": ReturnReason.DEFECTIVE, "quantity_requested": quantity, "order_item_id": order_item.id,
+        })
+        await ReturnService.approve_return(session, request.id, approved_amount)
+        await ReturnService.receive_return(session, request.id, quantity)
+        return request
+
+    async def test_stripe_paid_return_is_refunded_through_stripe(self, session, order, order_item, monkeypatch):
+        import stripe
+        from types import SimpleNamespace
+
+        from app.models.ecommerce import CheckoutSession, PaymentDetail, PaymentMethod, PaymentStatus, Refund
+        from app.services.ecommerce_service import CartService
+
+        order.payment_id = "pi_refund_1"
+        cart = await CartService(session).get_or_create_cart(order.user_id)
+        checkout = CheckoutSession(
+            checkout_token="refund-checkout", user_id=order.user_id, cart_id=cart.id, billing_address={},
+            shipping_address={}, email="owner@example.com", subtotal=Decimal("20.00"), total=Decimal("20.00"),
+        )
+        session.add(checkout)
+        await session.commit()
+        session.add(PaymentDetail(
+            checkout_id=checkout.id, payment_method=PaymentMethod.STRIPE, amount=Decimal("20.00"), currency="USD",
+            status=PaymentStatus.COMPLETED, transaction_id="pi_refund_1", stripe_payment_intent_id="pi_refund_1",
+        ))
+        await session.commit()
+        calls = []
+
+        def fake_refund(**kwargs):
+            calls.append(kwargs)
+            return SimpleNamespace(id="re_test_1")
+
+        monkeypatch.setattr(stripe.Refund, "create", fake_refund)
+
+        request = await self._received_return(session, order, order_item)
+        await ReturnService.process_refund(session, request.id)
+
+        refreshed = await ReturnService.get_return_request(session, request.id)
+        assert refreshed.status == ReturnStatus.REFUNDED
+        assert refreshed.refund_method == "stripe"
+        assert refreshed.refund_amount == Decimal("20.00")
+        assert calls == [{"payment_intent": "pi_refund_1", "amount": 2000}]
+        assert (await session.execute(select(Refund))).scalars().one().refund_transaction_id == "re_test_1"
+
+    async def test_orders_paid_another_way_are_refunded_manually(self, session, order, order_item):
+        request = await self._received_return(session, order, order_item)
+        await ReturnService.process_refund(session, request.id)
+        refreshed = await ReturnService.get_return_request(session, request.id)
+        assert refreshed.refund_method == "manual"
+        assert refreshed.refund_amount == Decimal("20.00")
+
+    async def test_refund_cannot_exceed_the_order_total(self, session, order, order_item):
+        request = await self._received_return(session, order, order_item, approved_amount=Decimal("999.00"))
+        with pytest.raises(ValidationError):
+            await ReturnService.process_refund(session, request.id)
+        refreshed = await ReturnService.get_return_request(session, request.id)
+        assert refreshed.status == ReturnStatus.RECEIVED
+
+    async def test_return_without_an_amount_or_item_is_refused(self, session, order):
+        request = await ReturnService.create_return_request(session, order.id, {
+            "reason": ReturnReason.OTHER, "quantity_requested": 1,
+        })
+        await ReturnService.approve_return(session, request.id)
+        await ReturnService.receive_return(session, request.id, 1)
+        with pytest.raises(ValidationError):
+            await ReturnService.process_refund(session, request.id)

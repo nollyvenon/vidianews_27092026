@@ -46,8 +46,8 @@ async def test_deployed_prediction_models_reach_their_handler(async_client, org_
     assert isinstance(response.json(), list)
 
 
-async def test_pending_returns_reach_their_handler(async_client, org_member):
-    response = await async_client.get("/api/v1/returns/pending", headers=org_member)
+async def test_pending_returns_reach_their_handler(async_client, platform_admin):
+    response = await async_client.get("/api/v1/returns/pending", headers=platform_admin)
 
     assert response.status_code == 200
     assert isinstance(response.json(), list)

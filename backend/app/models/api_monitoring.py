@@ -1,6 +1,6 @@
 """API, Monitoring & Testing models: Modules 41-45"""
 
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, JSON, Text, Enum as SQLEnum, Index, Float, Float as SQLFloat
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, JSON, Text, Enum as SQLEnum, Float
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from app.db.base import Base
@@ -120,6 +120,7 @@ class WebhookEvent(Base):
 
 class TestSuite(Base):
     __tablename__ = "test_suites"
+    __test__ = False  # a model, not a pytest test class
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False, unique=True)
     test_count = Column(Integer, default=0)
@@ -132,6 +133,7 @@ class TestSuite(Base):
 
 class TestResult(Base):
     __tablename__ = "test_results"
+    __test__ = False  # a model, not a pytest test class
     id = Column(Integer, primary_key=True, index=True)
     test_suite_id = Column(Integer, ForeignKey("test_suites.id", ondelete="CASCADE"), nullable=False)
     test_name = Column(String(255), nullable=False)

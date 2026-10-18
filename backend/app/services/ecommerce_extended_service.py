@@ -14,7 +14,7 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.ecommerce import Order, OrderItem, Product
+from app.models.ecommerce import Order, OrderItem, PaymentDetail, PaymentMethod, PaymentStatus, Product
 from app.models.ecommerce_extended import (
     InventoryLevel,
     InventoryStatus,
@@ -29,7 +29,10 @@ from app.models.ecommerce_extended import (
     Wishlist,
     WishlistItem,
 )
+from app.services.ecommerce_service import PaymentService
 from app.utils.exceptions import NotFoundError, ValidationError
+
+CENT = Decimal("0.01")
 
 
 def _now() -> datetime:
@@ -82,6 +85,11 @@ class ShippingService:
         await db.commit()
         await db.refresh(shipment)
         return shipment
+
+    @staticmethod
+    async def get_order_shipments(db: AsyncSession, order_id: int) -> List[Shipment]:
+        result = await db.execute(select(Shipment).where(Shipment.order_id == order_id).order_by(Shipment.id))
+        return list(result.scalars().all())
 
     @staticmethod
     async def get_shipment(db: AsyncSession, shipment_id: int) -> Optional[Shipment]:
@@ -378,9 +386,45 @@ class ReturnService:
         await db.commit()
 
     @staticmethod
+    async def _refund_amount(db: AsyncSession, return_request: Return) -> Decimal:
+        """The approved amount, or the unit price of the returned items when none was approved."""
+        if return_request.refund_amount is not None:
+            return Decimal(return_request.refund_amount).quantize(CENT)
+        if return_request.order_item_id is None:
+            raise ValidationError("A refund amount must be approved for this return")
+        item = await db.get(OrderItem, return_request.order_item_id)
+        if item is None:
+            raise NotFoundError("Order item")
+        quantity = return_request.quantity_received if return_request.quantity_received is not None else return_request.quantity_requested
+        return (Decimal(item.unit_price) * quantity).quantize(CENT)
+
+    @staticmethod
     async def process_refund(db: AsyncSession, return_id: int) -> None:
+        """Refund a received return. Stripe orders are refunded through Stripe before the return is marked refunded."""
         return_request = await ReturnService._return(db, return_id)
-        ReturnService._move(return_request, (ReturnStatus.RECEIVED,), ReturnStatus.REFUNDED)
+        if return_request.status != ReturnStatus.RECEIVED:
+            raise ValidationError(
+                f"Return cannot move from {return_request.status.value} to {ReturnStatus.REFUNDED.value}"
+            )
+        order = await db.get(Order, return_request.order_id)
+        amount = await ReturnService._refund_amount(db, return_request)
+        if amount <= 0 or amount > Decimal(order.total):
+            raise ValidationError("Refund amount must be positive and no more than the order total")
+
+        payment = None
+        if order.payment_method == PaymentMethod.STRIPE and order.payment_id:
+            payment = (await db.execute(select(PaymentDetail).where(
+                PaymentDetail.transaction_id == order.payment_id,
+                PaymentDetail.status == PaymentStatus.COMPLETED,
+            ))).scalars().first()
+        if payment is not None:
+            await PaymentService(db).process_refund(payment.id, amount, f"Return {return_request.rma_number}")
+            return_request.refund_method = "stripe"
+        else:
+            return_request.refund_method = "manual"
+
+        return_request.refund_amount = amount
+        return_request.status = ReturnStatus.REFUNDED
         return_request.refunded_at = _now()
         await db.commit()
 

@@ -211,6 +211,18 @@ async def create_shipment(
     return await ShippingService.create_shipment(db, order_id, shipment.model_dump())
 
 
+@router.get("/orders/{order_id}/shipments", response_model=List[ShipmentResponse])
+async def get_order_shipments(
+    order_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Shipments for an order, visible to the order's owner and administrators"""
+    if not await _may_see_order(db, current_user, await order_owner_id(db, order_id)):
+        raise NotFoundError("Order")
+    return await ShippingService.get_order_shipments(db, order_id)
+
+
 @router.post("/shipments/{shipment_id}/tracking", response_model=TrackingEventResponse, status_code=201)
 async def add_tracking_event(
     shipment_id: int,

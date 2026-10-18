@@ -88,7 +88,7 @@ class TestCacheSummary:
 
 
 class TestPendingJobs:
-    async def test_pending_jobs_are_listed_with_their_priority(self, async_client, org_member, reset_test_database):
+    async def test_pending_jobs_are_listed_with_their_priority(self, async_client, platform_admin, reset_test_database):
         with Session(reset_test_database) as session:
             session.add_all([
                 BackgroundJob(job_type="email_notification", status=JobStatus.PENDING, priority=2, payload={}),
@@ -96,7 +96,7 @@ class TestPendingJobs:
             ])
             session.commit()
 
-        response = await async_client.get("/api/v1/jobs/pending", headers=org_member)
+        response = await async_client.get("/api/v1/jobs/pending", headers=platform_admin)
 
         assert response.status_code == 200
         types = [row["job_type"] for row in response.json()]

@@ -15,15 +15,16 @@ from typing import List, Optional
 
 import stripe
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.admin_access import is_admin, require_admin
 from app.core.config import settings
 from app.core.security import get_current_user, get_optional_current_user
 from app.db.session import get_db
-from app.models.ecommerce import CartItem, ProductStatus
+from app.models.ecommerce import CartItem, DiscountType, ProductStatus
 from app.models.user import User
+from app.services.coupon_service import CouponService
 from app.services.ecommerce_service import (
     CartService,
     CheckoutService,
@@ -320,8 +321,73 @@ async def apply_coupon(
     checkout = await CheckoutService(session).get_checkout_session(checkout_id)
     if checkout is None or checkout.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Checkout not found")
-    await CheckoutService(session).apply_coupon(checkout_id, coupon_code)
-    return {"status": "success"}
+    checkout = await CheckoutService(session).apply_coupon(checkout_id, coupon_code)
+    return {
+        "status": "success",
+        "coupon_code": checkout.coupon_code,
+        "discount": checkout.discount,
+        "total": checkout.total,
+    }
+
+
+class CouponRequest(BaseModel):
+    code: str = Field(min_length=3, max_length=50)
+    discount_type: DiscountType
+    discount_value: Decimal = Field(gt=0)
+    min_subtotal: Decimal = Field(default=Decimal("0.00"), ge=0)
+    max_redemptions: Optional[int] = Field(default=None, ge=1)
+    valid_from: Optional[datetime] = None
+    valid_until: Optional[datetime] = None
+
+
+class CouponStatusRequest(BaseModel):
+    is_active: bool
+
+
+class CouponResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    code: str
+    discount_type: DiscountType
+    discount_value: Decimal
+    min_subtotal: Decimal
+    max_redemptions: Optional[int]
+    redemption_count: int
+    valid_from: Optional[datetime]
+    valid_until: Optional[datetime]
+    is_active: bool
+    created_at: Optional[datetime]
+
+
+@router.get("/coupons", response_model=List[CouponResponse])
+async def list_coupons(
+    _admin: User = Depends(require_ecommerce_admin),
+    session: AsyncSession = Depends(get_db),
+):
+    """Every coupon with its redemption count (administrators only)"""
+    return await CouponService.list_coupons(session)
+
+
+@router.post("/coupons", response_model=CouponResponse, status_code=201)
+async def create_coupon(
+    request: CouponRequest,
+    _admin: User = Depends(require_ecommerce_admin),
+    session: AsyncSession = Depends(get_db),
+):
+    """Create a discount code (administrators only)"""
+    return await CouponService.create_coupon(session, request.model_dump())
+
+
+@router.patch("/coupons/{coupon_id}", response_model=CouponResponse)
+async def set_coupon_status(
+    coupon_id: int,
+    request: CouponStatusRequest,
+    _admin: User = Depends(require_ecommerce_admin),
+    session: AsyncSession = Depends(get_db),
+):
+    """Enable or disable a discount code (administrators only)"""
+    return await CouponService.set_active(session, coupon_id, request.is_active)
 
 
 # ============================================================================

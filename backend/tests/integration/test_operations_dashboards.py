@@ -84,34 +84,34 @@ class TestVideoProcessing:
 
 
 class TestLiveFeed:
-    async def test_a_broadcast_appears_in_the_feed_newest_first(self, async_client, org_member):
+    async def test_a_broadcast_appears_in_the_feed_newest_first(self, async_client, platform_admin):
         first = await async_client.post(
             "/api/v1/websocket/broadcast",
             json={"event_type": "message", "event_source": "live-feed", "user_ids": [], "payload": {"message": "First"}},
-            headers=org_member,
+            headers=platform_admin,
         )
         second = await async_client.post(
             "/api/v1/websocket/broadcast",
             json={"event_type": "message", "event_source": "live-feed", "user_ids": [], "payload": {"message": "Second"}},
-            headers=org_member,
+            headers=platform_admin,
         )
         assert first.status_code == 200 and second.status_code == 200
 
-        feed = await async_client.get("/api/v1/websocket/events?limit=10", headers=org_member)
+        feed = await async_client.get("/api/v1/websocket/events?limit=10", headers=platform_admin)
 
         assert feed.status_code == 200
         assert [event["payload"]["message"] for event in feed.json()] == ["Second", "First"]
         assert feed.json()[0]["event_source"] == "live-feed"
 
-    async def test_the_feed_limit_is_enforced(self, async_client, org_member):
+    async def test_the_feed_limit_is_enforced(self, async_client, platform_admin):
         for index in range(3):
             await async_client.post(
                 "/api/v1/websocket/broadcast",
                 json={"event_type": "message", "event_source": "live-feed", "user_ids": [], "payload": {"message": str(index)}},
-                headers=org_member,
+                headers=platform_admin,
             )
 
-        feed = await async_client.get("/api/v1/websocket/events?limit=2", headers=org_member)
+        feed = await async_client.get("/api/v1/websocket/events?limit=2", headers=platform_admin)
 
         assert len(feed.json()) == 2
 

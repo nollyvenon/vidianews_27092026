@@ -31,6 +31,7 @@ from app.models.ecommerce import (
     Refund,
     ShippingStatus,
 )
+from app.services.coupon_service import CouponService
 from app.utils.exceptions import NotFoundError
 
 # Shipping charges by method, in the order currency. The checkout total adds the chosen rate.
@@ -41,7 +42,6 @@ SHIPPING_RATES = {
 }
 
 TAX_RATE = Decimal("0.08")
-COUPON_RATE = Decimal("0.10")
 
 
 def _utc_now_naive() -> datetime:
@@ -277,15 +277,11 @@ class CheckoutService:
         await self.session.refresh(checkout)
         return checkout
 
-    async def apply_coupon(self, checkout_id: int, coupon_code: str) -> None:
+    async def apply_coupon(self, checkout_id: int, coupon_code: str) -> CheckoutSession:
         checkout = await self.get_checkout_session(checkout_id)
         if checkout is None:
             raise NotFoundError("Checkout")
-        checkout.coupon_code = coupon_code
-        discount = COUPON_RATE * checkout.subtotal
-        checkout.discount = discount
-        checkout.total = checkout.subtotal + checkout.tax + checkout.shipping_cost - discount
-        await self.session.commit()
+        return await CouponService.apply_to_checkout(self.session, checkout, coupon_code)
 
 
 class PaymentService:
