@@ -2,53 +2,79 @@
 
 import { useEffect, useState } from 'react'
 import { ApiClient } from '@/lib/api-client'
+import { errorMessage } from '@/lib/api-error'
+
+interface UsageStats {
+  period_days: number
+  total: number
+  average: number
+  count: number
+}
+
+interface DailyUsage {
+  date: string
+  total: number
+}
+
+interface CostAlert {
+  id: number
+  threshold: number
+  period: string
+}
 
 export default function MonitoringPage() {
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<UsageStats>({
     period_days: 30,
     total: 0,
     average: 0,
     count: 0,
   })
-  const [alerts, setAlerts] = useState([])
+  const [daily, setDaily] = useState<DailyUsage[]>([])
+  const [alerts, setAlerts] = useState<CostAlert[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [newAlertThreshold, setNewAlertThreshold] = useState('100')
 
+  const loadAlerts = () =>
+    ApiClient.get('/ai/alerts')
+      .then((data: CostAlert[]) => setAlerts(Array.isArray(data) ? data : []))
+      .catch((err) => setError(errorMessage(err, 'Cost alerts could not be loaded.')))
+
   useEffect(() => {
-    fetchStats()
-    fetchAlerts()
+    let active = true
+    Promise.all([
+      ApiClient.get('/ai/metrics/usage?days=30'),
+      ApiClient.get('/ai/metrics/usage/daily?days=7'),
+      ApiClient.get('/ai/alerts'),
+    ])
+      .then(([usage, days, alertRows]) => {
+        if (!active) return
+        setStats(usage)
+        setDaily(Array.isArray(days) ? days : [])
+        setAlerts(Array.isArray(alertRows) ? alertRows : [])
+      })
+      .catch((err) => {
+        if (active) setError(errorMessage(err, 'AI usage could not be loaded.'))
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
   }, [])
 
-  const fetchStats = async () => {
-    try {
-      const data = await ApiClient.get('/ai/metrics/usage?days=30')
-      setStats(data)
-    } catch (err) {
-      console.error('Failed to fetch stats', err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchAlerts = async () => {
-    try {
-      const data = await ApiClient.get('/ai/alerts')
-      setAlerts(data)
-    } catch (err) {
-      console.error('Failed to fetch alerts', err)
-    }
-  }
-
   const createAlert = async () => {
+    setError(null)
     try {
       await ApiClient.post('/ai/alerts/cost', {
         threshold: parseFloat(newAlertThreshold),
         period: 'monthly',
       })
       setNewAlertThreshold('100')
-      fetchAlerts()
+      await loadAlerts()
     } catch (err) {
-      console.error('Failed to create alert', err)
+      setError(errorMessage(err, 'The cost alert could not be created.'))
     }
   }
 
@@ -56,9 +82,12 @@ export default function MonitoringPage() {
     return <div>Loading...</div>
   }
 
+  const peak = Math.max(0, ...daily.map((point) => point.total))
+
   return (
     <div>
       <h1 className="text-3xl font-bold mb-8">AI Monitoring</h1>
+      {error && <p role="alert" className="mb-6 bg-red-50 border border-red-200 text-red-700 rounded-md p-3">{error}</p>}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         <div className="bg-white rounded-lg shadow p-6">
@@ -98,7 +127,7 @@ export default function MonitoringPage() {
             </button>
           </div>
           <div className="space-y-2">
-            {alerts.map((alert: any) => (
+            {alerts.map((alert) => (
               <div key={alert.id} className="p-3 bg-gray-50 rounded">
                 <div className="font-medium">${alert.threshold} / month</div>
                 <div className="text-sm text-gray-600">{alert.period}</div>
@@ -108,16 +137,23 @@ export default function MonitoringPage() {
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Usage Trends</h2>
-          <div className="h-48 flex items-end justify-around gap-2">
-            {[...Array(7)].map((_, i) => (
-              <div
-                key={i}
-                className="flex-1 bg-blue-200 rounded"
-                style={{ height: `${Math.random() * 100}%` }}
-              />
-            ))}
-          </div>
+          <h2 className="text-xl font-semibold mb-4">Usage Trends (last 7 days)</h2>
+          {daily.length === 0 ? (
+            <p className="text-sm text-gray-500">No usage recorded yet.</p>
+          ) : (
+            <div className="h-48 flex items-end justify-around gap-2">
+              {daily.map((point) => (
+                <div key={point.date} className="flex-1 flex flex-col items-center justify-end h-full">
+                  <div
+                    className="w-full bg-blue-200 rounded"
+                    style={{ height: peak > 0 ? `${(point.total / peak) * 100}%` : '0%' }}
+                    title={`${point.date}: ${point.total} tokens`}
+                  />
+                  <span className="mt-1 text-xs text-gray-500">{point.date.slice(5)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

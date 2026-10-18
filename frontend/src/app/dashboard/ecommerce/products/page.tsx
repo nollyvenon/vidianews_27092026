@@ -20,6 +20,18 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [cartMessage, setCartMessage] = useState<string | null>(null);
+
+  const handleAddToCart = async (product: Product) => {
+    setCartMessage(null);
+    try {
+      await axios.post("/api/v1/cart/items", { product_id: product.id, quantity: 1 });
+      setCartMessage(`${product.name} added to your cart.`);
+    } catch (error) {
+      console.error("Error adding to cart:", error);
+      setCartMessage(`Could not add ${product.name} to your cart. Please try again.`);
+    }
+  };
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -94,6 +106,12 @@ export default function ProductsPage() {
         </select>
       </div>
 
+      {cartMessage && (
+        <div role="status" className="bg-blue-50 text-blue-900 rounded-lg p-4">
+          {cartMessage}
+        </div>
+      )}
+
       {loading ? (
         <div className="text-center py-8">Loading...</div>
       ) : (
@@ -116,7 +134,10 @@ export default function ProductsPage() {
               <div className="mt-2 text-sm text-gray-600">
                 Stock: {product.stock_quantity}
               </div>
-              <button className="mt-4 w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+              <button
+                onClick={() => handleAddToCart(product)}
+                className="mt-4 w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              >
                 Add to Cart
               </button>
             </div>

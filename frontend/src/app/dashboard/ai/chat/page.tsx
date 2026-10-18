@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { ApiClient } from '@/lib/api-client'
+import { errorMessage } from '@/lib/api-error'
 
 interface ChatSession {
   id: number
@@ -23,6 +24,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const messagesEnd = useRef<HTMLDivElement>(null)
 
   const selectChat = useCallback(async (chat: ChatSession) => {
@@ -72,31 +74,29 @@ export default function ChatPage() {
     e.preventDefault()
     if (!input.trim() || !selectedChat) return
 
-    const userMessage = { role: 'user', content: input }
+    const text = input
     setInput('')
     setLoading(true)
 
+    let stored = false
     try {
       const message = await ApiClient.post(`/ai/chats/${selectedChat.id}/messages`, {
         role: 'user',
-        content: input,
-        tokens: Math.ceil(input.length / 4),
+        content: text,
+        tokens: Math.ceil(text.length / 4),
       })
-      setMessages([...messages, message])
+      setMessages((prev) => [...prev, message])
+      stored = true
 
-      // TODO: Get AI response from streaming endpoint
-      // For now, just simulate a response
-      setTimeout(() => {
-        setMessages((prev) => [...prev, {
-          id: Date.now(),
-          role: 'assistant',
-          content: 'Thanks for your message!',
-          tokens: 5,
-          created_at: new Date().toISOString(),
-        }])
-      }, 500)
+      // The assistant's answer comes from the model provider and is stored by the server.
+      const reply = await ApiClient.post(`/ai/chats/${selectedChat.id}/reply`, {})
+      setMessages((prev) => [...prev, reply])
+      setError(null)
     } catch (err) {
+      // Give the text back only when it was not stored, so a retry never sends it twice.
       console.error('Failed to send message', err)
+      if (!stored) setInput(text)
+      setError(errorMessage(err, 'The assistant could not reply.'))
     } finally {
       setLoading(false)
     }
@@ -160,6 +160,9 @@ export default function ChatPage() {
                 <div ref={messagesEnd} />
               </div>
 
+              {error && (
+                <p role="alert" className="px-4 pt-3 text-sm text-red-700">{error}</p>
+              )}
               <form onSubmit={handleSendMessage} className="p-4 border-t flex gap-2">
                 <input
                   type="text"

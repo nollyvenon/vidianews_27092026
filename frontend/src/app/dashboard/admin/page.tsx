@@ -31,6 +31,10 @@ export default function AdminPage() {
     ]).then(([logsData, alertsData]) => {
       setLogs(Array.isArray(logsData) ? logsData : []);
       setAlerts(Array.isArray(alertsData) ? alertsData : []);
+    }).catch((error) => {
+      // A failed request leaves the panels empty instead of blocking the page.
+      console.error('Failed to load admin dashboard', error);
+    }).finally(() => {
       setLoading(false);
     });
   }, []);

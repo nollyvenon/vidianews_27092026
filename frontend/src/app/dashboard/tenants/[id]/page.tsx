@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import axios from 'axios';
+import { errorMessage } from '@/lib/api-error';
 
 interface Tenant {
   id: number;
@@ -37,7 +38,7 @@ export default function TenantDetailPage() {
       setFormData(response.data);
       setError('');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load tenant');
+      setError(errorMessage(err, 'Failed to load tenant'));
     } finally {
       setLoading(false);
     }
@@ -55,7 +56,7 @@ export default function TenantDetailPage() {
       setEditMode(false);
       setError('');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to update tenant');
+      setError(errorMessage(err, 'Failed to update tenant'));
     }
   };
 
@@ -65,7 +66,7 @@ export default function TenantDetailPage() {
         await axios.delete(`/api/v1/tenants/${tenantId}`);
         router.push('/dashboard/tenants');
       } catch (err: any) {
-        setError(err.response?.data?.detail || 'Failed to delete tenant');
+        setError(errorMessage(err, 'Failed to delete tenant'));
       }
     }
   };

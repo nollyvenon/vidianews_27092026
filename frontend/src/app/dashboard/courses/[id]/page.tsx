@@ -64,14 +64,19 @@ export default function CourseDetailPage() {
   const [reviewText, setReviewText] = useState('');
 
   useEffect(() => {
+    // Error responses carry a { detail } body; only successful bodies are stored, so a missing
+    // course shows "Course not found" instead of rendering the error payload.
     Promise.all([
-      fetch(`/api/v1/courses/${courseId}`).then(r => r.json()),
-      fetch(`/api/v1/courses/${courseId}/sections`).then(r => r.json()),
-      fetch(`/api/v1/courses/${courseId}/reviews`).then(r => r.json()),
+      fetch(`/api/v1/courses/${courseId}`).then(r => (r.ok ? r.json() : null)),
+      fetch(`/api/v1/courses/${courseId}/sections`).then(r => (r.ok ? r.json() : [])),
+      fetch(`/api/v1/courses/${courseId}/reviews`).then(r => (r.ok ? r.json() : [])),
     ]).then(([courseData, sectionsData, reviewsData]) => {
       setCourse(courseData);
-      setSections(sectionsData);
-      setReviews(reviewsData);
+      setSections(Array.isArray(sectionsData) ? sectionsData : []);
+      setReviews(Array.isArray(reviewsData) ? reviewsData : []);
+    }).catch((error) => {
+      console.error('Failed to load course:', error);
+    }).finally(() => {
       setLoading(false);
     });
   }, [courseId]);
@@ -81,6 +86,10 @@ export default function CourseDetailPage() {
       const response = await fetch(`/api/v1/courses/${courseId}/enroll`, {
         method: 'POST'
       });
+      if (!response.ok) {
+        console.error('Enrollment failed:', response.status);
+        return;
+      }
       const enrollmentData = await response.json();
       setEnrollment(enrollmentData);
     } catch (error) {

@@ -28,6 +28,10 @@ export default function AnalyticsPage() {
         totalRevenue,
         courseCompletions: 342
       });
+    }).catch((error) => {
+      // A failed request leaves the metrics at zero instead of blocking the page.
+      console.error('Failed to load analytics', error);
+    }).finally(() => {
       setLoading(false);
     });
   }, []);

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import axios from 'axios';
+import { errorMessage } from '@/lib/api-error';
 import { useRouter } from 'next/navigation';
 
 interface Tenant {
@@ -40,7 +41,7 @@ export default function TenantsPage() {
       setTenants(response.data.data);
       setError('');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load tenants');
+      setError(errorMessage(err, 'Failed to load tenants'));
     } finally {
       setLoading(false);
     }
@@ -55,7 +56,7 @@ export default function TenantsPage() {
       setShowCreateForm(false);
       router.push(`/dashboard/tenants/${response.data.id}`);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to create tenant');
+      setError(errorMessage(err, 'Failed to create tenant'));
     }
   };
 

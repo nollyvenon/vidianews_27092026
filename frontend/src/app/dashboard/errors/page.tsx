@@ -1,53 +1,58 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { ApiClient } from '@/lib/api-client'
+import { errorMessage } from '@/lib/api-error'
 
+interface ErrorReport {
+  id: number
+  error_type: string
+  message: string
+  severity: string | null
+  occurrence_count: number
+  first_seen: string | null
+  last_seen: string | null
+}
+
+/** Application errors that have not been resolved, most frequent first. */
 export default function ErrorsPage() {
-  const [errors] = useState([
-    { id: 1, type: 'ValueError', message: 'Invalid input parameter', severity: 'high', count: 12, lastSeen: '5 min ago' },
-    { id: 2, type: 'DatabaseError', message: 'Connection timeout', severity: 'critical', count: 8, lastSeen: '2 min ago' },
-    { id: 3, type: 'TypeError', message: 'Unexpected type conversion', severity: 'medium', count: 3, lastSeen: '1 hour ago' }
-  ])
+  const [errors, setErrors] = useState<ErrorReport[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    ApiClient.get('/errors/unresolved')
+      .then((data: ErrorReport[]) => {
+        const rows = Array.isArray(data) ? data : [];
+        setErrors([...rows].sort((a, b) => b.occurrence_count - a.occurrence_count));
+      })
+      .catch((err) => setError(errorMessage(err, 'Errors could not be loaded.')));
+  }, []);
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold mb-8">Error Tracking</h1>
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold">Errors</h1>
+      {error && <p role="alert" className="bg-red-50 border border-red-200 text-red-700 rounded-md p-3">{error}</p>}
 
-      <div className="grid gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Unresolved Errors</h2>
-          <div className="space-y-3">
-            {errors.map(err => (
-              <div key={err.id} className="border rounded-lg p-4">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <p className="font-semibold">{err.type}</p>
-                    <p className="text-sm text-gray-600">{err.message}</p>
-                  </div>
-                  <span className={`px-3 py-1 rounded text-xs font-medium ${
-                    err.severity === 'critical' ? 'bg-red-200 text-red-800' :
-                    err.severity === 'high' ? 'bg-red-100 text-red-800' :
-                    'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {err.severity}
-                  </span>
+      <div className="bg-white rounded-lg shadow p-6">
+        {errors === null && !error ? (
+          <p className="text-gray-500">Loading errors…</p>
+        ) : errors && errors.length === 0 ? (
+          <p className="text-gray-500">No unresolved errors.</p>
+        ) : errors ? (
+          <ul className="space-y-3">
+            {errors.map((item) => (
+              <li key={item.id} className="border rounded p-4">
+                <div className="flex justify-between">
+                  <span className="font-medium">{item.error_type}</span>
+                  <span className="text-sm text-gray-600">{item.occurrence_count} occurrences{item.severity ? ` · ${item.severity}` : ''}</span>
                 </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-600">{err.count} occurrences</span>
-                  <span className="text-gray-500">Last: {err.lastSeen}</span>
-                </div>
-              </div>
+                <p className="text-sm text-gray-700">{item.message}</p>
+                {item.last_seen && <p className="text-xs text-gray-500">Last seen {new Date(item.last_seen).toLocaleString()}</p>}
+              </li>
             ))}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Error Trends</h2>
-          <div className="text-center py-8">
-            <p className="text-gray-600">Error rate trending down ✓</p>
-          </div>
-        </div>
+          </ul>
+        ) : null}
       </div>
     </div>
-  )
+  );
 }

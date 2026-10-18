@@ -29,12 +29,20 @@ export default function MembershipsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // The backend answers 404 when the user has no active subscription; only a successful
+    // body may be stored as the subscription, otherwise the error payload would be rendered.
     Promise.all([
-      fetch('/api/v1/membership-types').then(r => r.json()),
-      fetch('/api/v1/subscriptions/me/active').then(r => r.json().catch(() => null))
+      fetch('/api/v1/membership-types').then(r => {
+        if (!r.ok) throw new Error(`Membership plans request failed: ${r.status}`);
+        return r.json();
+      }),
+      fetch('/api/v1/subscriptions/me/active').then(r => (r.ok ? r.json() : null))
     ]).then(([plansData, subscriptionData]) => {
-      setPlans(plansData);
+      setPlans(Array.isArray(plansData) ? plansData : []);
       setActiveSubscription(subscriptionData);
+    }).catch((error) => {
+      console.error('Failed to load memberships:', error);
+    }).finally(() => {
       setLoading(false);
     });
   }, []);
@@ -46,6 +54,10 @@ export default function MembershipsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ membership_type_id: planId })
       });
+      if (!response.ok) {
+        console.error('Subscription failed:', response.status);
+        return;
+      }
       const newSubscription = await response.json();
       setActiveSubscription(newSubscription);
     } catch (error) {

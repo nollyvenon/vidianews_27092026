@@ -5,18 +5,48 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import PublishingTab from './components/PublishingTab';
 import DistributionTab from './components/DistributionTab';
 import AnalyticsTab from './components/AnalyticsTab';
 import ABTestingTab from './components/ABTestingTab';
 import RecommendationsTab from './components/RecommendationsTab';
+import { ApiClient } from '@/lib/api-client';
+import { errorMessage } from '@/lib/api-error';
+
+interface PublishingOverview {
+  pending_publications: number;
+  average_engagement: number | null;
+  distribution_reach: number | null;
+  click_through_rate: number | null;
+  running_ab_tests: number;
+}
+
+/** A figure from the overview, or a plain statement when nothing has been recorded for it yet. */
+function figure(value: number | null | undefined, format: (value: number) => string) {
+  return value === null || value === undefined ? 'No data yet' : format(value);
+}
 
 export default function PublishingDistributionPage() {
   const [activeTab, setActiveTab] = useState('publishing');
+  const [overview, setOverview] = useState<PublishingOverview | null>(null);
+  const [overviewError, setOverviewError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    ApiClient.get('/publishing/overview')
+      .then((data: PublishingOverview) => {
+        if (active) setOverview(data);
+      })
+      .catch((err) => {
+        if (active) setOverviewError(errorMessage(err, 'Publishing figures could not be loaded.'));
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -29,14 +59,15 @@ export default function PublishingDistributionPage() {
       </div>
 
       {/* Overview Cards */}
+      {overviewError && <p role="alert" className="text-sm text-red-700">{overviewError}</p>}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Published Today</CardTitle>
+            <CardTitle className="text-sm font-medium">Pending Publications</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12</div>
-            <p className="text-xs text-gray-500">Scheduled publications</p>
+            <div className="text-2xl font-bold">{overview ? overview.pending_publications : '…'}</div>
+            <p className="text-xs text-gray-500">Scheduled and not yet published</p>
           </CardContent>
         </Card>
 
@@ -45,8 +76,8 @@ export default function PublishingDistributionPage() {
             <CardTitle className="text-sm font-medium">Avg Engagement</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">72.5%</div>
-            <Badge className="mt-2 bg-green-100 text-green-800">Up 8%</Badge>
+            <div className="text-2xl font-bold">{overview ? figure(overview.average_engagement, (v) => v.toFixed(1)) : '…'}</div>
+            <p className="text-xs text-gray-500">Average engagement score across content</p>
           </CardContent>
         </Card>
 
@@ -55,17 +86,17 @@ export default function PublishingDistributionPage() {
             <CardTitle className="text-sm font-medium">Distribution Reach</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">245K</div>
-            <p className="text-xs text-gray-500">Total impressions</p>
+            <div className="text-2xl font-bold">{overview ? figure(overview.distribution_reach, (v) => v.toLocaleString()) : '…'}</div>
+            <p className="text-xs text-gray-500">Total views recorded</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Active A/B Tests</CardTitle>
+            <CardTitle className="text-sm font-medium">Running A/B Tests</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">3</div>
+            <div className="text-2xl font-bold">{overview ? overview.running_ab_tests : '…'}</div>
             <p className="text-xs text-gray-500">In progress</p>
           </CardContent>
         </Card>
@@ -75,8 +106,8 @@ export default function PublishingDistributionPage() {
             <CardTitle className="text-sm font-medium">Click-Through Rate</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">4.2%</div>
-            <p className="text-xs text-gray-500">Average CTR</p>
+            <div className="text-2xl font-bold">{overview ? figure(overview.click_through_rate, (v) => `${v.toFixed(2)}%`) : '…'}</div>
+            <p className="text-xs text-gray-500">Clicks per view</p>
           </CardContent>
         </Card>
       </div>

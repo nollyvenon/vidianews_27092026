@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Card,
   CardContent,
@@ -9,46 +9,103 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Zap,
-  Database,
-  BarChart3,
-  Layers,
-  Clock,
-  TrendingUp,
-} from 'lucide-react';
+import { ApiClient } from '@/lib/api-client';
+import { errorMessage } from '@/lib/api-error';
+import { Zap, Clock, Layers, Database } from 'lucide-react';
 
+interface Presence {
+  online: number;
+  idle: number;
+}
+
+interface HealthReport {
+  metrics: { cpu_percent: number; memory_percent: number; disk_percent: number; database_latency_ms: number };
+  checks: { name: string; status: string; pending?: number; running?: number; failed?: number }[];
+}
+
+interface BackgroundJob {
+  id: number;
+  job_type: string;
+  status: string;
+  priority: number;
+  created_at: string;
+}
+
+interface Pipeline {
+  id: number;
+  name: string;
+  source_type: string;
+  destination_type: string;
+  status: string;
+  is_active: boolean;
+  failure_count: number;
+  last_run: string | null;
+}
+
+interface CacheSummary {
+  entries: number;
+  total_hits: number;
+  memory_usage_mb: number;
+}
+
+interface ApiUsage {
+  id: number;
+  endpoint: string;
+  method: string;
+  call_count: number;
+  error_count: number;
+  average_response_time_ms: number;
+}
+
+const CHECK_CLASSES: Record<string, string> = {
+  healthy: 'bg-green-100 text-green-800',
+  degraded: 'bg-yellow-100 text-yellow-800',
+};
+
+/** WebSocket presence, background jobs, data pipelines, cache and API usage, all read from the live platform. */
 export default function AdvancedPlatformPage() {
   const [activeTab, setActiveTab] = useState('overview');
+  const [presence, setPresence] = useState<Presence | null>(null);
+  const [health, setHealth] = useState<HealthReport | null>(null);
+  const [jobs, setJobs] = useState<BackgroundJob[] | null>(null);
+  const [jobsError, setJobsError] = useState<string | null>(null);
+  const [pipelines, setPipelines] = useState<Pipeline[] | null>(null);
+  const [pipelinesError, setPipelinesError] = useState<string | null>(null);
+  const [cache, setCache] = useState<CacheSummary | null>(null);
+  const [cacheError, setCacheError] = useState<string | null>(null);
+  const [usage, setUsage] = useState<ApiUsage[] | null>(null);
+  const [usageError, setUsageError] = useState<string | null>(null);
+  const [presenceError, setPresenceError] = useState<string | null>(null);
+  const [healthError, setHealthError] = useState<string | null>(null);
+
+  useEffect(() => {
+    ApiClient.get('/websocket/presence')
+      .then((data: Presence) => setPresence(data))
+      .catch((err) => setPresenceError(errorMessage(err, 'Connection figures could not be loaded.')));
+    ApiClient.get('/system/health/checks')
+      .then((data: HealthReport) => setHealth(data))
+      .catch((err) => setHealthError(errorMessage(err, 'Health figures could not be loaded.')));
+    ApiClient.get('/jobs/pending')
+      .then((data: BackgroundJob[]) => setJobs(Array.isArray(data) ? data : []))
+      .catch((err) => setJobsError(errorMessage(err, 'Pending jobs could not be loaded.')));
+    ApiClient.get('/pipelines/')
+      .then((data: Pipeline[]) => setPipelines(Array.isArray(data) ? data : []))
+      .catch((err) => setPipelinesError(errorMessage(err, 'Pipelines could not be loaded.')));
+    ApiClient.get('/cache-summary')
+      .then((data: CacheSummary) => setCache(data))
+      .catch((err) => setCacheError(errorMessage(err, 'Cache figures could not be loaded.')));
+    ApiClient.get('/api-docs/usage')
+      .then((data: ApiUsage[]) => setUsage(Array.isArray(data) ? data : []))
+      .catch((err) => setUsageError(errorMessage(err, 'API usage could not be loaded.')));
+  }, []);
+
+  const activePipelines = pipelines ? pipelines.filter((pipeline) => pipeline.is_active).length : null;
 
   const stats = [
-    { label: 'Active WebSockets', value: '234', icon: Zap, color: 'bg-blue-100' },
-    { label: 'Pending Jobs', value: '12', icon: Clock, color: 'bg-orange-100' },
-    { label: 'Running Pipelines', value: '5', icon: Layers, color: 'bg-green-100' },
-    { label: 'Cache Hit Rate', value: '87.3%', icon: TrendingUp, color: 'bg-purple-100' },
-  ];
-
-  const backgroundJobs = [
-    { id: 1, type: 'email_notification', status: 'running', priority: 2, retries: 0 },
-    { id: 2, type: 'data_export', status: 'pending', priority: 1, retries: 1 },
-    { id: 3, type: 'report_generation', status: 'pending', priority: 3, retries: 0 },
-  ];
-
-  const pipelines = [
-    { id: 1, name: 'User Sync', source: 'database', dest: 'warehouse', status: 'active', records: 5234 },
-    { id: 2, name: 'Event Pipeline', source: 'events', dest: 'analytics', status: 'active', records: 12456 },
-  ];
-
-  const cacheMetrics = [
-    { metric: 'Total Requests', value: '1,234,567' },
-    { metric: 'Cache Hits', value: '1,078,890' },
-    { metric: 'Avg Response Time', value: '45.2ms' },
-    { metric: 'Memory Usage', value: '512.5MB' },
-  ];
-
-  const apiEndpoints = [
-    { path: '/users', method: 'GET', calls: 12345, errors: 23 },
-    { path: '/content', method: 'GET', calls: 54321, errors: 12 },
+    { label: 'Active WebSockets', value: presence ? presence.online.toLocaleString() : '—', icon: Zap, color: 'bg-blue-100' },
+    { label: 'Pending Jobs', value: jobs ? jobs.length.toLocaleString() : '—', icon: Clock, color: 'bg-orange-100' },
+    { label: 'Active Pipelines', value: activePipelines !== null ? activePipelines.toLocaleString() : '—', icon: Layers, color: 'bg-green-100' },
+    { label: 'Cached Entries', value: cache ? cache.entries.toLocaleString() : '—', icon: Database, color: 'bg-purple-100' },
   ];
 
   return (
@@ -60,10 +117,10 @@ export default function AdvancedPlatformPage() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, idx) => {
+        {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <Card key={idx}>
+            <Card key={stat.label}>
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -94,16 +151,33 @@ export default function AdvancedPlatformPage() {
           <Card>
             <CardHeader>
               <CardTitle>Platform Overview</CardTitle>
+              <CardDescription>Live figures from this server</CardDescription>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4">
-              <div className="p-4 border rounded-lg">
-                <p className="text-sm text-gray-600">Uptime</p>
-                <p className="text-2xl font-bold mt-2">99.99%</p>
+            <CardContent className="space-y-4">
+              {presenceError && <p role="alert" className="text-red-700">{presenceError}</p>}
+              {healthError && <p role="alert" className="text-red-700">{healthError}</p>}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 border rounded-lg">
+                  <p className="text-sm text-gray-600">CPU Usage</p>
+                  <p className="text-2xl font-bold mt-2">{health ? `${health.metrics.cpu_percent}%` : '—'}</p>
+                </div>
+                <div className="p-4 border rounded-lg">
+                  <p className="text-sm text-gray-600">Database Latency</p>
+                  <p className="text-2xl font-bold mt-2">{health ? `${health.metrics.database_latency_ms}ms` : '—'}</p>
+                </div>
               </div>
-              <div className="p-4 border rounded-lg">
-                <p className="text-sm text-gray-600">Avg Latency</p>
-                <p className="text-2xl font-bold mt-2">45ms</p>
-              </div>
+              {health && (
+                <div className="space-y-2">
+                  {health.checks.map((check) => (
+                    <div key={check.name} className="flex items-center justify-between p-3 border rounded-lg">
+                      <span className="font-medium">{check.name}</span>
+                      <span className={`px-2 py-1 text-xs rounded ${CHECK_CLASSES[check.status] ?? 'bg-gray-100 text-gray-800'}`}>
+                        {check.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -112,21 +186,25 @@ export default function AdvancedPlatformPage() {
           <Card>
             <CardHeader>
               <CardTitle>Background Jobs</CardTitle>
+              <CardDescription>Jobs waiting to run</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              {backgroundJobs.map((job) => (
-                <div key={job.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium">{job.type}</p>
+              {jobsError && <p role="alert" className="text-red-700">{jobsError}</p>}
+              {jobs === null && !jobsError ? (
+                <p className="text-gray-500">Loading jobs…</p>
+              ) : jobs && jobs.length === 0 ? (
+                <p className="text-gray-500">No jobs are waiting.</p>
+              ) : jobs ? (
+                jobs.map((job) => (
+                  <div key={job.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <p className="font-medium">{job.job_type}</p>
+                      <p className="text-xs text-gray-600">Priority {job.priority} · queued {new Date(job.created_at).toLocaleString()}</p>
+                    </div>
+                    <span className="px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-800">{job.status}</span>
                   </div>
-                  <span className={`px-2 py-1 text-xs rounded ${
-                    job.status === 'running' ? 'bg-blue-100 text-blue-800' :
-                    'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {job.status}
-                  </span>
-                </div>
-              ))}
+                ))
+              ) : null}
             </CardContent>
           </Card>
         </TabsContent>
@@ -135,16 +213,31 @@ export default function AdvancedPlatformPage() {
           <Card>
             <CardHeader>
               <CardTitle>Data Pipelines</CardTitle>
+              <CardDescription>Sources, destinations and recent runs</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              {pipelines.map((pipeline) => (
-                <div key={pipeline.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <p className="font-medium">{pipeline.name}</p>
-                  <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                    {pipeline.status}
-                  </span>
-                </div>
-              ))}
+              {pipelinesError && <p role="alert" className="text-red-700">{pipelinesError}</p>}
+              {pipelines === null && !pipelinesError ? (
+                <p className="text-gray-500">Loading pipelines…</p>
+              ) : pipelines && pipelines.length === 0 ? (
+                <p className="text-gray-500">No pipelines have been created.</p>
+              ) : pipelines ? (
+                pipelines.map((pipeline) => (
+                  <div key={pipeline.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <p className="font-medium">{pipeline.name}</p>
+                      <p className="text-xs text-gray-600">
+                        {pipeline.source_type} → {pipeline.destination_type}
+                        {pipeline.last_run ? ` · last run ${new Date(pipeline.last_run).toLocaleString()}` : ' · never run'}
+                        {pipeline.failure_count > 0 ? ` · ${pipeline.failure_count} failures` : ''}
+                      </p>
+                    </div>
+                    <span className={`text-xs px-2 py-1 rounded ${pipeline.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                      {pipeline.is_active ? 'active' : pipeline.status}
+                    </span>
+                  </div>
+                ))
+              ) : null}
             </CardContent>
           </Card>
         </TabsContent>
@@ -153,14 +246,26 @@ export default function AdvancedPlatformPage() {
           <Card>
             <CardHeader>
               <CardTitle>Cache Performance</CardTitle>
+              <CardDescription>Cached entries and the hits they have served</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              {cacheMetrics.map((item, idx) => (
-                <div key={idx} className="flex justify-between p-3 border rounded-lg">
-                  <span>{item.metric}</span>
-                  <span className="font-bold">{item.value}</span>
-                </div>
-              ))}
+              {cacheError && <p role="alert" className="text-red-700">{cacheError}</p>}
+              {cache && (
+                <>
+                  <div className="flex justify-between p-3 border rounded-lg">
+                    <span>Cached Entries</span>
+                    <span className="font-bold">{cache.entries.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between p-3 border rounded-lg">
+                    <span>Hits Served</span>
+                    <span className="font-bold">{cache.total_hits.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between p-3 border rounded-lg">
+                    <span>Memory Usage</span>
+                    <span className="font-bold">{cache.memory_usage_mb.toFixed(2)}MB</span>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -169,14 +274,24 @@ export default function AdvancedPlatformPage() {
           <Card>
             <CardHeader>
               <CardTitle>API Usage</CardTitle>
+              <CardDescription>Measured calls per endpoint</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              {apiEndpoints.map((endpoint, idx) => (
-                <div key={idx} className="flex items-center justify-between p-3 border rounded-lg">
-                  <span className="font-medium">{endpoint.method} {endpoint.path}</span>
-                  <span className="text-sm text-gray-600">{endpoint.calls.toLocaleString()} calls</span>
-                </div>
-              ))}
+              {usageError && <p role="alert" className="text-red-700">{usageError}</p>}
+              {usage === null && !usageError ? (
+                <p className="text-gray-500">Loading usage…</p>
+              ) : usage && usage.length === 0 ? (
+                <p className="text-gray-500">No API calls have been measured yet.</p>
+              ) : usage ? (
+                usage.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <span className="font-medium">{item.method} {item.endpoint}</span>
+                    <span className="text-sm text-gray-600">
+                      {item.call_count.toLocaleString()} calls · {item.error_count.toLocaleString()} errors · {item.average_response_time_ms}ms avg
+                    </span>
+                  </div>
+                ))
+              ) : null}
             </CardContent>
           </Card>
         </TabsContent>

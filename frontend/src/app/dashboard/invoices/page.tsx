@@ -1,62 +1,78 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { ApiClient } from '@/lib/api-client'
+import { errorMessage } from '@/lib/api-error'
 
+interface Invoice {
+  id: number
+  amount: number
+  status: string
+  due_date: string | null
+  paid_date: string | null
+  created_at: string | null
+}
+
+/** Invoices of the signed-in user's current subscription. */
 export default function InvoicesPage() {
-  const [invoices] = useState([
-    { id: 'INV-001', date: '2026-09-27', amount: 99.00, status: 'paid', dueDate: '2026-09-27' },
-    { id: 'INV-002', date: '2026-08-27', amount: 99.00, status: 'paid', dueDate: '2026-08-27' },
-    { id: 'INV-003', date: '2026-07-27', amount: 99.00, status: 'paid', dueDate: '2026-07-27' },
-    { id: 'INV-004', date: '2026-06-27', amount: 0, status: 'overdue', dueDate: '2026-06-27' }
-  ])
+  const [hasSubscription, setHasSubscription] = useState<boolean | null>(null)
+  const [invoices, setInvoices] = useState<Invoice[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  const totalRevenue = invoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + i.amount, 0)
+  useEffect(() => {
+    ApiClient.get('/monetization/subscriptions/current')
+      .then(() => {
+        setHasSubscription(true);
+        return ApiClient.get('/monetization/invoices');
+      })
+      .then((data: Invoice[]) => setInvoices(Array.isArray(data) ? data : []))
+      .catch((err) => {
+        if (err instanceof Error && err.message === 'No active subscription') {
+          setHasSubscription(false);
+          setInvoices([]);
+        } else {
+          setError(errorMessage(err, 'Invoices could not be loaded.'));
+        }
+      });
+  }, []);
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold mb-8">Invoices</h1>
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold">Invoices</h1>
+      {error && <p role="alert" className="bg-red-50 border border-red-200 text-red-700 rounded-md p-3">{error}</p>}
 
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <div className="bg-white rounded-lg shadow p-6">
-          <p className="text-gray-600 text-sm">Total Revenue</p>
-          <p className="text-2xl font-bold text-green-600">${totalRevenue.toFixed(2)}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-6">
-          <p className="text-gray-600 text-sm">Invoices This Year</p>
-          <p className="text-2xl font-bold">{invoices.length}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-6">
-          <p className="text-gray-600 text-sm">Avg Invoice</p>
-          <p className="text-2xl font-bold">${(totalRevenue / invoices.filter(i => i.status === 'paid').length).toFixed(2)}</p>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-lg shadow">
-        <div className="p-6 border-b">
-          <h2 className="text-xl font-semibold">Recent Invoices</h2>
-        </div>
-        <div className="divide-y">
-          {invoices.map(inv => (
-            <div key={inv.id} className="p-6 flex justify-between items-center hover:bg-gray-50">
-              <div>
-                <p className="font-semibold">{inv.id}</p>
-                <p className="text-sm text-gray-600">{inv.date}</p>
-              </div>
-              <div className="text-right">
-                <p className="font-semibold">${inv.amount.toFixed(2)}</p>
-                <span className={`inline-block px-3 py-1 rounded text-sm text-white ${
-                  inv.status === 'paid' ? 'bg-green-600' : 'bg-red-600'
-                }`}>
-                  {inv.status.charAt(0).toUpperCase() + inv.status.slice(1)}
-                </span>
-              </div>
-              <button className="px-4 py-2 border border-blue-600 text-blue-600 rounded hover:bg-blue-50">
-                Download
-              </button>
-            </div>
-          ))}
-        </div>
+      <div className="bg-white rounded-lg shadow p-6">
+        {invoices === null && !error ? (
+          <p className="text-gray-500">Loading invoices…</p>
+        ) : hasSubscription === false ? (
+          <p className="text-gray-500">You have no active subscription, so there are no invoices.</p>
+        ) : invoices && invoices.length === 0 ? (
+          <p className="text-gray-500">No invoices yet.</p>
+        ) : invoices ? (
+          <table className="min-w-full text-sm">
+            <thead className="text-left text-gray-600">
+              <tr>
+                <th className="py-2">Invoice</th>
+                <th className="py-2">Amount</th>
+                <th className="py-2">Status</th>
+                <th className="py-2">Due</th>
+                <th className="py-2">Paid</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoices.map((invoice) => (
+                <tr key={invoice.id} className="border-t">
+                  <td className="py-2">#{invoice.id}</td>
+                  <td className="py-2">${invoice.amount.toFixed(2)}</td>
+                  <td className="py-2">{invoice.status}</td>
+                  <td className="py-2">{invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '—'}</td>
+                  <td className="py-2">{invoice.paid_date ? new Date(invoice.paid_date).toLocaleDateString() : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : null}
       </div>
     </div>
-  )
+  );
 }

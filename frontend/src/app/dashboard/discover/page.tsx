@@ -1,17 +1,41 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { ApiClient } from '@/lib/api-client'
+import { errorMessage } from '@/lib/api-error'
 
+interface Recommendation {
+  id: number
+  content_id: number
+  score: number
+  title: string
+  creator: string | null
+  views: number
+  reason: string | null
+}
+
+interface TrendingTopic {
+  id: number
+  topic: string
+  score: number
+  mention_count: number
+}
+
+/** Content recommended for the signed-in user, and the topics trending across the platform. */
 export default function DiscoverPage() {
-  const [recommendations] = useState([
-    { id: 1, title: 'Amazing Travel Vlog', creator: 'travelbug', views: '2.3K' },
-    { id: 2, title: 'Cooking Tutorial', creator: 'foodie', views: '1.8K' }
-  ])
+  const [recommendations, setRecommendations] = useState<Recommendation[] | null>(null)
+  const [recommendationsError, setRecommendationsError] = useState<string | null>(null)
+  const [trending, setTrending] = useState<TrendingTopic[] | null>(null)
+  const [trendingError, setTrendingError] = useState<string | null>(null)
 
-  const [trending] = useState([
-    { tag: 'python', count: '12.5K' },
-    { tag: 'webdesign', count: '8.3K' }
-  ])
+  useEffect(() => {
+    ApiClient.get('/recommendations?limit=10')
+      .then((data: Recommendation[]) => setRecommendations(Array.isArray(data) ? data : []))
+      .catch((err) => setRecommendationsError(errorMessage(err, 'Recommendations could not be loaded.')));
+    ApiClient.get('/trending?limit=10')
+      .then((data: TrendingTopic[]) => setTrending(Array.isArray(data) ? data : []))
+      .catch((err) => setTrendingError(errorMessage(err, 'Trending topics could not be loaded.')));
+  }, []);
 
   return (
     <div>
@@ -19,27 +43,44 @@ export default function DiscoverPage() {
       <div className="grid gap-6">
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold mb-4">Recommended</h2>
-          <div className="space-y-3">
-            {recommendations.map(r => (
-              <div key={r.id} className="border rounded-lg p-4">
-                <p className="font-semibold">{r.title}</p>
-                <p className="text-xs text-gray-600">{r.creator} - {r.views} views</p>
-              </div>
-            ))}
-          </div>
+          {recommendationsError && <p role="alert" className="text-red-700">{recommendationsError}</p>}
+          {recommendations === null && !recommendationsError ? (
+            <p className="text-gray-500">Loading recommendations…</p>
+          ) : recommendations && recommendations.length === 0 ? (
+            <p className="text-gray-500">No recommendations yet.</p>
+          ) : recommendations ? (
+            <div className="space-y-3">
+              {recommendations.map((item) => (
+                <div key={item.id} className="border rounded-lg p-4">
+                  <p className="font-semibold">{item.title}</p>
+                  <p className="text-xs text-gray-600">
+                    {item.creator ?? 'Unknown creator'} - {item.views.toLocaleString()} views
+                  </p>
+                  {item.reason && <p className="text-xs text-gray-500 mt-1">{item.reason}</p>}
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold mb-4">Trending</h2>
-          <div className="space-y-2">
-            {trending.map((t, i) => (
-              <div key={i} className="flex justify-between">
-                <span>#{t.tag}</span>
-                <span className="text-sm text-gray-600">{t.count} posts</span>
-              </div>
-            ))}
-          </div>
+          {trendingError && <p role="alert" className="text-red-700">{trendingError}</p>}
+          {trending === null && !trendingError ? (
+            <p className="text-gray-500">Loading trending topics…</p>
+          ) : trending && trending.length === 0 ? (
+            <p className="text-gray-500">No trending topics yet.</p>
+          ) : trending ? (
+            <div className="space-y-2">
+              {trending.map((item) => (
+                <div key={item.id} className="flex justify-between">
+                  <span>#{item.topic}</span>
+                  <span className="text-sm text-gray-600">{item.mention_count.toLocaleString()} mentions</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
-  )
+  );
 }

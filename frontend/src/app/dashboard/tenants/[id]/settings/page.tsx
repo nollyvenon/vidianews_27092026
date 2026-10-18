@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import axios from 'axios';
+import { errorMessage } from '@/lib/api-error';
 
 interface Setting {
   key: string;
@@ -60,7 +61,7 @@ export default function SettingsPage() {
       setEditingSetting(null);
       setError('');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to save setting');
+      setError(errorMessage(err, 'Failed to save setting'));
     }
   };
 
@@ -71,7 +72,7 @@ export default function SettingsPage() {
       setNewSetting({ key: '', value: '' });
       setShowAddForm(false);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to add setting');
+      setError(errorMessage(err, 'Failed to add setting'));
     }
   };
 

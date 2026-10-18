@@ -1,64 +1,89 @@
 'use client'
 
-import { useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
+import { ApiClient } from '@/lib/api-client'
+import { errorMessage } from '@/lib/api-error'
 
+interface Product {
+  id: number
+  name: string
+  price: number
+  category: string | null
+  stock_quantity: number
+  average_rating: number
+  review_count: number
+}
+
+/** The product catalogue, with search and a category filter. */
 export default function MarketplacePage() {
-  const [creators] = useState([
-    { id: 1, name: 'Tech Reviews', earnings: 5200, followers: 12400, rating: 4.8 },
-    { id: 2, name: 'Lifestyle Vlog', earnings: 3800, followers: 8900, rating: 4.6 },
-    { id: 3, name: 'Gaming Pro', earnings: 7100, followers: 25600, rating: 4.9 },
-    { id: 4, name: 'Travel Diaries', earnings: 2900, followers: 6200, rating: 4.5 }
-  ])
+  const [products, setProducts] = useState<Product[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
+  const [category, setCategory] = useState('')
+
+  const load = (path: string) =>
+    ApiClient.get(path)
+      .then((data: Product[]) => {
+        setProducts(Array.isArray(data) ? data : []);
+        setError(null);
+      })
+      .catch((err) => setError(errorMessage(err, 'Products could not be loaded.')));
+
+  useEffect(() => {
+    load(category ? `/products?category=${encodeURIComponent(category)}` : '/products');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category]);
+
+  const search = (event: FormEvent) => {
+    event.preventDefault();
+    if (!query.trim()) {
+      load(category ? `/products?category=${encodeURIComponent(category)}` : '/products');
+      return;
+    }
+    load(`/products/search?q=${encodeURIComponent(query.trim())}`);
+  };
+
+  const categories = Array.from(new Set((products ?? []).map((product) => product.category).filter(Boolean) as string[])).sort();
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold mb-8">Creator Marketplace</h1>
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold">Marketplace</h1>
+      {error && <p role="alert" className="bg-red-50 border border-red-200 text-red-700 rounded-md p-3">{error}</p>}
 
-      <div className="grid gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Top Creators</h2>
-          <div className="space-y-3">
-            {creators.map(creator => (
-              <div key={creator.id} className="border rounded-lg p-4 hover:shadow-md transition">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <p className="font-semibold text-lg">{creator.name}</p>
-                    <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
-                      <span>👥 {creator.followers.toLocaleString()} followers</span>
-                      <span>⭐ {creator.rating}/5</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-green-600">${creator.earnings.toLocaleString()}</p>
-                    <p className="text-xs text-gray-600">Monthly earnings</p>
-                  </div>
-                </div>
-                <button className="w-full mt-3 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
-                  View Profile
-                </button>
-              </div>
+      <div className="flex flex-wrap gap-3 items-end">
+        <form onSubmit={search} className="flex gap-2">
+          <input className="border rounded px-3 py-2" placeholder="Search products" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <button type="submit" className="px-3 py-2 border border-blue-600 text-blue-600 rounded">Search</button>
+        </form>
+        <label className="text-sm">
+          <span className="block text-xs text-gray-600">Category</span>
+          <select className="border rounded px-2 py-2" value={category} onChange={(e) => setCategory(e.target.value)}>
+            <option value="">All categories</option>
+            {categories.map((item) => (
+              <option key={item} value={item}>{item}</option>
             ))}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Marketplace Stats</h2>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="text-center">
-              <p className="text-3xl font-bold text-blue-600">847</p>
-              <p className="text-sm text-gray-600">Active Creators</p>
-            </div>
-            <div className="text-center">
-              <p className="text-3xl font-bold text-green-600">$2.4M</p>
-              <p className="text-sm text-gray-600">Monthly Revenue</p>
-            </div>
-            <div className="text-center">
-              <p className="text-3xl font-bold text-purple-600">1.2M</p>
-              <p className="text-sm text-gray-600">Total Followers</p>
-            </div>
-          </div>
-        </div>
+          </select>
+        </label>
       </div>
+
+      {products === null && !error ? (
+        <p className="text-gray-500">Loading products…</p>
+      ) : products && products.length === 0 ? (
+        <p className="text-gray-500">No products match.</p>
+      ) : products ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {products.map((product) => (
+            <div key={product.id} className="bg-white rounded-lg shadow p-4 space-y-1">
+              <p className="font-semibold">{product.name}</p>
+              <p className="text-sm text-gray-600">{product.category ?? 'Uncategorised'}</p>
+              <p className="text-lg font-bold">${Number(product.price).toFixed(2)}</p>
+              <p className="text-sm text-gray-600">
+                {product.average_rating.toFixed(1)} ★ ({product.review_count} reviews) · {product.stock_quantity > 0 ? `${product.stock_quantity} in stock` : 'Out of stock'}
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
-  )
+  );
 }

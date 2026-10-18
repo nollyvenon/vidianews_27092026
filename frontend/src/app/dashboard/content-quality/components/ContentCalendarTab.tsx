@@ -5,221 +5,136 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import React, { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, TrendingUp, Zap } from 'lucide-react';
 import { format } from 'date-fns';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+import { ApiClient } from '@/lib/api-client';
+import { errorMessage } from '@/lib/api-error';
 
 interface CalendarEvent {
   id: number;
   event_type: string;
   title: string;
   scheduled_for: string;
-  ai_recommended_time?: string;
+  ai_recommended_time?: string | null;
   ai_confidence_score: number;
-  predicted_reach?: number;
-  predicted_engagement?: number;
+  predicted_reach?: number | null;
+  predicted_engagement?: number | null;
+}
+
+interface CalendarResponse {
+  count: number;
+  events: CalendarEvent[];
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Badge colour for an AI confidence score between 0 and 1. */
+export function confidenceClass(confidence: number): string {
+  if (confidence >= 0.8) return 'bg-green-100 text-green-800';
+  if (confidence >= 0.6) return 'bg-blue-100 text-blue-800';
+  if (confidence >= 0.4) return 'bg-yellow-100 text-yellow-800';
+  return 'bg-gray-100 text-gray-800';
 }
 
 export default function ContentCalendarTab() {
-  const [dateRange, setDateRange] = useState({
-    start: new Date(),
-    end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-  });
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  // The window is fixed for each mount: the next 30 days from now.
+  const range = useMemo(() => {
+    const start = new Date();
+    return { start, end: new Date(start.getTime() + 30 * DAY_MS) };
+  }, []);
 
-  const { data: calendarEvents, isLoading } = useQuery({
-    queryKey: ['calendar-events', dateRange],
-    queryFn: async () => {
-      const response = await fetch(
-        `${API_BASE}/content/calendar/events?start_date=${dateRange.start.toISOString()}&end_date=${dateRange.end.toISOString()}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        }
-      );
-      if (!response.ok) throw new Error('Failed to fetch calendar events');
-      return response.json();
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['calendar-events', range.start.toISOString()],
+    queryFn: () => {
+      const params = new URLSearchParams({
+        start_date: range.start.toISOString(),
+        end_date: range.end.toISOString(),
+      });
+      return ApiClient.get(`/calendar/events?${params.toString()}`) as Promise<CalendarResponse>;
     },
   });
 
-  useEffect(() => {
-    if (calendarEvents?.events) {
-      setEvents(calendarEvents.events);
-    }
-  }, [calendarEvents]);
-
-  const getEventColor = (confidence: number) => {
-    if (confidence >= 0.8) return 'bg-green-100 text-green-800';
-    if (confidence >= 0.6) return 'bg-blue-100 text-blue-800';
-    if (confidence >= 0.4) return 'bg-yellow-100 text-yellow-800';
-    return 'bg-gray-100 text-gray-800';
-  };
+  const events = Array.isArray(data?.events) ? data.events : [];
+  const averageConfidence = events.length
+    ? (events.reduce((sum, event) => sum + event.ai_confidence_score, 0) / events.length) * 100
+    : 0;
+  const totalReach = events.reduce((sum, event) => sum + (event.predicted_reach ?? 0), 0);
 
   return (
     <div className="space-y-6">
-      {/* Calendar Overview */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
             Content Calendar
           </CardTitle>
-          <CardDescription>
-            View and manage your content schedule with AI-powered recommendations
-          </CardDescription>
+          <CardDescription>Scheduled content for the next 30 days, with AI timing recommendations</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Scheduled Events</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{events.length}</div>
-                <p className="text-xs text-gray-500">Next 30 days</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Avg Confidence</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">
-                  {events.length > 0
-                    ? (
-                        (events.reduce((acc, e) => acc + e.ai_confidence_score, 0) / events.length) *
-                        100
-                      ).toFixed(0)
-                    : 0}
-                  %
-                </div>
-                <p className="text-xs text-gray-500">AI recommendation quality</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Total Reach</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">
-                  {(
-                    events.reduce((acc, e) => acc + (e.predicted_reach || 0), 0) / 1000
-                  ).toFixed(0)}
-                  K
-                </div>
-                <p className="text-xs text-gray-500">Predicted reach</p>
-              </CardContent>
-            </Card>
+        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <p className="text-sm font-semibold text-gray-600">Scheduled events</p>
+            <p className="text-3xl font-bold">{events.length}</p>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-600">Average confidence</p>
+            <p className="text-3xl font-bold">{averageConfidence.toFixed(0)}%</p>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-600">Predicted reach</p>
+            <p className="text-3xl font-bold">{(totalReach / 1000).toFixed(0)}K</p>
           </div>
         </CardContent>
       </Card>
 
-      {/* Events List */}
       <Card>
         <CardHeader>
           <CardTitle>Upcoming Events</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="text-center py-8">Loading calendar events...</div>
+            <p className="text-center py-8">Loading calendar events…</p>
+          ) : error ? (
+            <p role="alert" className="text-center py-8 text-red-700">
+              {errorMessage(error, 'The calendar could not be loaded.')}
+            </p>
           ) : events.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              No events scheduled. Create one to get started!
-            </div>
+            <p className="text-center py-8 text-gray-500">No events scheduled in the next 30 days.</p>
           ) : (
             <div className="space-y-3">
               {events.map((event) => (
-                <div
-                  key={event.id}
-                  className="border rounded-lg p-4 hover:bg-gray-50 transition"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-2 flex-1">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-semibold">{event.title}</h4>
-                        <Badge className={getEventColor(event.ai_confidence_score)}>
-                          {(event.ai_confidence_score * 100).toFixed(0)}% Confidence
-                        </Badge>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                        <div className="flex items-center gap-2 text-gray-600">
-                          <Clock className="h-4 w-4" />
-                          <span>Scheduled: {format(new Date(event.scheduled_for), 'MMM d, HH:mm')}</span>
-                        </div>
-
-                        {event.ai_recommended_time && (
-                          <div className="flex items-center gap-2 text-blue-600">
-                            <Zap className="h-4 w-4" />
-                            <span>Recommended: {format(new Date(event.ai_recommended_time), 'MMM d, HH:mm')}</span>
-                          </div>
-                        )}
-
-                        {event.predicted_reach && (
-                          <div className="flex items-center gap-2 text-green-600">
-                            <TrendingUp className="h-4 w-4" />
-                            <span>Est. Reach: {(event.predicted_reach / 1000).toFixed(1)}K</span>
-                          </div>
-                        )}
-                      </div>
+                <div key={event.id} className="border rounded-lg p-4 hover:bg-gray-50 transition">
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-semibold">{event.title}</h4>
+                    <Badge className={confidenceClass(event.ai_confidence_score)}>
+                      {(event.ai_confidence_score * 100).toFixed(0)}% Confidence
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm mt-2">
+                    <div className="flex items-center gap-2 text-gray-600">
+                      <Clock className="h-4 w-4" />
+                      <span>Scheduled: {format(new Date(event.scheduled_for), 'MMM d, HH:mm')}</span>
                     </div>
-
-                    <div className="flex gap-2">
-                      {event.ai_recommended_time && (
-                        <Button size="sm" variant="outline">
-                          Use Recommendation
-                        </Button>
-                      )}
-                      <Button size="sm" variant="ghost">
-                        Edit
-                      </Button>
-                    </div>
+                    {event.ai_recommended_time && (
+                      <div className="flex items-center gap-2 text-blue-600">
+                        <Zap className="h-4 w-4" />
+                        <span>Recommended: {format(new Date(event.ai_recommended_time), 'MMM d, HH:mm')}</span>
+                      </div>
+                    )}
+                    {event.predicted_reach ? (
+                      <div className="flex items-center gap-2 text-green-600">
+                        <TrendingUp className="h-4 w-4" />
+                        <span>Est. Reach: {(event.predicted_reach / 1000).toFixed(1)}K</span>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* AI Insights */}
-      <Card>
-        <CardHeader>
-          <CardTitle>AI Insights</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <div className="border-l-4 border-blue-500 pl-4 py-2">
-              <p className="font-semibold text-sm">Best Publishing Time</p>
-              <p className="text-sm text-gray-600">
-                Based on audience behavior, Tuesday 2-4 PM has the highest engagement rates
-              </p>
-            </div>
-
-            <div className="border-l-4 border-green-500 pl-4 py-2">
-              <p className="font-semibold text-sm">Content Gap</p>
-              <p className="text-sm text-gray-600">
-                You have 3 days without scheduled content next week
-              </p>
-            </div>
-
-            <div className="border-l-4 border-yellow-500 pl-4 py-2">
-              <p className="font-semibold text-sm">Engagement Opportunity</p>
-              <p className="text-sm text-gray-600">
-                Trending topics in your niche could boost reach by 35%
-              </p>
-            </div>
-          </div>
         </CardContent>
       </Card>
     </div>

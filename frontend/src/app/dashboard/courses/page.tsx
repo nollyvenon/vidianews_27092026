@@ -29,10 +29,19 @@ export default function CoursesPage() {
 
   useEffect(() => {
     fetch('/api/v1/courses')
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`Course list request failed: ${r.status}`);
+        return r.json();
+      })
       .then(data => {
-        setCourses(data);
-        setFilteredCourses(data);
+        const list: Course[] = Array.isArray(data) ? data : [];
+        setCourses(list);
+        setFilteredCourses(list);
+      })
+      .catch((error) => {
+        console.error('Failed to load courses:', error);
+      })
+      .finally(() => {
         setLoading(false);
       });
   }, []);

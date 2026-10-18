@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import axios from 'axios';
+import { errorMessage } from '@/lib/api-error';
 
 interface Member {
   id: number;
@@ -33,7 +34,7 @@ export default function MembersPage() {
       setMembers(response.data);
       setError('');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load members');
+      setError(errorMessage(err, 'Failed to load members'));
     } finally {
       setLoading(false);
     }
@@ -53,7 +54,7 @@ export default function MembersPage() {
       // Refresh members
       await fetchMembers();
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to send invitation');
+      setError(errorMessage(err, 'Failed to send invitation'));
     }
   };
 
@@ -63,7 +64,7 @@ export default function MembersPage() {
         await axios.delete(`/api/v1/tenants/${tenantId}/members/${userId}`);
         await fetchMembers();
       } catch (err: any) {
-        setError(err.response?.data?.detail || 'Failed to remove member');
+        setError(errorMessage(err, 'Failed to remove member'));
       }
     }
   };

@@ -5,296 +5,207 @@
 
 'use client';
 
-import React, { useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import React, { useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ApiClient } from '@/lib/api-client';
+import { errorMessage } from '@/lib/api-error';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { AlertCircle, CheckCircle2, AlertTriangle, TrendingUp } from 'lucide-react';
+import { ContentPicker, ContentOption } from '@/components/content/content-picker';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-
-interface VoiceViolation {
+interface BrandGuide {
   id: number;
-  violation_type: string;
-  severity: string;
-  description: string;
-  suggested_fix: string;
+  name: string;
+  tone: Record<string, unknown>;
+  personality_traits: string[];
+  is_active: boolean;
 }
 
 interface BrandVoiceResult {
   id: number;
+  content_id: number;
+  check_result: string;
+  overall_score: number;
+  compliance_score: number;
+  tone_match_score: number;
   consistency_score: number;
-  compliance_percentage: number;
-  brand_alignment: string;
-  total_violations: number;
-  tone_violations: number;
-  style_violations: number;
-  terminology_violations: number;
-  violations: VoiceViolation[];
+  recommendations: string[];
 }
 
-export default function BrandVoiceTab() {
-  const [content, setContent] = useState('');
-  const [result, setResult] = useState<BrandVoiceResult | null>(null);
+const RESULT_LABELS: Record<string, string> = {
+  compliant: 'Compliant',
+  partial: 'Partially compliant',
+  non_compliant: 'Not compliant',
+  needs_review: 'Needs review',
+};
 
-  const checkMutation = useMutation({
-    mutationFn: async () => {
-      const response = await fetch(`${API_BASE}/content/brand-voice/check`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({
-          content_id: 1,
-          text: content,
-          brand_voice_guide_id: 1,
-        }),
+function GuideForm({ onCreated }: { onCreated: () => void }) {
+  const [name, setName] = useState('');
+  const [tone, setTone] = useState('');
+  const [traits, setTraits] = useState('');
+  const [vocabulary, setVocabulary] = useState('Moderate');
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    setSaving(true);
+    try {
+      await ApiClient.post('/brand-voice/guide', {
+        name: name.trim(),
+        tone: Object.fromEntries(tone.split(',').map((item) => item.trim()).filter(Boolean).map((item) => [item, true])),
+        personality_traits: traits.split(',').map((item) => item.trim()).filter(Boolean),
+        vocabulary_level: vocabulary,
       });
-      if (!response.ok) throw new Error('Brand voice check failed');
-      return response.json();
-    },
-    onSuccess: (data) => {
-      setResult(data);
-    },
-  });
-
-  const getAlignmentColor = (alignment: string) => {
-    switch (alignment) {
-      case 'Excellent':
-        return 'text-green-600 bg-green-50';
-      case 'Good':
-        return 'text-blue-600 bg-blue-50';
-      case 'Fair':
-        return 'text-yellow-600 bg-yellow-50';
-      case 'Poor':
-        return 'text-red-600 bg-red-50';
-      default:
-        return 'text-gray-600 bg-gray-50';
-    }
-  };
-
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'critical':
-        return 'bg-red-100 text-red-800';
-      case 'high':
-        return 'bg-orange-100 text-orange-800';
-      case 'medium':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'low':
-        return 'bg-blue-100 text-blue-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getSeverityIcon = (severity: string) => {
-    switch (severity) {
-      case 'critical':
-      case 'high':
-        return <AlertCircle className="h-4 w-4" />;
-      case 'medium':
-        return <AlertTriangle className="h-4 w-4" />;
-      default:
-        return <CheckCircle2 className="h-4 w-4" />;
+      onCreated();
+    } catch (err) {
+      setError(errorMessage(err, 'The brand guide could not be created.'));
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <p className="text-sm text-gray-600">
+        Your organization has no brand voice guide yet. Create one to check content against.
+      </p>
+      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+      <label className="block">
+        <span className="block text-sm font-medium mb-1">Guide name</span>
+        <Input value={name} onChange={(e) => setName(e.target.value)} required />
+      </label>
+      <label className="block">
+        <span className="block text-sm font-medium mb-1">Tone keywords (comma separated)</span>
+        <Input value={tone} onChange={(e) => setTone(e.target.value)} placeholder="authoritative, warm" />
+      </label>
+      <label className="block">
+        <span className="block text-sm font-medium mb-1">Personality traits (comma separated)</span>
+        <Input value={traits} onChange={(e) => setTraits(e.target.value)} placeholder="curious, direct" />
+      </label>
+      <label className="block">
+        <span className="block text-sm font-medium mb-1">Vocabulary level</span>
+        <select className="w-full border rounded-md px-3 py-2" value={vocabulary} onChange={(e) => setVocabulary(e.target.value)}>
+          <option>Simple</option>
+          <option>Moderate</option>
+          <option>Advanced</option>
+        </select>
+      </label>
+      <Button type="submit" disabled={saving || !name.trim()}>
+        {saving ? 'Saving…' : 'Create brand guide'}
+      </Button>
+    </form>
+  );
+}
+
+export default function BrandVoiceTab() {
+  const queryClient = useQueryClient();
+  const [content, setContent] = useState('');
+  const [selected, setSelected] = useState<ContentOption | null>(null);
+  const [result, setResult] = useState<BrandVoiceResult | null>(null);
+
+  const guidesQuery = useQuery({
+    queryKey: ['brand-voice-guides'],
+    queryFn: () => ApiClient.get('/brand-voice/guide') as Promise<BrandGuide[]>,
+  });
+  const guides = Array.isArray(guidesQuery.data) ? guidesQuery.data : [];
+  const activeGuide = guides.find((guide) => guide.is_active) ?? guides[0];
+
+  useEffect(() => {
+    if (selected?.body !== undefined) setContent(selected.body ?? '');
+  }, [selected]);
+
+  const checkMutation = useMutation({
+    mutationFn: () =>
+      ApiClient.post('/brand-voice/check', {
+        content_id: selected?.id,
+        text: content,
+        guide_id: activeGuide?.id,
+      }),
+    onSuccess: (data: BrandVoiceResult) => setResult(data),
+  });
+
+  const percent = (value: number) => `${Number(value).toFixed(1)}%`;
+
+  return (
     <div className="space-y-6">
-      {/* Input Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Brand Guide</CardTitle>
+          <CardDescription>Content is checked against your organization&apos;s active guide</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {guidesQuery.isLoading && <p className="text-sm text-gray-500">Loading guides…</p>}
+          {!guidesQuery.isLoading && !activeGuide && (
+            <GuideForm onCreated={() => queryClient.invalidateQueries({ queryKey: ['brand-voice-guides'] })} />
+          )}
+          {activeGuide && <p className="text-sm">Active guide: <strong>{activeGuide.name}</strong></p>}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Check Brand Voice</CardTitle>
-          <CardDescription>
-            Verify your content aligns with brand guidelines and tone
-          </CardDescription>
+          <CardDescription>Choose the content to check; its text loads here and can be edited.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <ContentPicker value={selected?.id ?? null} onChange={setSelected} />
           <Textarea
-            placeholder="Paste your content here..."
+            placeholder="Choose content above to load its text…"
             value={content}
             onChange={(e) => setContent(e.target.value)}
             className="min-h-48"
           />
-
+          {checkMutation.isError && (
+            <p role="alert" className="text-sm text-red-700">
+              {errorMessage(checkMutation.error, 'The brand voice check failed.')}
+            </p>
+          )}
           <Button
             onClick={() => checkMutation.mutate()}
-            disabled={!content.trim() || checkMutation.isPending}
+            disabled={!selected || !content.trim() || !activeGuide || checkMutation.isPending}
             className="w-full"
           >
-            {checkMutation.isPending ? 'Analyzing...' : 'Check Brand Voice'}
+            {checkMutation.isPending ? 'Analyzing…' : 'Check Brand Voice'}
           </Button>
         </CardContent>
       </Card>
 
-      {/* Results Section */}
       {result && (
-        <>
-          {/* Alignment Overview */}
-          <Card className={getAlignmentColor(result.brand_alignment)}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" />
-                Brand Voice Alignment
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <p className="text-sm font-semibold mb-2">Consistency Score</p>
-                  <div className="text-3xl font-bold">{result.consistency_score.toFixed(1)}</div>
-                  <p className="text-sm text-gray-600 mt-1">out of 100</p>
+        <Card>
+          <CardHeader>
+            <CardTitle>Result: {RESULT_LABELS[result.check_result] ?? result.check_result}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {[
+              ['Compliance', result.compliance_score],
+              ['Tone match', result.tone_match_score],
+              ['Consistency', result.consistency_score],
+            ].map(([label, value]) => (
+              <div key={label as string}>
+                <div className="flex justify-between text-sm mb-1">
+                  <span>{label}</span>
+                  <span>{percent(value as number)}</span>
                 </div>
-
-                <div>
-                  <p className="text-sm font-semibold mb-2">Alignment Status</p>
-                  <p className="text-3xl font-bold">{result.brand_alignment}</p>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {result.compliance_percentage.toFixed(1)}% compliant
-                  </p>
-                </div>
+                <Progress value={value as number} className="h-2" />
               </div>
-
+            ))}
+            {result.recommendations.length > 0 && (
               <div>
-                <p className="text-sm font-semibold mb-2">Compliance Level</p>
-                <Progress value={result.compliance_percentage} className="h-2" />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Violation Categories */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Violation Summary</CardTitle>
-              <CardDescription>
-                Total violations found: {result.total_violations}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="border rounded-lg p-4">
-                  <p className="text-sm font-semibold mb-2">Tone Violations</p>
-                  <div className="text-2xl font-bold text-orange-600">
-                    {result.tone_violations}
-                  </div>
-                  <p className="text-xs text-gray-600 mt-1">
-                    Voice inconsistencies detected
-                  </p>
-                </div>
-
-                <div className="border rounded-lg p-4">
-                  <p className="text-sm font-semibold mb-2">Style Violations</p>
-                  <div className="text-2xl font-bold text-blue-600">
-                    {result.style_violations}
-                  </div>
-                  <p className="text-xs text-gray-600 mt-1">
-                    Writing style mismatches
-                  </p>
-                </div>
-
-                <div className="border rounded-lg p-4">
-                  <p className="text-sm font-semibold mb-2">Terminology Violations</p>
-                  <div className="text-2xl font-bold text-red-600">
-                    {result.terminology_violations}
-                  </div>
-                  <p className="text-xs text-gray-600 mt-1">
-                    Brand terminology issues
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Detailed Violations */}
-          {result.violations.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Issues Found</CardTitle>
-                <CardDescription>
-                  {result.violations.length} issue{result.violations.length !== 1 ? 's' : ''} to address
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {result.violations.map((violation) => (
-                    <div
-                      key={violation.id}
-                      className="border rounded-lg p-3 hover:bg-gray-50 transition"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-3 flex-1">
-                          {getSeverityIcon(violation.severity)}
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-semibold text-sm">
-                                {violation.violation_type}
-                              </span>
-                              <Badge className={getSeverityColor(violation.severity)}>
-                                {violation.severity}
-                              </Badge>
-                            </div>
-                            <p className="text-sm text-gray-600 mb-2">
-                              {violation.description}
-                            </p>
-                            <p className="text-sm text-blue-600">
-                              Suggestion: <strong>{violation.suggested_fix}</strong>
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                <p className="text-sm font-semibold mb-2">Recommendations</p>
+                <ul className="list-disc pl-5 text-sm space-y-1">
+                  {result.recommendations.map((item) => (
+                    <li key={item}>{item}</li>
                   ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Recommendations */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Improvement Recommendations</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2">
-                {result.consistency_score < 70 && (
-                  <li className="flex items-start gap-2 text-sm">
-                    <span className="text-orange-600 font-bold">•</span>
-                    <span>Review and align content tone with established brand voice guidelines</span>
-                  </li>
-                )}
-                {result.tone_violations > 3 && (
-                  <li className="flex items-start gap-2 text-sm">
-                    <span className="text-orange-600 font-bold">•</span>
-                    <span>Multiple tone inconsistencies detected. Consider rewriting key sections</span>
-                  </li>
-                )}
-                {result.terminology_violations > 2 && (
-                  <li className="flex items-start gap-2 text-sm">
-                    <span className="text-orange-600 font-bold">•</span>
-                    <span>Use standard terminology from brand guidelines for technical terms</span>
-                  </li>
-                )}
-                {result.style_violations > 3 && (
-                  <li className="flex items-start gap-2 text-sm">
-                    <span className="text-orange-600 font-bold">•</span>
-                    <span>Adjust writing style to match brand formatting and structure standards</span>
-                  </li>
-                )}
-                {result.compliance_percentage >= 90 && (
-                  <li className="flex items-start gap-2 text-sm">
-                    <span className="text-green-600 font-bold">✓</span>
-                    <span>Excellent brand voice alignment! Content is well-aligned with guidelines</span>
-                  </li>
-                )}
-              </ul>
-            </CardContent>
-          </Card>
-        </>
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
     </div>
   );
