@@ -7,6 +7,7 @@ from app.models.memberships import (
 )
 from datetime import datetime, timezone, timedelta
 import uuid
+from app.utils.exceptions import NotFoundError, ValidationError
 
 
 class MembershipTypeService:
@@ -79,6 +80,8 @@ class MembershipSubscriptionService:
         subscription = db.query(MembershipSubscription).filter(
             MembershipSubscription.id == subscription_id
         ).first()
+        if subscription is None:
+            raise NotFoundError("Subscription")
         subscription.status = "cancelled"
         subscription.end_date = datetime.now(timezone.utc)
         db.commit()
@@ -106,6 +109,8 @@ class MembershipSubscriptionService:
         subscription = db.query(MembershipSubscription).filter(
             MembershipSubscription.id == subscription_id
         ).first()
+        if subscription is None:
+            raise NotFoundError("Subscription")
         subscription.status = "paused"
         db.commit()
 
@@ -118,7 +123,8 @@ class MembershipInvoiceService:
             MembershipSubscription.id == subscription_id
         ).first()
 
-        invoice_number = f"INV-{int(datetime.now(timezone.utc).timestamp())}"
+        # The random suffix keeps invoice numbers unique when several are created in the same second.
+        invoice_number = f"INV-{int(datetime.now(timezone.utc).timestamp())}-{uuid.uuid4().hex[:8].upper()}"
         tax_amount = amount * 0.1
 
         invoice = MembershipInvoice(
@@ -161,6 +167,8 @@ class MembershipPaymentMethodService:
             is_default=True
         )
         db.add(payment_method)
+        # Flush so the new row has an id; without it the filter below would also clear the new row's default.
+        db.flush()
 
         db.query(MembershipPaymentMethod).filter(
             and_(

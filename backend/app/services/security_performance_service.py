@@ -5,6 +5,7 @@ from sqlalchemy import select, update, delete, and_, desc, func
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, timedelta
 from app.models.security_performance import *
+from app.utils.exceptions import NotFoundError, ValidationError
 
 
 class RateLimitService:
@@ -20,7 +21,7 @@ class RateLimitService:
         bucket = result.scalar_one_or_none()
 
         if not bucket:
-            bucket = RateLimitBucket(user_id=user_id, endpoint=endpoint, reset_at=now + timedelta(hours=1))
+            bucket = RateLimitBucket(user_id=user_id, endpoint=endpoint, requests_count=0, reset_at=now + timedelta(hours=1))
             self.session.add(bucket)
 
         if bucket.requests_count >= limit:
@@ -70,6 +71,8 @@ class PrivacyService:
         return result.scalar_one_or_none()
 
     async def update_privacy_settings(self, user_id: int, **kwargs) -> PrivacySettings:
+        if not kwargs:
+            raise ValidationError("Provide at least one setting to change")
         stmt = update(PrivacySettings).where(PrivacySettings.user_id == user_id).values(**kwargs)
         await self.session.execute(stmt)
         await self.session.commit()
@@ -105,7 +108,7 @@ class CacheService:
         metric = result.scalar_one_or_none()
 
         if not metric:
-            metric = CacheMetric(resource_type=resource_type)
+            metric = CacheMetric(resource_type=resource_type, hits=0, misses=0)
             self.session.add(metric)
 
         if hit:

@@ -1,10 +1,12 @@
 """Authentication service"""
+from typing import Optional
 
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.models.user import User
 from app.models.auth import EmailVerification, PasswordReset, TokenBlacklist, LoginAttempt
+from app.services.mfa_service import verify_code
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
 from app.utils.exceptions import UnauthorizedError, ConflictError, NotFoundError, RateLimitError
 from app.utils.logger import logger
@@ -47,13 +49,45 @@ class AuthService:
         logger.info(f"User registered: {email}")
         return user, verification_token
 
+    async def provision_personal_workspace(self, user: User) -> None:
+        """Give a new account its own tenant and organization, with the user as owner.
+
+        Organization-scoped features (content quality checks, brand guides) need a membership,
+        so every account starts with one. The user can add more organizations later.
+        """
+        from app.services.tenant_service import TenantService
+        from app.services.organization_service import OrganizationService
+
+        display_name = " ".join(part for part in (user.first_name, user.last_name) if part) or user.email.split("@")[0]
+        tenant = await TenantService(self.session).create_tenant(
+            name=f"{display_name} workspace",
+            slug=f"workspace-{user.id}",
+            user_id=user.id,
+        )
+        await OrganizationService(self.session).create_organization(
+            tenant_id=tenant.id,
+            name=f"{display_name} team",
+            slug=f"team-{user.id}",
+            user_id=user.id,
+        )
+
+    async def activate_user(self, user_id: int) -> None:
+        """Mark an account as active and email-verified (used when verification is disabled)."""
+        user = await self.session.get(User, user_id)
+        if user is None:
+            raise NotFoundError("User")
+        user.status = "active"
+        user.email_verified_at = datetime.now(timezone.utc)
+        await self.session.commit()
+
     async def login_user(
         self,
         email: str,
         password: str,
         ip_address: str,
+        otp_code: Optional[str] = None,
     ) -> tuple:
-        """Login user with email and password"""
+        """Login user with email and password, plus a one-time code when two-factor authentication is on"""
         attempt = LoginAttempt(email=email, ip_address=ip_address, success=False)
         self.session.add(attempt)
         await self.session.flush()
@@ -91,6 +125,15 @@ class AuthService:
             await self.session.commit()
             logger.warning(f"Login failed: account not active ({email})")
             raise UnauthorizedError("Account inactive")
+
+        if user.mfa_enabled:
+            if not otp_code:
+                await self.session.commit()
+                raise UnauthorizedError("MFA code required")
+            if not verify_code(user.mfa_secret, otp_code):
+                await self.session.commit()
+                logger.warning(f"Login failed: invalid MFA code ({email})")
+                raise UnauthorizedError("Invalid authentication code")
 
         attempt.success = True
         user.last_login_at = datetime.now(timezone.utc)

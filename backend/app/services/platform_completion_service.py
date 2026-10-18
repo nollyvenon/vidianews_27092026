@@ -317,6 +317,7 @@ class SearchService:
     ) -> SavedSearch:
         saved_search = SavedSearch(
             user_id=user_id,
+            name=query[:255],
             query=query,
             filters=filters or {},
             result_count=result_count

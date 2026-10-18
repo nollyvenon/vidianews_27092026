@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, inspect as sa_inspect
 from app.models.settings import (
     SystemSetting, UserSetting,
     NotificationPreference, PrivacySetting, DisplaySetting
@@ -242,10 +242,5 @@ class SettingsService:
         return await self.get_all_user_settings(user_id)
 
     def _to_dict(self, obj) -> dict:
-        """Convert settings object to dict"""
-        return {
-            key: getattr(obj, key)
-            for key in dir(obj)
-            if not key.startswith("_") and key not in {"metadata", "sa_instance_state"}
-            and not callable(getattr(obj, key))
-        }
+        """Convert a settings row to a dict of its mapped column values"""
+        return {attr.key: getattr(obj, attr.key) for attr in sa_inspect(obj).mapper.column_attrs}

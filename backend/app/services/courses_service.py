@@ -8,6 +8,7 @@ from app.models.courses import (
 )
 from datetime import datetime, timezone
 import uuid
+from app.utils.exceptions import NotFoundError, ValidationError
 
 
 class CourseService:
@@ -43,6 +44,8 @@ class CourseService:
     @staticmethod
     def publish_course(db: Session, course_id: int):
         course = CourseService.get_course(db, course_id)
+        if course is None:
+            raise NotFoundError("Course")
         course.status = "published"
         db.commit()
 
@@ -105,6 +108,8 @@ class EnrollmentService:
     @staticmethod
     def enroll_student(db: Session, user_id: int, course_id: int) -> CourseEnrollment:
         course = db.query(Course).filter(Course.id == course_id).first()
+        if course is None:
+            raise NotFoundError("Course")
         total_lessons = db.query(Lesson).filter(Lesson.course_id == course_id).count()
 
         enrollment = CourseEnrollment(

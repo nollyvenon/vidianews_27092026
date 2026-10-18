@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, and_, desc, func
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, timedelta
+from app.utils.exceptions import NotFoundError, ValidationError
 from app.models.integrations import (
     AnalyticsReport, Metric, Dashboard, Integration, Webhook, WebhookEvent,
     NotificationPreference, Notification, AuditTrail, ComplianceReport,
@@ -15,9 +16,11 @@ class AnalyticsService:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def create_report(self, org_id: int, report_type: str, title: str, data: Dict) -> AnalyticsReport:
+    async def create_report(
+        self, org_id: int, report_type: str, title: str, data: Dict, user_id: int
+    ) -> AnalyticsReport:
         report = AnalyticsReport(
-            organization_id=org_id, report_type=report_type, title=title, data=data
+            organization_id=org_id, user_id=user_id, report_type=report_type, title=title, data=data
         )
         self.session.add(report)
         await self.session.commit()
@@ -124,6 +127,8 @@ class NotificationService:
         return result.scalar_one_or_none()
 
     async def update_preferences(self, user_id: int, **kwargs) -> NotificationPreference:
+        if not kwargs:
+            raise ValidationError("Provide at least one preference to change")
         stmt = update(NotificationPreference).where(
             NotificationPreference.user_id == user_id
         ).values(**kwargs)

@@ -10,6 +10,7 @@ from app.models.ecommerce_extended import (
 from app.models.ecommerce import Order, OrderItem
 from datetime import datetime, timezone, timedelta
 import uuid
+from app.utils.exceptions import NotFoundError, ValidationError
 
 
 class ShippingService:
@@ -176,6 +177,8 @@ class WishlistService:
     @staticmethod
     def remove_from_wishlist(db: Session, wishlist_item_id: int):
         item = db.query(WishlistItem).filter(WishlistItem.id == wishlist_item_id).first()
+        if item is None:
+            raise NotFoundError("Wishlist item")
         db.delete(item)
         db.commit()
 
@@ -224,6 +227,8 @@ class ReturnService:
     @staticmethod
     def approve_return(db: Session, return_id: int, refund_amount: float = None):
         return_request = ReturnService.get_return_request(db, return_id)
+        if return_request is None:
+            raise NotFoundError("Return request")
         return_request.status = ReturnStatus.APPROVED
         return_request.approved_at = datetime.now(timezone.utc)
 
@@ -251,6 +256,8 @@ class ReturnService:
     @staticmethod
     def process_refund(db: Session, return_id: int):
         return_request = ReturnService.get_return_request(db, return_id)
+        if return_request is None:
+            raise NotFoundError("Return request")
         return_request.status = ReturnStatus.REFUNDED
         return_request.refunded_at = datetime.now(timezone.utc)
         db.commit()
@@ -258,6 +265,8 @@ class ReturnService:
     @staticmethod
     def reject_return(db: Session, return_id: int, reason: str = None):
         return_request = ReturnService.get_return_request(db, return_id)
+        if return_request is None:
+            raise NotFoundError("Return request")
         return_request.status = ReturnStatus.REJECTED
         db.commit()
 

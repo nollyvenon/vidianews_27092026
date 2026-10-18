@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import and_, desc, func, or_, select
+from sqlalchemy import and_, delete, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.analytics_reporting import (
@@ -530,6 +530,23 @@ class CacheService:
             avg_hits_per_entry=total_hits / len(entries) if entries else 0.0,
             hit_rate=(len([e for e in entries if (e.hits or 0) > 0]) / len(entries)) if entries else 0.0,
         )
+
+
+    async def flush(self) -> int:
+        """Remove every cache entry; returns how many were removed."""
+        result = await self.db.execute(delete(CacheEntry))
+        await self.db.commit()
+        return result.rowcount or 0
+
+    async def optimize(self) -> Dict[str, int]:
+        """Remove entries whose time-to-live has passed; returns the removed and remaining counts."""
+        entries = (await self.db.execute(select(CacheEntry))).scalars().all()
+        now = _utcnow()
+        expired = [e.id for e in entries if e.created_at and e.created_at + timedelta(seconds=e.ttl_seconds) <= now]
+        if expired:
+            await self.db.execute(delete(CacheEntry).where(CacheEntry.id.in_(expired)))
+            await self.db.commit()
+        return {"removed": len(expired), "remaining": len(entries) - len(expired)}
 
 
 # ---------------------------------------------------------------- performance

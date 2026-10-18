@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Optional, List, Dict, Any, Set
 from datetime import datetime, timedelta
 import json
+import time
 import asyncio
 
 from app.models.advanced_platform import (
@@ -95,6 +96,20 @@ class WebSocketService:
         self.db.add(event)
         self.db.commit()
         return event
+
+    def list_recent_events(self, limit: int = 50) -> List[RealtimeEvent]:
+        """Most recent realtime events first"""
+        return self.db.query(RealtimeEvent).order_by(RealtimeEvent.id.desc()).limit(limit).all()
+
+    def presence(self, now: datetime, idle_after: timedelta) -> Dict[str, int]:
+        """Connected sockets, and how many of them have not sent a heartbeat within `idle_after`"""
+        connected = self.db.query(WebSocketConnection).filter(
+            WebSocketConnection.status == WebSocketConnectionStatus.CONNECTED
+        )
+        return {
+            "online": connected.count(),
+            "idle": connected.filter(WebSocketConnection.last_heartbeat < now - idle_after).count(),
+        }
 
     async def publish_event(self, event_id: int) -> Optional[RealtimeEvent]:
         event = self.db.query(RealtimeEvent).filter(
@@ -213,6 +228,10 @@ class BackgroundJobService:
 class DataPipelineService:
     def __init__(self, db: Session):
         self.db = db
+
+    def list_pipelines(self) -> List[DataPipeline]:
+        """Every pipeline, most recently run first"""
+        return self.db.query(DataPipeline).order_by(DataPipeline.last_run.desc().nulls_last(), DataPipeline.id).all()
 
     async def create_pipeline(
         self,
@@ -341,31 +360,51 @@ class CacheService:
         return entry
 
     async def get_cache(self, cache_key: str) -> Optional[Dict[str, Any]]:
-        if cache_key in self.local_cache:
-            entry = self.db.query(CacheEntry).filter(
-                CacheEntry.cache_key == cache_key
-            ).first()
-            if entry:
-                entry.hit_count += 1
-                self.db.commit()
-            return self.local_cache[cache_key]
-
+        started = time.perf_counter()
         entry = self.db.query(CacheEntry).filter(
             CacheEntry.cache_key == cache_key
         ).first()
 
-        if entry:
-            if entry.expires_at and entry.expires_at < datetime.utcnow():
-                self.db.delete(entry)
-                self.db.commit()
-                return None
-
-            entry.hit_count += 1
+        value: Optional[Dict[str, Any]] = None
+        if entry is not None and entry.expires_at and entry.expires_at < datetime.utcnow():
+            self.db.delete(entry)
             self.db.commit()
-            self.local_cache[cache_key] = entry.cache_value
-            return entry.cache_value
+            entry = None
+        if entry is not None:
+            entry.hit_count += 1
+            value = entry.cache_value
+            self.local_cache[cache_key] = value
+        self.db.commit()
 
-        return None
+        self._record_access(hit=value is not None, elapsed_ms=(time.perf_counter() - started) * 1000)
+        return value
+
+    def _running_metrics(self) -> CacheMetrics:
+        """The single running row that accumulates every recorded cache access."""
+        row = self.db.query(CacheMetrics).order_by(CacheMetrics.id.desc()).first()
+        if row is None:
+            row = CacheMetrics(
+                total_requests=0,
+                total_hits=0,
+                total_misses=0,
+                average_response_time_ms=0.0,
+                memory_usage_mb=0.0,
+                eviction_count=0,
+            )
+            self.db.add(row)
+        return row
+
+    def _record_access(self, hit: bool, elapsed_ms: float) -> None:
+        row = self._running_metrics()
+        prior = row.total_requests or 0
+        row.average_response_time_ms = ((row.average_response_time_ms or 0.0) * prior + elapsed_ms) / (prior + 1)
+        row.total_requests = prior + 1
+        if hit:
+            row.total_hits = (row.total_hits or 0) + 1
+        else:
+            row.total_misses = (row.total_misses or 0) + 1
+        row.measured_at = datetime.utcnow()
+        self.db.commit()
 
     async def invalidate_cache(self, cache_key: str) -> bool:
         self.local_cache.pop(cache_key, None)
@@ -380,21 +419,19 @@ class CacheService:
 
         return False
 
-    async def get_cache_metrics(self) -> CacheMetrics:
-        entries = self.db.query(CacheEntry).all()
-        total_hits = sum(e.hit_count for e in entries)
-        total_size = sum(e.size_bytes or 0 for e in entries)
-
-        metrics = CacheMetrics(
-            total_requests=len(entries),
-            total_hits=total_hits,
-            total_misses=len(entries) - total_hits,
-            memory_usage_mb=total_size / (1024 * 1024),
-        )
-        self.db.add(metrics)
+    async def get_cache_metrics(self) -> Dict[str, Any]:
+        """Recorded cache accesses (hits, misses, latency) with the memory the live entries occupy."""
+        row = self._running_metrics()
+        total_size = sum(size or 0 for (size,) in self.db.query(CacheEntry.size_bytes).all())
+        row.memory_usage_mb = total_size / (1024 * 1024)
         self.db.commit()
-
-        return metrics
+        return {
+            "total_requests": int(row.total_requests or 0),
+            "total_hits": int(row.total_hits or 0),
+            "total_misses": int(row.total_misses or 0),
+            "average_response_time_ms": round(float(row.average_response_time_ms or 0.0), 3),
+            "memory_usage_mb": round(float(row.memory_usage_mb or 0.0), 6),
+        }
 
 
 class APIDocumentationService:

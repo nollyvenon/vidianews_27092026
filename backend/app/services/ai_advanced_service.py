@@ -1,14 +1,17 @@
 """Advanced AI services: Memory, Templates, Chat, Research, Monitoring, Safety"""
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, and_, desc, func
+from sqlalchemy import select, update, delete, and_, desc, func, or_
+import re
+from fastapi import HTTPException
 from sqlalchemy.orm import selectinload
+from app.services.ai_chat_service import complete_json
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, timedelta
 from app.models.ai_advanced import (
     Memory, ConversationMemory, AITemplate, Chat, ChatMessage,
     Document, ResearchQuery, UsageMetric, CostAlert,
-    SafetyCheck, ComplianceLog
+    SafetyCheck, SafetyLevel, ComplianceLog
 )
 
 
@@ -129,15 +132,24 @@ class ResearchService:
         await self.session.commit()
         return result.rowcount
 
-    async def search_documents(self, user_id: int, query: str) -> List[Document]:
-        stmt = select(Document).where(
-            and_(Document.user_id == user_id, Document.is_indexed == True)
-        ).order_by(desc(Document.created_at))
+    async def search_documents(self, user_id: int, query: str, limit: int = 20) -> List[Document]:
+        """Documents of the user whose title or text contains any word of the query, newest first."""
+        terms = [term for term in re.findall(r"\w+", query.lower()) if len(term) > 2]
+        if not terms:
+            return []
+        matches = or_(*[or_(Document.title.ilike(f"%{term}%"), Document.content.ilike(f"%{term}%")) for term in terms])
+        stmt = (
+            select(Document)
+            .where(and_(Document.user_id == user_id, matches))
+            .order_by(desc(Document.created_at))
+            .limit(limit)
+        )
         result = await self.session.execute(stmt)
         return result.scalars().all()
 
-    async def create_research_query(self, user_id: int, query: str) -> ResearchQuery:
-        research = ResearchQuery(user_id=user_id, query=query)
+    async def create_research_query(self, user_id: int, query: str, summary: Optional[str] = None,
+                                    sources: Optional[List[str]] = None) -> ResearchQuery:
+        research = ResearchQuery(user_id=user_id, query=query, summary=summary, sources=sources or [])
         self.session.add(research)
         await self.session.commit()
         await self.session.refresh(research)
@@ -173,6 +185,28 @@ class MonitoringService:
             "count": row.count or 0
         }
 
+    async def get_daily_usage(self, user_id: int, days: int = 7) -> List[Dict[str, Any]]:
+        """Total recorded usage for each of the last `days` days, oldest first; days without usage are zero."""
+        today = datetime.now(timezone.utc).date()
+        start = today - timedelta(days=days - 1)
+        cutoff = datetime.combine(start, datetime.min.time(), tzinfo=timezone.utc)
+        # Group by the UTC calendar day, independent of the database session's timezone.
+        day = func.date(func.timezone("UTC", UsageMetric.created_at)).label("day")
+        stmt = (
+            select(day, func.sum(UsageMetric.value).label("total"))
+            .where(and_(UsageMetric.user_id == user_id, UsageMetric.created_at >= cutoff))
+            .group_by(day)
+        )
+        result = await self.session.execute(stmt)
+        totals = {row.day: float(row.total or 0) for row in result.all()}
+        return [
+            {
+                "date": (start + timedelta(days=offset)).isoformat(),
+                "total": totals.get(start + timedelta(days=offset), 0.0),
+            }
+            for offset in range(days)
+        ]
+
     async def create_cost_alert(self, user_id: int, threshold: float, period: str) -> CostAlert:
         alert = CostAlert(user_id=user_id, threshold=threshold, period=period)
         self.session.add(alert)
@@ -188,12 +222,36 @@ class MonitoringService:
         return result.scalars().all()
 
 
+SAFETY_INSTRUCTIONS = (
+    "Assess the document for unsafe content: hate or harassment, violence, sexual content, self-harm, "
+    "illegal activity, or exposure of personal data. Return a JSON object with \"severity\", one of "
+    "\"low\", \"medium\", \"high\" or \"critical\" (\"low\" when there is no concern), and \"flags\", a list "
+    "of short strings naming each concern (an empty list when there is none)."
+)
+
+
+def _safety_analysis(analysis: Any) -> tuple:
+    """Validate the model's safety answer; a malformed answer is refused, never stored as if it were a verdict."""
+    if not isinstance(analysis, dict):
+        raise HTTPException(status_code=503, detail="AI provider returned an unreadable safety analysis")
+    try:
+        severity = SafetyLevel(analysis.get("severity"))
+    except ValueError:
+        raise HTTPException(status_code=503, detail="AI provider returned an unreadable safety analysis")
+    flags = analysis.get("flags", [])
+    if not isinstance(flags, list) or not all(isinstance(flag, str) for flag in flags):
+        raise HTTPException(status_code=503, detail="AI provider returned an unreadable safety analysis")
+    return severity, flags
+
+
 class SafetyService:
     def __init__(self, session: AsyncSession):
         self.session = session
 
     async def check_content(self, content: str) -> SafetyCheck:
-        check = SafetyCheck(content=content)
+        """Assess content with the model provider and store the verdict for review."""
+        severity, flags = _safety_analysis(await complete_json(SAFETY_INSTRUCTIONS, content))
+        check = SafetyCheck(content=content, severity=severity, flags=flags)
         self.session.add(check)
         await self.session.commit()
         await self.session.refresh(check)

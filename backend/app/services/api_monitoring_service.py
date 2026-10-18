@@ -5,8 +5,10 @@ from sqlalchemy import select, update, and_, desc
 from typing import Optional, List
 from datetime import datetime, timezone
 from app.models.api_monitoring import *
+from app.services.graphql_explorer import run_query
 import hashlib
 import hmac
+import time
 
 
 class APIVersionService:
@@ -35,6 +37,16 @@ class APIVersionService:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def list_endpoint_versions(self) -> List[APIEndpointVersion]:
+        stmt = select(APIEndpointVersion).order_by(APIEndpointVersion.endpoint, APIEndpointVersion.version)
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def list_migrations(self) -> List[VersionMigration]:
+        stmt = select(VersionMigration).order_by(VersionMigration.id)
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
 
 class GraphQLService:
     def __init__(self, session: AsyncSession):
@@ -50,12 +62,30 @@ class GraphQLService:
     async def record_query_execution(self, query_id: int, execution_time_ms: float) -> None:
         query = await self.session.get(GraphQLQuery, query_id)
         if query:
-            query.execution_count += 1
-            query.avg_execution_time_ms = (query.avg_execution_time_ms + execution_time_ms) / 2
+            previous_total = (query.avg_execution_time_ms or 0.0) * (query.execution_count or 0)
+            query.execution_count = (query.execution_count or 0) + 1
+            query.avg_execution_time_ms = (previous_total + execution_time_ms) / query.execution_count
             await self.session.commit()
 
+    async def execute_stored_query(self, query_id: int, variables: Optional[dict] = None) -> dict:
+        """Run a saved query against the explorer schema and record how long it took."""
+        query = await self.session.get(GraphQLQuery, query_id)
+        if query is None:
+            raise ValueError(f"GraphQL query {query_id} not found")
+        started = time.perf_counter()
+        response = await run_query(self.session, query.query_string, variables)
+        elapsed_ms = (time.perf_counter() - started) * 1000
+        await self.record_query_execution(query_id, elapsed_ms)
+        return {"query_id": query_id, "elapsed_ms": round(elapsed_ms, 3), "response": response}
+
+    async def run_ad_hoc(self, query_string: str, variables: Optional[dict] = None) -> dict:
+        """Run a query typed into the explorer without saving it."""
+        started = time.perf_counter()
+        response = await run_query(self.session, query_string, variables)
+        return {"elapsed_ms": round((time.perf_counter() - started) * 1000, 3), "response": response}
+
     async def get_all_queries(self) -> List[GraphQLQuery]:
-        stmt = select(GraphQLQuery)
+        stmt = select(GraphQLQuery).order_by(GraphQLQuery.execution_count.desc(), GraphQLQuery.id)
         result = await self.session.execute(stmt)
         return result.scalars().all()
 
@@ -119,6 +149,10 @@ class TestingService:
 
     async def get_test_suite(self, suite_id: int) -> Optional[TestSuite]:
         return await self.session.get(TestSuite, suite_id)
+
+    async def list_test_suites(self) -> List[TestSuite]:
+        result = await self.session.execute(select(TestSuite).order_by(TestSuite.name))
+        return result.scalars().all()
 
 
 class MonitoringService:

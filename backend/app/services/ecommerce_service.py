@@ -13,6 +13,16 @@ from datetime import datetime, timezone, timedelta
 import uuid
 import stripe
 
+from app.core.config import settings
+from app.utils.exceptions import NotFoundError, ValidationError
+
+# Shipping charges by method, in the order currency. The checkout total adds the chosen rate.
+SHIPPING_RATES = {
+    "standard": Decimal("5.00"),
+    "express": Decimal("15.00"),
+    "overnight": Decimal("25.00"),
+}
+
 
 class ProductService:
     """Product management service"""
@@ -142,6 +152,8 @@ class CartService:
     @staticmethod
     def remove_from_cart(db: Session, cart_item_id: int):
         item = db.query(CartItem).filter(CartItem.id == cart_item_id).first()
+        if item is None:
+            raise NotFoundError("Cart item")
         cart_id = item.cart_id
         db.delete(item)
         CartService.update_cart_totals(db, cart_id)
@@ -149,6 +161,9 @@ class CartService:
 
     @staticmethod
     def update_cart_totals(db: Session, cart_id: int):
+        # The session does not autoflush, so pending item changes must reach the database
+        # before the totals are summed from it.
+        db.flush()
         cart = db.query(Cart).filter(Cart.id == cart_id).first()
         items = db.query(CartItem).filter(CartItem.cart_id == cart_id).all()
 
@@ -178,6 +193,13 @@ class CheckoutService:
     @staticmethod
     def create_checkout_session(db: Session, user_id: int, cart_id: int, checkout_data: dict) -> CheckoutSession:
         cart = CartService.get_cart(db, cart_id)
+        if not cart or cart.item_count == 0:
+            raise ValueError("Your cart is empty")
+        shipping_method = checkout_data.get("shipping_method")
+        if shipping_method not in SHIPPING_RATES:
+            raise ValueError(f"Unknown shipping method: {shipping_method}")
+
+        shipping_cost = SHIPPING_RATES[shipping_method]
         checkout = CheckoutSession(
             checkout_token=str(uuid.uuid4()),
             user_id=user_id,
@@ -186,7 +208,9 @@ class CheckoutService:
         )
         checkout.subtotal = cart.subtotal
         checkout.tax = cart.tax
-        checkout.total = cart.total
+        checkout.shipping_cost = shipping_cost
+        checkout.discount = Decimal("0.00")
+        checkout.total = cart.subtotal + cart.tax + shipping_cost - checkout.discount
 
         db.add(checkout)
         db.commit()
@@ -212,7 +236,7 @@ class CheckoutService:
         checkout.coupon_code = coupon_code
         discount = Decimal("0.10") * checkout.subtotal
         checkout.discount = discount
-        checkout.total = checkout.subtotal + checkout.tax + checkout.shipping - discount
+        checkout.total = checkout.subtotal + checkout.tax + checkout.shipping_cost - discount
         db.commit()
 
 
@@ -233,6 +257,7 @@ class PaymentService:
     @staticmethod
     def process_stripe_payment(db: Session, payment_id: int, token: str):
         payment = db.query(PaymentDetail).filter(PaymentDetail.id == payment_id).first()
+        stripe.api_key = settings.STRIPE_SECRET_KEY
 
         try:
             intent = stripe.PaymentIntent.create(
@@ -297,7 +322,7 @@ class OrderService:
             phone=checkout_session.phone,
             subtotal=checkout_session.subtotal,
             tax=checkout_session.tax,
-            shipping=checkout_session.shipping,
+            shipping=checkout_session.shipping_cost,
             discount=checkout_session.discount,
             total=checkout_session.total,
             payment_method=payment.payment_method,

@@ -1,10 +1,12 @@
 """Services for Social, Messaging & Discovery: Modules 51-55"""
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, and_, desc, func, or_
-from typing import Optional, List
-from datetime import datetime, timezone
+from sqlalchemy import select, update, delete, and_, desc, func, or_
+from typing import Any, Dict, Optional, List
+from datetime import datetime, timedelta, timezone
 from app.models.social_messaging import *
+from app.models.content import Content
+from app.models.user import User
 
 
 class ModerationService:
@@ -176,7 +178,61 @@ class DiscoveryService:
         result = await self.session.execute(stmt)
         return result.scalars().all()
 
+    async def get_recommendation_cards(self, user_id: int, limit: int = 10) -> List[Dict[str, Any]]:
+        """The user's recommendations with the recommended content's title, creator and view count."""
+        stmt = (
+            select(DiscoveryRecommendation, Content, User)
+            .join(Content, Content.id == DiscoveryRecommendation.content_id)
+            .outerjoin(User, User.id == Content.creator_user_id)
+            .where(DiscoveryRecommendation.user_id == user_id)
+            .order_by(desc(DiscoveryRecommendation.recommendation_score), DiscoveryRecommendation.id)
+            .limit(limit)
+        )
+        rows = (await self.session.execute(stmt)).all()
+        return [
+            {
+                "id": recommendation.id,
+                "content_id": recommendation.content_id,
+                "score": recommendation.recommendation_score,
+                "title": content.title,
+                "creator": " ".join(part for part in (creator.first_name, creator.last_name) if part) if creator else None,
+                "views": content.views_count or 0,
+                "reason": recommendation.reason,
+            }
+            for recommendation, content, creator in rows
+        ]
+
+    async def refresh_trending_topics(self, window_days: int = 7, limit: int = 50) -> None:
+        """Rank topics by how often people searched for them in the last `window_days` days."""
+        since = datetime.now(timezone.utc) - timedelta(days=window_days)
+        counts = (await self.session.execute(
+            select(func.lower(func.trim(SearchQuery.query)), func.count(SearchQuery.id))
+            .where(SearchQuery.searched_at >= since, func.trim(SearchQuery.query) != "")
+            .group_by(func.lower(func.trim(SearchQuery.query)))
+            .order_by(desc(func.count(SearchQuery.id)))
+            .limit(limit)
+        )).all()
+        current = {topic: int(count) for topic, count in counts}
+        existing = (await self.session.execute(select(TrendingTopic))).scalars().all()
+        for row in existing:
+            mentions = current.pop(row.topic, 0)
+            row.mention_count = mentions
+            row.trend_score = float(mentions)
+            row.updated_at = datetime.now(timezone.utc)
+        for topic, mentions in current.items():
+            self.session.add(TrendingTopic(
+                topic=topic[:255],
+                mention_count=mentions,
+                trend_score=float(mentions),
+            ))
+        await self.session.commit()
+
     async def get_trending_topics(self, limit: int = 10) -> List[TrendingTopic]:
-        stmt = select(TrendingTopic).order_by(desc(TrendingTopic.trend_score)).limit(limit)
+        stmt = (
+            select(TrendingTopic)
+            .where(TrendingTopic.trend_score > 0)
+            .order_by(desc(TrendingTopic.trend_score), TrendingTopic.id)
+            .limit(limit)
+        )
         result = await self.session.execute(stmt)
         return result.scalars().all()

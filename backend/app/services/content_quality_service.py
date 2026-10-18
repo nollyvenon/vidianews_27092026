@@ -300,6 +300,22 @@ class PlagiarismDetectionService:
         return result.scalar_one_or_none()
 
 
+def _readability_recommendations(metrics) -> list:
+    """Concrete suggestions derived from the measured values, in the order they matter most."""
+    tips = []
+    if metrics.avg_sentence_length > 20:
+        tips.append("Break long sentences into shorter ones (average is over 20 words).")
+    if metrics.avg_word_length > 5.5:
+        tips.append("Prefer shorter, common words where the meaning allows.")
+    if metrics.flesch_reading_ease < 60:
+        tips.append("Simplify wording to raise the Flesch Reading Ease above 60 for a general audience.")
+    if metrics.avg_sentence_length < 10:
+        tips.append("Some sentences are very short; combine related ideas where it reads naturally.")
+    if not tips:
+        tips.append("The reading level suits a general audience.")
+    return tips
+
+
 class ReadabilityService:
     """Module 64: Content readability analysis with multiple metrics"""
 
@@ -328,6 +344,28 @@ class ReadabilityService:
         await self.session.refresh(score)
         return score
 
+    async def store_readability_metrics(self, score_id: int, metrics) -> Optional[ReadabilityScore]:
+        """Store the full set of metrics computed by readability_analyzer.analyze."""
+        await self.session.execute(
+            update(ReadabilityScore).where(ReadabilityScore.id == score_id).values(
+                word_count=metrics.word_count,
+                sentence_count=metrics.sentence_count,
+                paragraph_count=metrics.paragraph_count,
+                flesch_reading_ease=metrics.flesch_reading_ease,
+                flesch_kincaid_grade=metrics.flesch_kincaid_grade,
+                gunning_fog_index=metrics.gunning_fog_index,
+                smog_index=metrics.smog_index,
+                avg_word_length=metrics.avg_word_length,
+                avg_sentence_length=metrics.avg_sentence_length,
+                readability_level=metrics.readability_level,
+                target_audience_grade_level=metrics.target_audience_grade_level,
+                complexity_score=metrics.complexity_score,
+                recommendations=_readability_recommendations(metrics),
+            )
+        )
+        await self.session.commit()
+        return await self.get_readability_score(score_id)
+
     async def get_readability_score(self, score_id: int) -> Optional[ReadabilityScore]:
         """Get readability score"""
         stmt = select(ReadabilityScore).where(ReadabilityScore.id == score_id)
@@ -348,13 +386,13 @@ class ReadabilityService:
         # Determine target grade level
         avg_grade = (flesch_kincaid_grade + gunning_fog_index + smog_index) / 3
         if avg_grade < 6:
-            target_grade = "5-6 (Elementary)"
+            target_grade = "Grade 5-6 (Elementary)"
         elif avg_grade < 9:
-            target_grade = "7-8 (Middle School)"
+            target_grade = "Grade 7-8 (Middle School)"
         elif avg_grade < 13:
-            target_grade = "9-12 (High School)"
+            target_grade = "Grade 9-12 (High School)"
         else:
-            target_grade = "12+ (College)"
+            target_grade = "College level (12+)"
 
         # Determine readability level based on Flesch Reading Ease
         if flesch_reading_ease >= 90:

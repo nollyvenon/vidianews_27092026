@@ -10,8 +10,10 @@ from app.models.content import (
     ContentType, ContentStatus, ContentAccessLevel, content_tags
 )
 from app.models.user import User
+from app.models.advanced_features import VideoProcess
 from app.models.activity_logs import ActivityLog, ActionType, EntityType
 import math
+from app.utils.exceptions import NotFoundError, ValidationError
 
 
 class ContentService:
@@ -87,6 +89,8 @@ class ContentService:
 
     async def update_tag(self, tag_id: int, **kwargs) -> Optional[ContentTag]:
         """Update tag"""
+        if not kwargs:
+            raise ValidationError("Provide at least one field to change")
         stmt = update(ContentTag).where(ContentTag.id == tag_id).values(**kwargs)
         await self.session.execute(stmt)
         await self.session.commit()
@@ -192,7 +196,8 @@ class ContentService:
 
         stmt = select(Content).options(
             selectinload(Content.category),
-            selectinload(Content.tags)
+            selectinload(Content.tags),
+            selectinload(Content.videos),
         )
 
         if conditions:
@@ -282,11 +287,68 @@ class ContentService:
         await self.session.commit()
         return await self.get_video(video_id)
 
+    async def record_page_view(self, content_id: int) -> None:
+        """Count one view of the content for today (UTC). Unique visitors, time on page, bounce and scroll
+        depth need client-side measurement and are not written here."""
+        from app.models.analytics_reporting import PageViewMetrics
+
+        today = datetime.now(timezone.utc).replace(tzinfo=None, hour=0, minute=0, second=0, microsecond=0)
+        row = (await self.session.execute(
+            select(PageViewMetrics).where(PageViewMetrics.content_id == content_id, PageViewMetrics.date == today)
+        )).scalar_one_or_none()
+        if row is None:
+            row = PageViewMetrics(content_id=content_id, date=today, page_views=0)
+            self.session.add(row)
+        row.page_views = (row.page_views or 0) + 1
+        await self.session.commit()
+
     async def get_content_video(self, content_id: int) -> Optional[Video]:
         """Get video for specific content"""
         stmt = select(Video).where(Video.content_id == content_id)
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def list_creator_video_processing(self, creator_user_id: int) -> List[Dict[str, Any]]:
+        """A creator's videos with their encoding status and transcoding progress across quality levels."""
+        rows = (await self.session.execute(
+            select(Video, Content.title)
+            .join(Content, Content.id == Video.content_id)
+            .where(Content.creator_user_id == creator_user_id)
+            .order_by(Video.id)
+        )).all()
+        if not rows:
+            return []
+
+        video_ids = [video.id for video, _ in rows]
+        process_rows = (await self.session.execute(
+            select(VideoProcess.video_id, VideoProcess.quality, VideoProcess.status)
+            .where(VideoProcess.video_id.in_(video_ids))
+            .order_by(VideoProcess.video_id, VideoProcess.id)
+        )).all()
+        qualities_by_video: Dict[int, List[Dict[str, str]]] = {}
+        for video_id, quality, status in process_rows:
+            qualities_by_video.setdefault(video_id, []).append({
+                "quality": quality.value if hasattr(quality, "value") else str(quality),
+                "status": status.value if hasattr(status, "value") else str(status),
+            })
+
+        payload = []
+        for video, title in rows:
+            qualities = qualities_by_video.get(video.id, [])
+            if qualities:
+                finished = sum(1 for item in qualities if item["status"] == "completed")
+                progress = round(finished / len(qualities) * 100)
+            else:
+                progress = 100 if video.encoding_status == "completed" else 0
+            payload.append({
+                "video_id": video.id,
+                "content_id": video.content_id,
+                "title": title,
+                "status": video.encoding_status or "pending",
+                "progress": progress,
+                "qualities": qualities,
+            })
+        return payload
 
     # Media File Management
     async def add_media_file(self, content_id: int, file_name: str, file_type: str,
@@ -404,10 +466,10 @@ class ContentService:
             access_level=access_level
         )
 
-    async def schedule_content(self, content_id: int, scheduled_at: datetime) -> Optional[Content]:
-        """Schedule content for future publication"""
+    async def schedule_content(self, content_id: int, scheduled_at: datetime, user_id: int) -> Optional[Content]:
+        """Schedule content for future publication, on behalf of the user who scheduled it"""
         return await self.update_content(
-            content_id, user_id=None,
+            content_id, user_id=user_id,
             status=ContentStatus.SCHEDULED,
             scheduled_at=scheduled_at
         )

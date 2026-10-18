@@ -305,7 +305,8 @@ class RateLimitService:
         ).first()
 
         if not config:
-            return {"limited": False, "remaining": None}
+            # No limit applies to this caller, so there is nothing left to count down.
+            return {"limited": False, "minute_remaining": None, "hour_remaining": None, "day_remaining": None}
 
         now = datetime.utcnow()
         minute_ago = now - timedelta(minutes=1)

@@ -1,11 +1,12 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_
-from datetime import datetime, timedelta
+from sqlalchemy import select, func, and_, or_, case, cast, Text
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional, Any
 import json
 import secrets
 import hmac
 import hashlib
+import httpx
 from app.models.user_management import (
     EmailTemplate, EmailCampaign, CampaignRecipient, UserSegment,
     UserSegmentMembership, UserPreferenceProfile, NotificationLog,
@@ -13,6 +14,17 @@ from app.models.user_management import (
     WebhookEndpoint, WebhookLog, APIKey, PersonalizationProfile,
     CampaignStatus, NotificationChannel, UserSegmentType
 )
+
+WEBHOOK_TIMEOUT_SECONDS = 10.0
+WEBHOOK_RESPONSE_LIMIT = 2000
+
+# Engagement scores run 0-100; churn risk runs 0-1. These bands drive the dashboard breakdowns.
+HIGHLY_ENGAGED_MIN = 70.0
+ENGAGED_MIN = 40.0
+LOW_ENGAGEMENT_MIN = 15.0
+HIGH_CHURN_RISK = 0.8
+MEDIUM_CHURN_RISK = 0.5
+RECENT_CAMPAIGN_DAYS = 7
 
 
 class EmailTemplateService:
@@ -57,6 +69,25 @@ class EmailTemplateService:
 
 
 class EmailCampaignService:
+    async def list_recent_campaigns(self, db: AsyncSession, limit: int = 10) -> List[Dict[str, Any]]:
+        """Most recently created campaigns with their delivery counters and click-through rate."""
+        rows = (await db.execute(
+            select(EmailCampaign).order_by(EmailCampaign.created_at.desc(), EmailCampaign.id.desc()).limit(limit)
+        )).scalars().all()
+        return [
+            {
+                "id": row.id,
+                "name": row.name,
+                "status": row.status.value if row.status else None,
+                "sent_count": row.sent_count or 0,
+                "open_count": row.open_count or 0,
+                "click_count": row.click_count or 0,
+                "ctr": round((row.click_count or 0) / row.sent_count * 100, 1) if row.sent_count else 0.0,
+                "sent_at": row.sent_at.isoformat() if row.sent_at else None,
+            }
+            for row in rows
+        ]
+
     async def create_email_campaign(
         self,
         db: AsyncSession,
@@ -232,6 +263,82 @@ class UserSegmentService:
 
 
 class SubscriberService:
+    async def get_overview(self, db: AsyncSession) -> Dict[str, Any]:
+        """Platform-wide subscriber, engagement, churn, campaign and segment figures."""
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        recent_start = now - timedelta(days=RECENT_CAMPAIGN_DAYS)
+
+        totals = (await db.execute(
+            select(
+                func.count(SubscriberProfile.id),
+                func.count(SubscriberProfile.id).filter(SubscriberProfile.created_at >= month_start),
+                func.coalesce(func.avg(SubscriberProfile.engagement_score), 0.0),
+                func.coalesce(func.avg(SubscriberProfile.churn_risk_score), 0.0),
+            )
+        )).one()
+
+        tiers = (await db.execute(
+            select(SubscriberProfile.subscription_tier, func.count(SubscriberProfile.id))
+            .group_by(SubscriberProfile.subscription_tier)
+            .order_by(SubscriberProfile.subscription_tier)
+        )).all()
+
+        engagement_level = case(
+            (SubscriberProfile.engagement_score >= HIGHLY_ENGAGED_MIN, "highly_engaged"),
+            (SubscriberProfile.engagement_score >= ENGAGED_MIN, "engaged"),
+            (SubscriberProfile.engagement_score >= LOW_ENGAGEMENT_MIN, "low_engagement"),
+            else_="inactive",
+        )
+        engagement_rows = dict((await db.execute(
+            select(engagement_level, func.count(SubscriberProfile.id)).group_by(engagement_level)
+        )).all())
+
+        churn_level = case(
+            (SubscriberProfile.churn_risk_score > HIGH_CHURN_RISK, "high"),
+            (SubscriberProfile.churn_risk_score >= MEDIUM_CHURN_RISK, "medium"),
+            else_="low",
+        )
+        churn_rows = dict((await db.execute(
+            select(churn_level, func.count(SubscriberProfile.id)).group_by(churn_level)
+        )).all())
+
+        campaign_counts = (await db.execute(
+            select(
+                func.count(EmailCampaign.id),
+                func.count(EmailCampaign.id).filter(EmailCampaign.sent_at >= recent_start),
+            ).where(EmailCampaign.status == CampaignStatus.SENT)
+        )).one()
+
+        segment_counts = (await db.execute(
+            select(
+                func.count(UserSegment.id),
+                func.count(UserSegment.id).filter(
+                    cast(UserSegment.filter_criteria, Text).notin_(["{}", "null"])
+                ),
+            )
+        )).one()
+
+        return {
+            "total_subscribers": totals[0],
+            "new_subscribers_this_month": totals[1],
+            "average_engagement": round(float(totals[2]), 1),
+            "average_churn_risk": round(float(totals[3]), 3),
+            "tiers": [{"tier": tier, "count": count} for tier, count in tiers],
+            "engagement_levels": [
+                {"level": level, "count": int(engagement_rows.get(level, 0))}
+                for level in ("highly_engaged", "engaged", "low_engagement", "inactive")
+            ],
+            "churn_risk_levels": [
+                {"level": level, "count": int(churn_rows.get(level, 0))}
+                for level in ("high", "medium", "low")
+            ],
+            "campaigns_sent": campaign_counts[0],
+            "campaigns_sent_last_7_days": campaign_counts[1],
+            "active_segments": segment_counts[0],
+            "dynamic_segments": segment_counts[1],
+        }
+
     async def create_or_update_subscriber(
         self,
         db: AsyncSession,
@@ -503,12 +610,39 @@ class WebhookService:
         if not webhook:
             raise ValueError(f"Webhook {webhook_id} not found")
 
-        webhook.last_triggered_at = datetime.utcnow()
+        body = json.dumps(
+            {"event": event_type, "data": payload, "webhook_id": webhook_id},
+            sort_keys=True,
+            default=str,
+        )
+        signature = self.generate_signature(body, webhook.secret_key)
+        status_code: Optional[int] = None
+        response_text: Optional[str] = None
+        error: Optional[str] = None
+        try:
+            async with httpx.AsyncClient(timeout=WEBHOOK_TIMEOUT_SECONDS) as client:
+                response = await client.post(
+                    webhook.url,
+                    content=body,
+                    headers={
+                        "Content-Type": "application/json",
+                        "X-Webhook-Event": event_type,
+                        "X-Webhook-Signature": signature,
+                    },
+                )
+            status_code = response.status_code
+            response_text = response.text[:WEBHOOK_RESPONSE_LIMIT]
+        except httpx.HTTPError as exc:
+            error = f"{type(exc).__name__}: {exc}"[:WEBHOOK_RESPONSE_LIMIT]
 
+        webhook.last_triggered_at = datetime.utcnow()
         log = WebhookLog(
             webhook_id=webhook_id,
             event_type=event_type,
             payload=payload,
+            status_code=status_code,
+            response=response_text,
+            error=error,
         )
         db.add(log)
         await db.commit()
@@ -517,6 +651,9 @@ class WebhookService:
             "log_id": log.id,
             "webhook_id": webhook_id,
             "event_type": event_type,
+            "delivered": error is None and status_code is not None and 200 <= status_code < 300,
+            "status_code": status_code,
+            "error": error,
         }
 
     @staticmethod

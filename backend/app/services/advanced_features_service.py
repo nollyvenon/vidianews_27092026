@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, func, and_, or_, desc
 from sqlalchemy.orm import joinedload
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 import hashlib
 import math
@@ -9,6 +9,9 @@ from typing import List, Optional, Dict, Any
 from scipy import stats
 import numpy as np
 
+from app.models.content import Video
+from app.models.rbac import ResourcePermission
+from app.utils.exceptions import NotFoundError
 from app.models.advanced_features import (
     AdvancedPersonalizationProfile,
     ContentEmbedding,
@@ -27,6 +30,17 @@ from app.models.advanced_features import (
     RecommendationType,
     RetentionStatus,
     ABTestStatus,
+    PermissionLevel,
+    ShareLink,
+    StorageFile,
+    StorageProvider,
+    VideoProcess,
+    VideoQualityLevel,
+    ProcessingStatus,
+    Thumbnail,
+    Comment,
+    CommentReaction,
+    ReactionType,
 )
 
 
@@ -189,6 +203,35 @@ class RecommendationService:
             rec.click_timestamp = datetime.utcnow()
             await self.db.commit()
         return rec
+
+    async def add_recommendation(
+        self,
+        user_id: int,
+        content_id: int,
+        score: float,
+        reason: str,
+        recommendation_type: str,
+    ) -> ContentRecommendation:
+        """Store a recommendation with a 0-1 score and the reason shown to the user"""
+        rec_type = RecommendationType(recommendation_type)
+        if not 0.0 <= score <= 1.0:
+            raise ValueError("Recommendation score must be between 0 and 1")
+        rec = ContentRecommendation(
+            user_id=user_id,
+            content_id=content_id,
+            recommendation_type=rec_type,
+            similarity_score=score,
+            relevance_score=score,
+            reason=reason,
+        )
+        self.db.add(rec)
+        await self.db.commit()
+        await self.db.refresh(rec)
+        return rec
+
+    async def record_recommendation_click(self, recommendation_id: int) -> bool:
+        """Mark a recommendation as clicked; returns False if it does not exist"""
+        return await self.record_click(recommendation_id) is not None
 
     async def record_conversion(
         self, recommendation_id: int
@@ -382,6 +425,11 @@ class ABTestingService:
         self.db.add(test)
         await self.db.commit()
         return test
+
+    async def list_tests(self) -> List[ABTest]:
+        """Every A/B test, newest first"""
+        result = await self.db.execute(select(ABTest).order_by(ABTest.id.desc()))
+        return result.scalars().all()
 
     async def get_test(self, test_id: int) -> Optional[ABTest]:
         result = await self.db.execute(
@@ -758,3 +806,380 @@ class PredictionService:
             select(PredictionModel).where(PredictionModel.deployed == True)
         )
         return result.scalars().all()
+
+
+class PermissionService:
+    """Module 26: per-user permission levels on resources and share links."""
+
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    @staticmethod
+    def _level(value) -> PermissionLevel:
+        try:
+            return PermissionLevel(value)
+        except ValueError as exc:
+            raise ValueError(f"Unknown permission level: {value}") from exc
+
+    async def grant_permission(
+        self, resource_type: str, resource_id: int, user_id: int, permission_level
+    ) -> ResourcePermission:
+        """Grant (or change) a user's permission level on a resource"""
+        level = self._level(permission_level)
+        result = await self.db.execute(
+            select(ResourcePermission).where(
+                and_(
+                    ResourcePermission.resource_type == resource_type,
+                    ResourcePermission.resource_id == resource_id,
+                    ResourcePermission.user_id == user_id,
+                )
+            )
+        )
+        perm = result.scalar_one_or_none()
+        if perm is None:
+            perm = ResourcePermission(
+                resource_type=resource_type,
+                resource_id=resource_id,
+                user_id=user_id,
+                permission=level.value,
+            )
+            self.db.add(perm)
+        else:
+            perm.permission = level.value
+        await self.db.commit()
+        await self.db.refresh(perm)
+        return perm
+
+    async def get_permission(self, resource_type: str, resource_id: int, user_id: int) -> PermissionLevel:
+        """Return the user's level on a resource, PermissionLevel.NONE when none was granted"""
+        result = await self.db.execute(
+            select(ResourcePermission).where(
+                and_(
+                    ResourcePermission.resource_type == resource_type,
+                    ResourcePermission.resource_id == resource_id,
+                    ResourcePermission.user_id == user_id,
+                )
+            )
+        )
+        perm = result.scalar_one_or_none()
+        return PermissionLevel(perm.permission) if perm else PermissionLevel.NONE
+
+    async def create_share_link(
+        self,
+        resource_type: str,
+        resource_id: int,
+        created_by: int,
+        token: str,
+        permission_level,
+    ) -> ShareLink:
+        """Create a token that grants access to a resource at the given level"""
+        if not token or len(token) > 64:
+            raise ValueError("Share token must be 1-64 characters")
+        level = self._level(permission_level)
+        existing = await self.db.execute(select(ShareLink.id).where(ShareLink.token == token))
+        if existing.scalar_one_or_none() is not None:
+            raise ValueError("Share token is already in use")
+        link = ShareLink(
+            resource_type=resource_type,
+            resource_id=resource_id,
+            token=token,
+            created_by=created_by,
+            permission_level=level,
+        )
+        self.db.add(link)
+        await self.db.commit()
+        await self.db.refresh(link)
+        return link
+
+    async def get_share_link(self, token: str) -> Optional[ShareLink]:
+        """Return an active share link for a token"""
+        result = await self.db.execute(
+            select(ShareLink).where(and_(ShareLink.token == token, ShareLink.is_active == True))
+        )
+        return result.scalar_one_or_none()
+
+
+class StorageService:
+    """Module 27: metadata for stored files (the bytes live in the storage provider)."""
+
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def upload_file(
+        self,
+        user_id: int,
+        tenant_id: int,
+        filename: str,
+        storage_path: str,
+        size_bytes: int,
+        mime_type: str,
+        storage_provider=StorageProvider.LOCAL,
+        checksum_sha256: Optional[str] = None,
+    ) -> StorageFile:
+        """Record a file that has been written to the storage provider"""
+        if not filename or not storage_path:
+            raise ValueError("Filename and storage path are required")
+        if size_bytes < 0:
+            raise ValueError("File size cannot be negative")
+        file = StorageFile(
+            user_id=user_id,
+            tenant_id=tenant_id,
+            filename=filename,
+            storage_path=storage_path,
+            storage_provider=StorageProvider(storage_provider),
+            mime_type=mime_type,
+            size_bytes=size_bytes,
+            checksum_sha256=checksum_sha256,
+        )
+        self.db.add(file)
+        await self.db.commit()
+        await self.db.refresh(file)
+        return file
+
+    async def get_file(self, file_id: int) -> Optional[StorageFile]:
+        """Return a file that has not been deleted"""
+        result = await self.db.execute(
+            select(StorageFile).where(and_(StorageFile.id == file_id, StorageFile.deleted_at.is_(None)))
+        )
+        return result.scalar_one_or_none()
+
+    async def delete_file(self, file_id: int) -> bool:
+        """Soft-delete a file; the metadata row is kept for the audit trail"""
+        file = await self.get_file(file_id)
+        if file is None:
+            return False
+        file.deleted_at = datetime.now(timezone.utc)
+        await self.db.commit()
+        return True
+
+
+class VideoProcessingService:
+    """Module 28: transcoding jobs and thumbnails for videos."""
+
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def _get_video(self, video_id: int) -> Video:
+        video = await self.db.get(Video, video_id)
+        if video is None:
+            raise NotFoundError("Video")
+        return video
+
+    async def start_processing(self, video_id: int, quality) -> VideoProcess:
+        """Queue a transcoding job for one quality level"""
+        await self._get_video(video_id)
+        try:
+            level = VideoQualityLevel(quality)
+        except ValueError as exc:
+            raise ValueError(f"Unknown video quality: {quality}") from exc
+        job = VideoProcess(video_id=video_id, quality=level, status=ProcessingStatus.PENDING)
+        self.db.add(job)
+        await self.db.commit()
+        await self.db.refresh(job)
+        return job
+
+    async def update_processing_status(
+        self,
+        process_id: int,
+        status,
+        output_url: Optional[str] = None,
+        error_message: Optional[str] = None,
+    ) -> Optional[VideoProcess]:
+        """Advance a transcoding job and stamp its start and completion times"""
+        job = await self.db.get(VideoProcess, process_id)
+        if job is None:
+            return None
+        try:
+            new_status = ProcessingStatus(status)
+        except ValueError as exc:
+            raise ValueError(f"Unknown processing status: {status}") from exc
+        now = datetime.now(timezone.utc)
+        if new_status == ProcessingStatus.PROCESSING and job.started_at is None:
+            job.started_at = now
+        if new_status in (ProcessingStatus.COMPLETED, ProcessingStatus.FAILED):
+            job.completed_at = now
+        job.status = new_status
+        if output_url is not None:
+            job.output_url = output_url
+        job.error_message = error_message
+        await self.db.commit()
+        await self.db.refresh(job)
+        return job
+
+    async def add_thumbnail(
+        self,
+        video_id: int,
+        url: str,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+        make_default: bool = False,
+    ) -> Thumbnail:
+        """Attach a thumbnail to a video; making it the default clears the previous default"""
+        await self._get_video(video_id)
+        if make_default:
+            await self.db.execute(
+                update(Thumbnail).where(Thumbnail.video_id == video_id).values(is_default=False)
+            )
+        thumb = Thumbnail(video_id=video_id, url=url, width=width, height=height, is_default=make_default)
+        self.db.add(thumb)
+        await self.db.commit()
+        await self.db.refresh(thumb)
+        return thumb
+
+
+class CollaborationService:
+    """Module 29: comments on content or videos, and reactions to comments."""
+
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def _content_id(self, resource_type: str, resource_id: int) -> int:
+        """Comments hang off content; a video's comments belong to its content item"""
+        if resource_type == "content":
+            return resource_id
+        if resource_type == "video":
+            video = await self.db.get(Video, resource_id)
+            if video is None:
+                raise NotFoundError("Video")
+            return video.content_id
+        raise ValueError(f"Unsupported resource type: {resource_type}")
+
+    async def add_comment(
+        self,
+        resource_type: str,
+        resource_id: int,
+        user_id: int,
+        body: str,
+        parent_id: Optional[int] = None,
+    ) -> Comment:
+        """Post a comment on a content item or a video"""
+        if not body or not body.strip():
+            raise ValueError("Comment body cannot be empty")
+        content_id = await self._content_id(resource_type, resource_id)
+        comment = Comment(
+            content_id=content_id,
+            user_id=user_id,
+            parent_id=parent_id,
+            body=body.strip(),
+        )
+        self.db.add(comment)
+        await self.db.commit()
+        await self.db.refresh(comment)
+        return comment
+
+    async def add_reaction(self, comment_id: int, user_id: int, reaction_type) -> CommentReaction:
+        """Set a user's reaction on a comment; a user has at most one reaction per comment"""
+        comment = await self.db.get(Comment, comment_id)
+        if comment is None:
+            raise NotFoundError("Comment")
+        try:
+            level = ReactionType(reaction_type)
+        except ValueError as exc:
+            raise ValueError(f"Unknown reaction type: {reaction_type}") from exc
+        result = await self.db.execute(
+            select(CommentReaction).where(
+                and_(CommentReaction.comment_id == comment_id, CommentReaction.user_id == user_id)
+            )
+        )
+        reaction = result.scalar_one_or_none()
+        if reaction is None:
+            reaction = CommentReaction(comment_id=comment_id, user_id=user_id, reaction_type=level)
+            self.db.add(reaction)
+        else:
+            reaction.reaction_type = level
+        await self.db.commit()
+        await self.db.refresh(reaction)
+        return reaction
+
+
+class AdvancedSummaryService:
+    """Read-only aggregates behind the advanced features dashboard"""
+
+    AT_RISK_CHURN = 0.8
+
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    @staticmethod
+    def _percent(part: int, whole: int) -> float:
+        return round(part / whole * 100, 1) if whole else 0.0
+
+    async def summary(self) -> Dict[str, Any]:
+        from app.models.advanced_platform import APIUsageMetrics
+        from app.models.user_management import SubscriberProfile
+
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        total, clicked, converted = (await self.session.execute(select(
+            func.count(ContentRecommendation.id),
+            func.count(ContentRecommendation.id).filter(ContentRecommendation.clicked.is_(True)),
+            func.count(ContentRecommendation.id).filter(ContentRecommendation.conversion.is_(True)),
+        ))).one()
+        type_rows = (await self.session.execute(select(
+            ContentRecommendation.recommendation_type,
+            func.count(ContentRecommendation.id),
+            func.count(ContentRecommendation.id).filter(ContentRecommendation.clicked.is_(True)),
+            func.count(ContentRecommendation.id).filter(ContentRecommendation.conversion.is_(True)),
+        ).group_by(ContentRecommendation.recommendation_type).order_by(ContentRecommendation.recommendation_type))).all()
+
+        profiles, average_profile_score = (await self.session.execute(select(
+            func.count(AdvancedPersonalizationProfile.id),
+            func.coalesce(func.avg(AdvancedPersonalizationProfile.personalization_score), 0.0),
+        ))).one()
+
+        deployed_models, average_accuracy = (await self.session.execute(select(
+            func.count(PredictionModel.id).filter(PredictionModel.deployed.is_(True)),
+            func.coalesce(func.avg(PredictionModel.accuracy).filter(PredictionModel.deployed.is_(True)), 0.0),
+        ))).one()
+        predictions_this_month = (await self.session.execute(select(
+            func.count(UserPrediction.id)
+        ).where(UserPrediction.created_at >= month_start))).scalar_one()
+
+        subscribers, average_churn, at_risk = (await self.session.execute(select(
+            func.count(SubscriberProfile.id),
+            func.coalesce(func.avg(SubscriberProfile.churn_risk_score), 0.0),
+            func.count(SubscriberProfile.id).filter(SubscriberProfile.churn_risk_score > self.AT_RISK_CHURN),
+        ))).one()
+
+        endpoints, calls, weighted_time = (await self.session.execute(select(
+            func.count(APIUsageMetrics.id),
+            func.coalesce(func.sum(APIUsageMetrics.call_count), 0),
+            func.coalesce(func.sum(APIUsageMetrics.average_response_time_ms * APIUsageMetrics.call_count), 0.0),
+        ))).one()
+
+        return {
+            "recommendations": {
+                "total": int(total),
+                "click_through_rate": self._percent(int(clicked), int(total)),
+                "conversion_rate": self._percent(int(converted), int(total)),
+                "by_type": [
+                    {
+                        "type": row[0].value if hasattr(row[0], "value") else str(row[0]),
+                        "count": int(row[1]),
+                        "click_through_rate": self._percent(int(row[2]), int(row[1])),
+                        "conversion_rate": self._percent(int(row[3]), int(row[1])),
+                    }
+                    for row in type_rows
+                ],
+            },
+            "retention": {
+                "subscribers": int(subscribers),
+                "at_risk": int(at_risk),
+                "average_churn_risk": round(float(average_churn), 3),
+            },
+            "personalization": {
+                "profiles": int(profiles),
+                "average_score": round(float(average_profile_score), 3),
+            },
+            "predictions": {
+                "deployed_models": int(deployed_models),
+                "average_accuracy": round(float(average_accuracy), 3),
+                "predictions_this_month": int(predictions_this_month),
+            },
+            "performance": {
+                "measured_endpoints": int(endpoints),
+                "total_calls": int(calls),
+                "average_response_time_ms": round(float(weighted_time) / int(calls), 2) if calls else 0.0,
+            },
+        }

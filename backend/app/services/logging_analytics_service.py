@@ -147,6 +147,21 @@ class DocumentationService:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_published_doc(self, slug: str) -> Optional[Documentation]:
+        stmt = select(Documentation).where(Documentation.slug == slug, Documentation.published.is_(True))
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def list_published_docs(self) -> List[Documentation]:
+        stmt = select(Documentation).where(Documentation.published.is_(True)).order_by(desc(Documentation.views), Documentation.id)
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def record_view(self, doc_id: int) -> None:
+        stmt = update(Documentation).where(Documentation.id == doc_id).values(views=Documentation.views + 1)
+        await self.session.execute(stmt)
+        await self.session.commit()
+
     async def publish_doc(self, doc_id: int) -> None:
         stmt = update(Documentation).where(Documentation.id == doc_id).values(published=True)
         await self.session.execute(stmt)
