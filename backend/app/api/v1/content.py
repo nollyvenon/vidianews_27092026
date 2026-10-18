@@ -6,7 +6,7 @@ from typing import List, Optional
 from datetime import datetime
 
 from app.db.session import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_optional_current_user
 from app.models.user import User
 from app.models.content import ContentType, ContentStatus, ContentAccessLevel
 from app.services.content_service import ContentService
@@ -47,7 +47,7 @@ async def list_categories(
     is_active: bool = Query(True),
     limit: int = Query(100, le=1000),
     session: AsyncSession = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     """List content categories"""
     service = ContentService(session)
     return await service.get_categories(is_active=is_active, limit=limit)
@@ -57,7 +57,7 @@ async def list_categories(
 async def get_category(
     category_id: int,
     session: AsyncSession = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     """Get category by ID"""
     service = ContentService(session)
     category = await service.get_category(category_id)
@@ -110,7 +110,7 @@ async def create_tag(
 async def list_tags(
     is_active: bool = Query(True),
     session: AsyncSession = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     """List tags"""
     service = ContentService(session)
     return await service.get_tags(is_active=is_active)
@@ -120,7 +120,7 @@ async def list_tags(
 async def get_tag(
     tag_id: int,
     session: AsyncSession = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     """Get tag by ID"""
     service = ContentService(session)
     tag = await service.get_tag(tag_id)
@@ -207,7 +207,7 @@ async def list_content(
     order_by: str = Query("created_at"),
     order: str = Query("desc", regex="^(asc|desc)$"),
     session: AsyncSession = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     """List content with filters"""
     service = ContentService(session)
 
@@ -243,7 +243,7 @@ async def search_content(
     limit: int = Query(50, le=100),
     offset: int = Query(0),
     session: AsyncSession = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     """Search content"""
     service = ContentService(session)
     return await service.search_content(query, content_type, limit=limit, offset=offset)
@@ -254,7 +254,7 @@ async def get_featured_content(
     content_type: Optional[ContentType] = Query(None),
     limit: int = Query(10, le=50),
     session: AsyncSession = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     """Get featured content"""
     service = ContentService(session)
     return await service.get_featured_content(content_type=content_type, limit=limit)
@@ -265,7 +265,7 @@ async def get_trending_content(
     days: int = Query(7, ge=1, le=365),
     limit: int = Query(10, le=50),
     session: AsyncSession = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     """Get trending content"""
     service = ContentService(session)
     return await service.get_trending_content(days=days, limit=limit)
@@ -275,12 +275,13 @@ async def get_trending_content(
 async def get_content(
     content_id: int,
     session: AsyncSession = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     """Get content by ID"""
     service = ContentService(session)
     content = await service.get_content(content_id, include_engagement=True)
     if not content:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+    await service.record_page_view(content_id)
     return content
 
 
@@ -288,7 +289,7 @@ async def get_content(
 async def get_content_by_slug(
     slug: str,
     session: AsyncSession = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     """Get content by slug"""
     service = ContentService(session)
     content = await service.get_content_by_slug(slug)
@@ -373,7 +374,7 @@ async def schedule_content(
 ):
     """Schedule content"""
     service = ContentService(session)
-    content = await service.schedule_content(content_id, req.scheduled_at)
+    content = await service.schedule_content(content_id, req.scheduled_at, current_user.id)
     if not content:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
     return content
@@ -418,11 +419,20 @@ async def add_video(
     )
 
 
+@router.get("/videos/processing")
+async def list_video_processing(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """The signed-in creator's videos with encoding status and transcoding progress"""
+    return await ContentService(session).list_creator_video_processing(current_user.id)
+
+
 @router.get("/{content_id}/videos", response_model=Optional[VideoResponse])
 async def get_content_video(
     content_id: int,
     session: AsyncSession = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     """Get video for content"""
     service = ContentService(session)
     return await service.get_content_video(content_id)
@@ -473,7 +483,7 @@ async def add_media_file(
 async def get_media_files(
     content_id: int,
     session: AsyncSession = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     """Get media files for content"""
     service = ContentService(session)
     return await service.get_content_media_files(content_id)
@@ -498,7 +508,7 @@ async def delete_media_file(
 async def record_engagement(
     content_id: int,
     req: ContentEngagementCreate,
-    current_user: Optional[User] = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     session: AsyncSession = Depends(get_db),
 ):
     """Record user engagement"""
@@ -518,7 +528,7 @@ async def get_engagement(
     engagement_type: Optional[str] = Query(None),
     limit: int = Query(100, le=1000),
     session: AsyncSession = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     """Get engagement for content"""
     service = ContentService(session)
     return await service.get_content_engagement(content_id, engagement_type, limit=limit)
@@ -529,7 +539,7 @@ async def get_engagement(
 async def get_content_stats(
     content_id: int,
     session: AsyncSession = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     """Get content statistics"""
     service = ContentService(session)
     stats = await service.get_content_stats(content_id)

@@ -8,6 +8,7 @@ from app.services.ecommerce_extended_service import (
     ShippingService, InventoryService, WishlistService, ReturnService
 )
 from app.models.user import User
+from app.models.ecommerce import Product
 from pydantic import BaseModel
 from typing import List, Optional
 from decimal import Decimal
@@ -129,8 +130,10 @@ def get_shipment_tracking(
 def get_product_inventory(
     product_id: int,
     db: Session = Depends(get_db)
-):
+, current_user: User = Depends(get_current_user)):
     """Get product inventory"""
+    if db.get(Product, product_id) is None:
+        raise HTTPException(status_code=404, detail="Product not found")
     return InventoryService.get_or_create_inventory_level(db, product_id)
 
 
@@ -270,6 +273,15 @@ def create_return_request(
     return return_request
 
 
+@router.get("/returns/pending")
+def get_pending_returns(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get pending returns (admin only)"""
+    return ReturnService.get_pending_returns(db)
+
+
 @router.get("/returns/{return_id}")
 def get_return_request(
     return_id: int,
@@ -338,12 +350,3 @@ def process_refund(
     """Process refund"""
     ReturnService.process_refund(db, return_id)
     return {"status": "refunded"}
-
-
-@router.get("/returns/pending")
-def get_pending_returns(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Get pending returns (admin only)"""
-    return ReturnService.get_pending_returns(db)

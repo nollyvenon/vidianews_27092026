@@ -1,6 +1,8 @@
 """Memberships API endpoints"""
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
+from app.models.memberships import MembershipSubscription, MembershipType, SubscriptionStatus
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.core.security import get_current_user
@@ -37,14 +39,45 @@ class PaymentMethodRequest(BaseModel):
     stripe_payment_method_id: str
 
 
+def _organization_id(current_user: User) -> int:
+    if current_user.organization_id is None:
+        raise HTTPException(status_code=422, detail="Your account has no organization yet. Create one under Organizations first.")
+    return current_user.organization_id
+
+
+def _membership_payload(membership, subscriber_count: int) -> dict:
+    return {
+        "id": membership.id,
+        "name": membership.name,
+        "tier": membership.tier.value if hasattr(membership.tier, "value") else membership.tier,
+        "description": membership.description,
+        "price": membership.price,
+        "billing_cycle": membership.billing_cycle.value if hasattr(membership.billing_cycle, "value") else membership.billing_cycle,
+        "max_courses": membership.max_courses,
+        "max_students": membership.max_students,
+        "is_active": membership.is_active,
+        "subscriber_count": subscriber_count,
+    }
+
+
+def _active_subscriber_counts(db: Session, membership_ids: list) -> dict:
+    if not membership_ids:
+        return {}
+    rows = db.query(MembershipSubscription.membership_type_id, func.count(MembershipSubscription.id)).filter(
+        MembershipSubscription.membership_type_id.in_(membership_ids),
+        MembershipSubscription.status == SubscriptionStatus.ACTIVE,
+    ).group_by(MembershipSubscription.membership_type_id).all()
+    return dict(rows)
+
+
 @router.post("/membership-types")
 def create_membership_type(
     req: MembershipTypeRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Create membership type"""
-    return MembershipTypeService.create_membership_type(db, 1, req.dict())
+    """Create membership type in the caller's organization"""
+    return MembershipTypeService.create_membership_type(db, _organization_id(current_user), req.dict())
 
 
 @router.get("/membership-types/{membership_id}")
@@ -53,11 +86,14 @@ def get_membership_type(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get membership type"""
-    membership = MembershipTypeService.get_membership_type(db, membership_id)
+    """Get membership type of the caller's organization, with its active subscriber count"""
+    membership = db.query(MembershipType).filter(
+        MembershipType.id == membership_id,
+        MembershipType.organization_id == _organization_id(current_user),
+    ).first()
     if not membership:
         raise HTTPException(status_code=404, detail="Membership type not found")
-    return membership
+    return _membership_payload(membership, _active_subscriber_counts(db, [membership.id]).get(membership.id, 0))
 
 
 @router.get("/membership-types")
@@ -65,8 +101,10 @@ def list_membership_types(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """List all membership types"""
-    return MembershipTypeService.list_membership_types(db, 1)
+    """List the organization's active membership types with their active subscriber counts"""
+    memberships = MembershipTypeService.list_membership_types(db, _organization_id(current_user))
+    counts = _active_subscriber_counts(db, [m.id for m in memberships])
+    return [_membership_payload(m, counts.get(m.id, 0)) for m in memberships]
 
 
 @router.post("/subscriptions")

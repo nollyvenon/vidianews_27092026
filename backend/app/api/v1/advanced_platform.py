@@ -1,7 +1,9 @@
+from app.core.security import get_current_user
+from app.models.user import User
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timedelta
 from pydantic import BaseModel
 
 from app.database import get_db
@@ -202,10 +204,45 @@ async def websocket_endpoint(
         await service.unregister_connection(connection_id)
 
 
+PRESENCE_IDLE_AFTER = timedelta(minutes=5)
+
+
+@websocket_router.get("/events")
+async def list_realtime_events(
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Recent realtime events, newest first"""
+    events = WebSocketService(db).list_recent_events(limit)
+    return [
+        {
+            "id": event.id,
+            "event_type": event.event_type,
+            "event_source": event.event_source,
+            "payload": event.payload,
+            "priority": event.priority or 0,
+            "status": event.status,
+            "created_at": event.created_at.isoformat() if event.created_at else None,
+        }
+        for event in events
+    ]
+
+
+@websocket_router.get("/presence")
+async def get_presence(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """How many sockets are connected, and how many of them have gone idle"""
+    return WebSocketService(db).presence(datetime.utcnow(), PRESENCE_IDLE_AFTER)
+
+
 @websocket_router.post("/broadcast", response_model=RealtimeEventResponse)
 async def broadcast_event(
     req: RealtimeEventRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = WebSocketService(db)
     event = await service.broadcast_event(
@@ -223,6 +260,7 @@ async def broadcast_event(
 async def create_job(
     req: BackgroundJobRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = BackgroundJobService(db)
     job = await service.create_job(
@@ -238,7 +276,7 @@ async def create_job(
 async def get_pending_jobs(
     limit: int = Query(50),
     db: Session = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     service = BackgroundJobService(db)
     jobs = await service.get_pending_jobs(limit)
     return jobs
@@ -248,6 +286,7 @@ async def get_pending_jobs(
 async def start_job(
     job_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = BackgroundJobService(db)
     job = await service.start_job(job_id)
@@ -261,6 +300,7 @@ async def complete_job(
     job_id: int,
     result: Optional[dict] = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = BackgroundJobService(db)
     job = await service.complete_job(job_id, result)
@@ -273,6 +313,7 @@ async def complete_job(
 async def create_schedule(
     req: JobScheduleRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = BackgroundJobService(db)
     schedule = await service.create_schedule(
@@ -285,10 +326,33 @@ async def create_schedule(
 
 
 # Data Pipeline Endpoints
+@pipeline_router.get("/")
+async def list_pipelines(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Every data pipeline with its state and run history"""
+    return [
+        {
+            "id": pipeline.id,
+            "name": pipeline.name,
+            "source_type": pipeline.source_type,
+            "destination_type": pipeline.destination_type,
+            "status": pipeline.status,
+            "is_active": bool(pipeline.is_active),
+            "failure_count": pipeline.failure_count or 0,
+            "last_run": pipeline.last_run.isoformat() if pipeline.last_run else None,
+            "last_success": pipeline.last_success.isoformat() if pipeline.last_success else None,
+        }
+        for pipeline in DataPipelineService(db).list_pipelines()
+    ]
+
+
 @pipeline_router.post("/", response_model=PipelineResponse)
 async def create_pipeline(
     req: PipelineRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = DataPipelineService(db)
     pipeline = await service.create_pipeline(
@@ -307,6 +371,7 @@ async def create_pipeline(
 async def activate_pipeline(
     pipeline_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = DataPipelineService(db)
     pipeline = await service.activate_pipeline(pipeline_id)
@@ -319,6 +384,7 @@ async def activate_pipeline(
 async def execute_pipeline(
     pipeline_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = DataPipelineService(db)
     execution = await service.execute_pipeline(pipeline_id)
@@ -333,6 +399,7 @@ async def add_pipeline_stage(
     stage_type: str,
     config: dict,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = DataPipelineService(db)
     stage = await service.add_pipeline_stage(
@@ -350,6 +417,7 @@ async def add_pipeline_stage(
 async def set_cache(
     req: CacheEntryRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = CacheService(db)
     entry = await service.set_cache(
@@ -365,7 +433,7 @@ async def set_cache(
 async def get_cache(
     cache_key: str,
     db: Session = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     service = CacheService(db)
     return await service.get_cache(cache_key)
 
@@ -374,6 +442,7 @@ async def get_cache(
 async def invalidate_cache(
     cache_key: str,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = CacheService(db)
     success = await service.invalidate_cache(cache_key)
@@ -382,10 +451,38 @@ async def invalidate_cache(
     return {"invalidated": True}
 
 
-@cache_router.get("/metrics", response_model=CacheMetricsResponse)
+# Its own prefix: analytics_reporting mounts GET /cache/{cache_key} ahead of this module, which would shadow /cache/summary.
+cache_summary_router = APIRouter(prefix="/cache-summary", tags=["caching"])
+
+
+@cache_summary_router.get("")
+async def get_cache_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Cached entries, the hits they have served, and the memory they occupy. Read-only."""
+    from sqlalchemy import func
+    from app.models.advanced_platform import CacheEntry
+    entries, hits, size_bytes = db.query(
+        func.count(CacheEntry.id),
+        func.coalesce(func.sum(CacheEntry.hit_count), 0),
+        func.coalesce(func.sum(CacheEntry.size_bytes), 0),
+    ).one()
+    return {
+        "entries": int(entries),
+        "total_hits": int(hits),
+        "memory_usage_mb": round(int(size_bytes) / (1024 * 1024), 3),
+    }
+
+
+# Its own prefix: analytics_reporting mounts GET /cache/{cache_key} ahead of this module, which would shadow /cache/metrics.
+cache_metrics_router = APIRouter(prefix="/cache-metrics", tags=["caching"])
+
+
+@cache_metrics_router.get("", response_model=CacheMetricsResponse)
 async def get_cache_metrics(
     db: Session = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     service = CacheService(db)
     return await service.get_cache_metrics()
 
@@ -395,6 +492,7 @@ async def get_cache_metrics(
 async def create_documentation(
     req: APIDocumentationRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = APIDocumentationService(db)
     doc = await service.create_documentation(
@@ -414,6 +512,7 @@ async def add_endpoint(
     doc_id: int,
     req: APIEndpointRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = APIDocumentationService(db)
     endpoint = await service.add_endpoint(
@@ -427,6 +526,27 @@ async def add_endpoint(
         req.response_schema,
     )
     return {"id": endpoint.id, "path": endpoint.path, "method": endpoint.method}
+
+
+@api_docs_router.get("/usage")
+async def list_api_usage(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Call counts, errors and response times for every endpoint that has been measured"""
+    from app.models.advanced_platform import APIUsageMetrics
+    rows = db.query(APIUsageMetrics).order_by(APIUsageMetrics.call_count.desc(), APIUsageMetrics.id).all()
+    return [
+        {
+            "id": row.id,
+            "endpoint": row.endpoint,
+            "method": row.method,
+            "call_count": row.call_count or 0,
+            "error_count": row.error_count or 0,
+            "average_response_time_ms": round(row.average_response_time_ms or 0.0, 2),
+        }
+        for row in rows
+    ]
 
 
 @api_docs_router.get("/{doc_id}", response_model=dict)
@@ -466,6 +586,7 @@ async def record_api_usage(
     response_time_ms: float,
     is_error: bool = False,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = APIDocumentationService(db)
     metrics = await service.record_usage(endpoint, method, response_time_ms, is_error)
@@ -476,7 +597,7 @@ async def record_api_usage(
 async def get_usage_metrics(
     endpoint: str,
     db: Session = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     from app.models.advanced_platform import APIUsageMetrics
     metrics = db.query(APIUsageMetrics).filter(
         APIUsageMetrics.endpoint == endpoint

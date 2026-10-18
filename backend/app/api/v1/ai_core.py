@@ -52,14 +52,20 @@ async def create_prompt(req: PromptCreate, current_user: User = Depends(get_curr
     )
 
 @router.get("/prompts", response_model=List[PromptResponse])
-async def list_prompts(status_filter: Optional[str] = Query(None, alias="status"), limit: int = Query(50, le=100), session: AsyncSession = Depends(get_db)):
+async def list_prompts(status_filter: Optional[str] = Query(None, alias="status"), limit: int = Query(50, le=100), session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """List prompts"""
     service = PromptService(session)
     status_enum = PromptStatus(status_filter) if status_filter else None
     return await service.list_prompts(status=status_enum, limit=limit)
 
+@router.get("/prompts/search", response_model=List[PromptResponse])
+async def search_prompts(query: str = Query(..., min_length=1), session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Search prompts"""
+    service = PromptService(session)
+    return await service.search_prompts(query)
+
 @router.get("/prompts/{prompt_id}", response_model=PromptResponse)
-async def get_prompt(prompt_id: int, session: AsyncSession = Depends(get_db)):
+async def get_prompt(prompt_id: int, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get prompt"""
     service = PromptService(session)
     prompt = await service.get_prompt(prompt_id)
@@ -68,16 +74,11 @@ async def get_prompt(prompt_id: int, session: AsyncSession = Depends(get_db)):
     return prompt
 
 @router.get("/prompts/category/{category}", response_model=List[PromptResponse])
-async def get_prompts_by_category(category: str, session: AsyncSession = Depends(get_db)):
+async def get_prompts_by_category(category: str, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get prompts by category"""
     service = PromptService(session)
     return await service.get_prompts_by_category(category)
 
-@router.get("/prompts/search", response_model=List[PromptResponse])
-async def search_prompts(query: str = Query(..., min_length=1), session: AsyncSession = Depends(get_db)):
-    """Search prompts"""
-    service = PromptService(session)
-    return await service.search_prompts(query)
 
 @router.post("/prompts/{prompt_id}/publish", response_model=PromptResponse)
 async def publish_prompt(prompt_id: int, current_user: User = Depends(get_current_user), session: AsyncSession = Depends(get_db)):
@@ -145,13 +146,13 @@ async def create_workflow(req: WorkflowCreate, current_user: User = Depends(get_
     )
 
 @router.get("/workflows", response_model=List[WorkflowResponse])
-async def list_workflows(session: AsyncSession = Depends(get_db)):
+async def list_workflows(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """List workflows"""
     service = WorkflowService(session)
     return await service.list_workflows()
 
 @router.get("/workflows/{workflow_id}", response_model=WorkflowResponse)
-async def get_workflow(workflow_id: int, session: AsyncSession = Depends(get_db)):
+async def get_workflow(workflow_id: int, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get workflow"""
     service = WorkflowService(session)
     workflow = await service.get_workflow(workflow_id)
@@ -169,7 +170,7 @@ async def execute_workflow(workflow_id: int, input_data: Dict[str, Any], current
     return await service.execute_workflow(workflow_id, current_user.id, input_data)
 
 @router.get("/workflows/{workflow_id}/executions", response_model=List[WorkflowExecutionResponse])
-async def get_execution_history(workflow_id: int, session: AsyncSession = Depends(get_db)):
+async def get_execution_history(workflow_id: int, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get execution history"""
     service = WorkflowService(session)
     return await service.get_execution_history(workflow_id)
@@ -232,13 +233,13 @@ async def create_agent(req: AgentCreate, current_user: User = Depends(get_curren
     )
 
 @router.get("/agents", response_model=List[AgentResponse])
-async def list_agents(session: AsyncSession = Depends(get_db)):
+async def list_agents(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """List agents"""
     service = AgentService(session)
     return await service.list_agents()
 
 @router.get("/agents/{agent_id}", response_model=AgentResponse)
-async def get_agent(agent_id: int, session: AsyncSession = Depends(get_db)):
+async def get_agent(agent_id: int, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get agent"""
     service = AgentService(session)
     agent = await service.get_agent(agent_id)
@@ -247,7 +248,7 @@ async def get_agent(agent_id: int, session: AsyncSession = Depends(get_db)):
     return agent
 
 @router.get("/agents/{agent_id}/stats", response_model=Dict[str, Any])
-async def get_agent_stats(agent_id: int, session: AsyncSession = Depends(get_db)):
+async def get_agent_stats(agent_id: int, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get agent statistics"""
     service = AgentService(session)
     stats = await service.get_agent_stats(agent_id)

@@ -1,5 +1,6 @@
 """Social login endpoints (public login flow) and admin management of provider credentials."""
 
+from app.core.security import get_current_user
 from datetime import datetime
 from typing import Optional
 
@@ -145,7 +146,7 @@ async def exchange_social_code(
 async def list_social_providers(
     _admin: User = Depends(require_social_admin),
     session: AsyncSession = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     """All supported providers with their configuration. Client secrets are never returned."""
     return await SocialAuthService(session).list_admin_view()
 

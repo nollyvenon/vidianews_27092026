@@ -90,19 +90,19 @@ async def create_provider(req: ProviderCreate, current_user: User = Depends(get_
     return await service.create_provider(**req.model_dump())
 
 @router.get("/", response_model=List[ProviderResponse])
-async def list_providers(is_active: bool = Query(True), session: AsyncSession = Depends(get_db)):
+async def list_providers(is_active: bool = Query(True), session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """List AI providers"""
     service = AIProviderService(session)
     return await service.get_providers(is_active=is_active)
 
 @router.get("/by-type/{provider_type}", response_model=List[ProviderResponse])
-async def get_providers_by_type(provider_type: ProviderType, session: AsyncSession = Depends(get_db)):
+async def get_providers_by_type(provider_type: ProviderType, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get providers by type"""
     service = AIProviderService(session)
     return await service.get_providers_by_type(provider_type)
 
 @router.get("/{provider_id}", response_model=ProviderResponse)
-async def get_provider(provider_id: int, session: AsyncSession = Depends(get_db)):
+async def get_provider(provider_id: int, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get provider by ID"""
     service = AIProviderService(session)
     provider = await service.get_provider(provider_id)
@@ -157,19 +157,19 @@ async def register_model(provider_id: int, req: ModelCreate, current_user: User 
     return await service.register_model(provider_id, req.name, req.model_id, req.family, **req.model_dump(exclude={"name", "model_id", "family"}))
 
 @router.get("/{provider_id}/models", response_model=List[ModelResponse])
-async def get_provider_models(provider_id: int, session: AsyncSession = Depends(get_db)):
+async def get_provider_models(provider_id: int, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get models for provider"""
     service = AIProviderService(session)
     return await service.get_available_models(provider_id)
 
 @router.get("/models/by-family/{family}", response_model=List[ModelResponse])
-async def get_models_by_family(family: ModelFamily, session: AsyncSession = Depends(get_db)):
+async def get_models_by_family(family: ModelFamily, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get models by family"""
     service = AIProviderService(session)
     return await service.get_models_by_family(family)
 
 @router.get("/models/{model_id}", response_model=ModelResponse)
-async def get_model(model_id: int, session: AsyncSession = Depends(get_db)):
+async def get_model(model_id: int, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get model details"""
     service = AIProviderService(session)
     model = await service.get_model(model_id)
@@ -188,7 +188,7 @@ async def deprecate_model(model_id: int, current_user: User = Depends(get_curren
 
 # Usage and Analytics
 @router.get("/{provider_id}/stats", response_model=dict)
-async def get_provider_stats(provider_id: int, session: AsyncSession = Depends(get_db)):
+async def get_provider_stats(provider_id: int, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get provider statistics"""
     service = AIProviderService(session)
     stats = await service.get_provider_stats(provider_id)
@@ -197,20 +197,20 @@ async def get_provider_stats(provider_id: int, session: AsyncSession = Depends(g
     return stats
 
 @router.get("/{provider_id}/usage", response_model=dict)
-async def get_usage_stats(provider_id: int, days: int = Query(7, ge=1, le=365), session: AsyncSession = Depends(get_db)):
+async def get_usage_stats(provider_id: int, days: int = Query(7, ge=1, le=365), session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get usage statistics"""
     service = AIProviderService(session)
     return await service.get_usage_stats(provider_id, days)
 
 @router.get("/{provider_id}/costs", response_model=dict)
-async def get_cost_breakdown(provider_id: int, days: int = Query(30, ge=1, le=365), session: AsyncSession = Depends(get_db)):
+async def get_cost_breakdown(provider_id: int, days: int = Query(30, ge=1, le=365), session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get cost breakdown"""
     service = AIProviderService(session)
     return await service.get_cost_breakdown(provider_id, days)
 
 # Comparison and Selection
 @router.post("/compare", response_model=dict)
-async def compare_models(model_ids: List[int], session: AsyncSession = Depends(get_db)):
+async def compare_models(model_ids: List[int], session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Compare multiple models"""
     service = AIProviderService(session)
     return await service.get_model_comparison(model_ids)
@@ -220,7 +220,7 @@ async def get_best_provider(
     requires_streaming: bool = False,
     requires_vision: bool = False,
     requires_function_calling: bool = False,
-    session: AsyncSession = Depends(get_db)
+    session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """Find best provider for task"""
     service = AIProviderService(session)

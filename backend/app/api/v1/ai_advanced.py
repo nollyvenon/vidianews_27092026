@@ -8,10 +8,12 @@ from datetime import datetime
 from app.db.session import get_db
 from app.core.security import get_current_user
 from app.models.user import User
+from app.models.ai_advanced import DocumentType
 from app.services.ai_advanced_service import (
     MemoryService, TemplateService, ChatService,
     ResearchService, MonitoringService, SafetyService
 )
+from app.services.ai_chat_service import complete_text, generate_reply
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/ai", tags=["ai-advanced"])
@@ -42,7 +44,7 @@ async def store_memory(req: MemoryCreate, current_user: User = Depends(get_curre
     return await service.store_memory(current_user.id, req.memory_type, req.key, req.value)
 
 @router.get("/memory/{key}", response_model=Optional[MemoryResponse])
-async def get_memory(key: str, session: AsyncSession = Depends(get_db)):
+async def get_memory(key: str, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Retrieve memory by key"""
     service = MemoryService(session)
     return await service.get_memory(key)
@@ -81,13 +83,13 @@ async def create_template(req: TemplateCreate, current_user: User = Depends(get_
     return await service.create_template(req.name, req.slug, req.definition, current_user.id, category=req.category, description=req.description)
 
 @router.get("/templates", response_model=List[TemplateResponse])
-async def list_templates(category: Optional[str] = None, session: AsyncSession = Depends(get_db)):
+async def list_templates(category: Optional[str] = None, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """List templates"""
     service = TemplateService(session)
     return await service.list_templates(category)
 
 @router.get("/templates/{template_id}", response_model=TemplateResponse)
-async def get_template(template_id: int, session: AsyncSession = Depends(get_db)):
+async def get_template(template_id: int, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get template"""
     service = TemplateService(session)
     template = await service.get_template(template_id)
@@ -129,8 +131,31 @@ class ChatResponse(BaseModel):
     total_tokens: int
     total_cost: float
     created_at: datetime
+    messages: List[ChatMessageResponse] = []
     class Config:
         from_attributes = True
+
+
+def _chat_with_messages(chat) -> Dict[str, Any]:
+    """Chat fields plus its messages in conversation order."""
+    messages = sorted(getattr(chat, "chat_messages", []) or [], key=lambda m: m.id)
+    return {
+        "id": chat.id,
+        "title": chat.title,
+        "status": chat.status.value if hasattr(chat.status, "value") else str(chat.status),
+        "total_tokens": chat.total_tokens,
+        "total_cost": chat.total_cost,
+        "created_at": chat.created_at,
+        "messages": [ChatMessageResponse.model_validate(m) for m in messages],
+    }
+
+
+async def _owned_chat(service: "ChatService", chat_id: int, user_id: int):
+    """Return the chat if it belongs to the user; otherwise 404 (no existence leak)."""
+    chat = await service.get_chat(chat_id)
+    if not chat or chat.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
+    return chat
 
 @router.post("/chats", response_model=ChatResponse, status_code=status.HTTP_201_CREATED)
 async def create_chat(req: ChatCreate, current_user: User = Depends(get_current_user), session: AsyncSession = Depends(get_db)):
@@ -146,25 +171,41 @@ async def list_chats(current_user: User = Depends(get_current_user), session: As
 
 @router.get("/chats/{chat_id}", response_model=ChatResponse)
 async def get_chat(chat_id: int, current_user: User = Depends(get_current_user), session: AsyncSession = Depends(get_db)):
-    """Get chat"""
+    """Get one of the caller's chats, including its messages"""
     service = ChatService(session)
-    chat = await service.get_chat(chat_id)
-    if not chat:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
-    return chat
+    chat = await _owned_chat(service, chat_id, current_user.id)
+    return _chat_with_messages(chat)
 
 @router.post("/chats/{chat_id}/messages", response_model=ChatMessageResponse, status_code=status.HTTP_201_CREATED)
 async def add_message(chat_id: int, req: ChatMessageCreate, current_user: User = Depends(get_current_user), session: AsyncSession = Depends(get_db)):
-    """Add message to chat"""
+    """Add a message to one of the caller's chats"""
     service = ChatService(session)
+    await _owned_chat(service, chat_id, current_user.id)
     return await service.add_message(chat_id, req.role, req.content, req.tokens)
+
+@router.post("/chats/{chat_id}/reply", response_model=ChatMessageResponse, status_code=status.HTTP_201_CREATED)
+async def request_reply(chat_id: int, current_user: User = Depends(get_current_user), session: AsyncSession = Depends(get_db)):
+    """Generate the assistant's answer to the latest user message and store it.
+
+    Fails with 503 when no AI provider key is configured, and never stores a placeholder reply.
+    """
+    service = ChatService(session)
+    chat = await _owned_chat(service, chat_id, current_user.id)
+    history = [
+        {"role": m.role, "content": m.content}
+        for m in sorted(chat.chat_messages or [], key=lambda m: m.id)
+    ]
+    if not history or history[-1]["role"] != "user":
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Send a message before requesting a reply")
+    content, tokens = await generate_reply(history)
+    return await service.add_message(chat_id, "assistant", content, tokens)
 
 # ==================== MODULE 18: RESEARCH ====================
 
 class DocumentCreate(BaseModel):
     title: str
     content: str
-    document_type: str
+    document_type: DocumentType
     source_url: Optional[str] = None
 
 class DocumentResponse(BaseModel):
@@ -208,9 +249,25 @@ async def search_documents(query: str, current_user: User = Depends(get_current_
 
 @router.post("/research", response_model=ResearchQueryResponse, status_code=status.HTTP_201_CREATED)
 async def create_research_query(req: ResearchQueryCreate, current_user: User = Depends(get_current_user), session: AsyncSession = Depends(get_db)):
-    """Create research query"""
+    """Answer a question from the user's own documents.
+
+    The answer is written by the model from matching excerpts only and cites their titles. When no
+    document matches, the answer says so and the model is not asked to guess.
+    """
     service = ResearchService(session)
-    return await service.create_research_query(current_user.id, req.query)
+    documents = await service.search_documents(current_user.id, req.query, limit=5)
+    if not documents:
+        summary = "No documents in your library match this question. Add documents and search again."
+        return await service.create_research_query(current_user.id, req.query, summary, [])
+
+    excerpts = "\n\n".join(f"[{doc.title}]\n{doc.content[:3000]}" for doc in documents)
+    prompt = (
+        "Answer the question using only the excerpts below. Cite document titles in square brackets. "
+        "If the excerpts do not answer it, say so.\n\n"
+        f"Question: {req.query}\n\nExcerpts:\n{excerpts}"
+    )
+    summary, _ = await complete_text([{"role": "user", "content": prompt}])
+    return await service.create_research_query(current_user.id, req.query, summary, [doc.title for doc in documents])
 
 # ==================== MODULE 19: MONITORING ====================
 
@@ -251,6 +308,18 @@ async def get_usage_stats(days: int = Query(30, ge=1, le=365), current_user: Use
     """Get usage statistics"""
     service = MonitoringService(session)
     return await service.get_usage_stats(current_user.id, days)
+
+
+class DailyUsagePoint(BaseModel):
+    date: str
+    total: float
+
+
+@router.get("/metrics/usage/daily", response_model=List[DailyUsagePoint])
+async def get_daily_usage(days: int = Query(7, ge=1, le=90), current_user: User = Depends(get_current_user), session: AsyncSession = Depends(get_db)):
+    """Get usage per day for the trend chart"""
+    service = MonitoringService(session)
+    return await service.get_daily_usage(current_user.id, days)
 
 @router.post("/alerts/cost", response_model=CostAlertResponse, status_code=status.HTTP_201_CREATED)
 async def create_cost_alert(req: CostAlertCreate, current_user: User = Depends(get_current_user), session: AsyncSession = Depends(get_db)):

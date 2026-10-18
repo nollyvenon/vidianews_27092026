@@ -12,7 +12,8 @@ from app.services.integrations_service import (
     AnalyticsService, WebhookService, NotificationService,
     AuditService, SearchService
 )
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from app.models.integrations import IntegrationType
 
 router = APIRouter(prefix="/system", tags=["system"])
 
@@ -35,10 +36,12 @@ class ReportResponse(BaseModel):
 async def create_report(req: ReportCreate, current_user: User = Depends(get_current_user), session: AsyncSession = Depends(get_db)):
     """Create analytics report"""
     service = AnalyticsService(session)
-    return await service.create_report(current_user.organization_id, req.report_type, req.title, req.data)
+    return await service.create_report(
+        current_user.organization_id, req.report_type, req.title, req.data, current_user.id
+    )
 
 @router.get("/reports/{report_id}", response_model=ReportResponse)
-async def get_report(report_id: int, session: AsyncSession = Depends(get_db)):
+async def get_report(report_id: int, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get report"""
     service = AnalyticsService(session)
     report = await service.get_report(report_id)
@@ -73,7 +76,7 @@ async def create_dashboard(req: DashboardCreate, current_user: User = Depends(ge
     return await service.create_dashboard(current_user.id, current_user.organization_id, req.name)
 
 @router.get("/dashboards/{dashboard_id}")
-async def get_dashboard(dashboard_id: int, session: AsyncSession = Depends(get_db)):
+async def get_dashboard(dashboard_id: int, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get dashboard"""
     service = AnalyticsService(session)
     dashboard = await service.get_dashboard(dashboard_id)
@@ -89,22 +92,65 @@ async def list_dashboards(current_user: User = Depends(get_current_user), sessio
 
 # ==================== MODULE 22: WEBHOOKS & INTEGRATIONS ====================
 
+SECRET_KEY_HINTS = ("secret", "token", "password", "api_key", "apikey", "key")
+
+
+def _organization(user: User) -> int:
+    if user.organization_id is None:
+        raise HTTPException(status_code=422, detail="Your account has no organization yet. Create one under Organizations first.")
+    return user.organization_id
+
+
+def _masked_config(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Credentials are never returned; their presence is shown instead."""
+    masked = {}
+    for name, value in (config or {}).items():
+        if any(hint in name.lower() for hint in SECRET_KEY_HINTS):
+            masked[name] = "********" if value else None
+        else:
+            masked[name] = value
+    return masked
+
+
 class IntegrationCreate(BaseModel):
+    integration_type: IntegrationType
+    name: str = Field(..., min_length=1, max_length=255)
+    config: Dict[str, Any] = Field(default_factory=dict)
+
+
+class IntegrationResponse(BaseModel):
+    id: int
     integration_type: str
     name: str
+    is_active: bool
     config: Dict[str, Any]
+    created_at: Optional[datetime] = None
 
-@router.post("/integrations", status_code=status.HTTP_201_CREATED)
+
+def _integration_response(row) -> IntegrationResponse:
+    return IntegrationResponse(
+        id=row.id,
+        integration_type=row.integration_type.value,
+        name=row.name,
+        is_active=bool(row.is_active),
+        config=_masked_config(row.config),
+        created_at=row.created_at,
+    )
+
+
+@router.post("/integrations", status_code=status.HTTP_201_CREATED, response_model=IntegrationResponse)
 async def create_integration(req: IntegrationCreate, current_user: User = Depends(get_current_user), session: AsyncSession = Depends(get_db)):
-    """Create integration"""
+    """Connect an integration for the caller's organization"""
     service = WebhookService(session)
-    return await service.create_integration(current_user.organization_id, req.integration_type, req.name, req.config)
+    row = await service.create_integration(_organization(current_user), req.integration_type.value, req.name, req.config)
+    return _integration_response(row)
 
-@router.get("/integrations")
+
+@router.get("/integrations", response_model=List[IntegrationResponse])
 async def list_integrations(current_user: User = Depends(get_current_user), session: AsyncSession = Depends(get_db)):
-    """List integrations"""
+    """Integrations connected for the caller's organization"""
     service = WebhookService(session)
-    return await service.list_integrations(current_user.organization_id)
+    return [_integration_response(row) for row in await service.list_integrations(_organization(current_user))]
 
 class WebhookCreate(BaseModel):
     event_type: str
@@ -123,7 +169,7 @@ async def list_webhooks(current_user: User = Depends(get_current_user), session:
     return await service.list_webhooks(current_user.organization_id)
 
 @router.get("/webhooks/{webhook_id}/events")
-async def get_webhook_events(webhook_id: int, session: AsyncSession = Depends(get_db)):
+async def get_webhook_events(webhook_id: int, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get webhook events"""
     service = WebhookService(session)
     return await service.get_webhook_events(webhook_id)

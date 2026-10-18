@@ -68,8 +68,10 @@ def create_course(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Create course"""
-    return CourseService.create_course(db, 1, current_user.id, req.dict())
+    """Create a course in the caller's tenant"""
+    if current_user.tenant_id is None:
+        raise HTTPException(status_code=422, detail="Your account has no workspace yet. Create a tenant first.")
+    return CourseService.create_course(db, current_user.tenant_id, current_user.id, req.dict())
 
 
 @router.get("/courses/{course_id}")
@@ -92,7 +94,7 @@ def list_courses(
     db: Session = Depends(get_db)
 ):
     """List courses"""
-    return CourseService.list_courses(db, 1, status)
+    return CourseService.list_courses(db, current_user.tenant_id, status)
 
 
 @router.put("/courses/{course_id}")
@@ -124,7 +126,7 @@ def search_courses(
     db: Session = Depends(get_db)
 ):
     """Search courses"""
-    return CourseService.search_courses(db, 1, search_term)
+    return CourseService.search_courses(db, current_user.tenant_id, search_term)
 
 
 @router.post("/courses/{course_id}/sections")

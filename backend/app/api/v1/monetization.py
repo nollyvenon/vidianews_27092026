@@ -42,7 +42,7 @@ async def get_subscription(current_user: User = Depends(get_current_user), sessi
     service = BillingService(session)
     sub = await service.get_subscription(current_user.id)
     if not sub:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active subscription")
     return sub
 
 @router.get("/invoices")
@@ -51,7 +51,7 @@ async def list_invoices(current_user: User = Depends(get_current_user), session:
     service = BillingService(session)
     sub = await service.get_subscription(current_user.id)
     if not sub:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active subscription")
     return await service.get_invoices(sub.id)
 
 # ==================== MODULE 33: MARKETPLACE ====================
@@ -72,7 +72,7 @@ async def get_creator_profile(current_user: User = Depends(get_current_user), se
     return profile
 
 @router.get("/creators")
-async def list_creators(verified_only: bool = False, session: AsyncSession = Depends(get_db)):
+async def list_creators(verified_only: bool = False, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """List creators"""
     service = MarketplaceService(session)
     return await service.list_creators(verified_only)
@@ -96,7 +96,7 @@ async def list_dashboards(current_user: User = Depends(get_current_user), sessio
     return await service.list_dashboards(current_user.id)
 
 @router.get("/dashboards/{dashboard_id}")
-async def get_dashboard(dashboard_id: int, session: AsyncSession = Depends(get_db)):
+async def get_dashboard(dashboard_id: int, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get dashboard"""
     service = AnalyticsService(session)
     dashboard = await service.get_dashboard(dashboard_id)
@@ -130,7 +130,7 @@ async def list_campaigns(current_user: User = Depends(get_current_user), session
     return await service.list_campaigns(current_user.id)
 
 @router.get("/campaigns/{campaign_id}")
-async def get_campaign(campaign_id: int, session: AsyncSession = Depends(get_db)):
+async def get_campaign(campaign_id: int, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get campaign"""
     service = CampaignService(session)
     campaign = await service.get_campaign(campaign_id)

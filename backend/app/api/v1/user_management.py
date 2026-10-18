@@ -1,9 +1,14 @@
+from app.core.security import get_current_user
+from app.models.user import User
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.models.user_management import APIKey
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 from pydantic import BaseModel, EmailStr
 
+from app.core.admin_access import require_admin
 from app.db.session import get_db
 from app.services.user_management_service import (
     EmailTemplateService, EmailCampaignService, UserSegmentService,
@@ -104,6 +109,7 @@ class UserInterestsRequest(BaseModel):
 async def create_email_template(
     request: EmailTemplateRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = EmailTemplateService()
     result = await service.create_email_template(
@@ -120,7 +126,7 @@ async def create_email_template(
 async def get_email_template(
     template_id: int,
     db: AsyncSession = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     service = EmailTemplateService()
     try:
         result = await service.get_email_template(db, template_id)
@@ -130,10 +136,21 @@ async def get_email_template(
 
 
 # Email Campaign Endpoints
+@email_router.get("/campaigns")
+async def list_recent_campaigns(
+    limit: int = 10,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin("emails")),
+):
+    """Recent campaigns with delivery counters. Admin only."""
+    return await EmailCampaignService().list_recent_campaigns(db, min(max(limit, 1), 100))
+
+
 @email_router.post("/campaigns", status_code=status.HTTP_201_CREATED)
 async def create_email_campaign(
     request: EmailCampaignRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = EmailCampaignService()
     result = await service.create_email_campaign(
@@ -151,6 +168,7 @@ async def create_email_campaign(
 async def add_campaign_recipients(
     request: CampaignRecipientRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = EmailCampaignService()
     try:
@@ -171,6 +189,7 @@ async def update_campaign_metrics(
     open_count: int = 0,
     click_count: int = 0,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = EmailCampaignService()
     try:
@@ -190,6 +209,7 @@ async def update_campaign_metrics(
 async def send_campaign(
     campaign_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = EmailCampaignService()
     try:
@@ -204,6 +224,7 @@ async def send_campaign(
 async def create_user_segment(
     request: UserSegmentRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = UserSegmentService()
     result = await service.create_user_segment(
@@ -221,6 +242,7 @@ async def add_users_to_segment(
     segment_id: int,
     request: AddSegmentUsersRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = UserSegmentService()
     try:
@@ -238,7 +260,7 @@ async def add_users_to_segment(
 async def get_segment_users(
     segment_id: int,
     db: AsyncSession = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     service = UserSegmentService()
     user_ids = await service.get_segment_users(db, segment_id)
     return {"segment_id": segment_id, "user_ids": user_ids}
@@ -249,6 +271,7 @@ async def get_segment_users(
 async def create_subscriber(
     request: SubscriberRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = SubscriberService()
     result = await service.create_or_update_subscriber(
@@ -263,6 +286,7 @@ async def create_subscriber(
 async def record_subscriber_activity(
     request: SubscriberActivityRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = SubscriberService()
     result = await service.record_subscriber_activity(
@@ -275,11 +299,20 @@ async def record_subscriber_activity(
     return result
 
 
+@subscriber_router.get("/overview")
+async def get_subscriber_overview(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin("subscribers")),
+):
+    """Platform-wide subscriber dashboard figures. Admin only."""
+    return await SubscriberService().get_overview(db)
+
+
 @subscriber_router.get("/{subscriber_id}/engagement-score")
 async def get_engagement_score(
     subscriber_id: int,
     db: AsyncSession = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     service = SubscriberService()
     score = await service.calculate_engagement_score(db, subscriber_id)
     return {"subscriber_id": subscriber_id, "engagement_score": score}
@@ -289,7 +322,7 @@ async def get_engagement_score(
 async def get_churn_risk(
     subscriber_id: int,
     db: AsyncSession = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     service = SubscriberService()
     risk = await service.calculate_churn_risk(db, subscriber_id)
     return {"subscriber_id": subscriber_id, "churn_risk_score": risk}
@@ -300,6 +333,7 @@ async def update_daily_analytics(
     subscriber_id: int,
     date: datetime,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = SubscriberService()
     result = await service.update_daily_analytics(db, subscriber_id, date)
@@ -311,6 +345,7 @@ async def update_daily_analytics(
 async def send_notification(
     request: NotificationRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = NotificationService()
     result = await service.send_notification(
@@ -327,6 +362,7 @@ async def send_notification(
 async def mark_notification_sent(
     notification_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = NotificationService()
     try:
@@ -340,6 +376,7 @@ async def mark_notification_sent(
 async def mark_notification_read(
     notification_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = NotificationService()
     try:
@@ -354,6 +391,7 @@ async def mark_notification_read(
 async def create_webhook_endpoint(
     request: WebhookEndpointRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = WebhookService()
     result = await service.create_webhook_endpoint(
@@ -370,6 +408,7 @@ async def trigger_webhook(
     webhook_id: int,
     request: WebhookTriggerRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = WebhookService()
     try:
@@ -385,16 +424,38 @@ async def trigger_webhook(
 
 
 # API Key Endpoints
+@api_key_router.get("/")
+async def list_api_keys(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """The signed-in user's API keys. Only the last four characters of each key are shown."""
+    rows = (await db.execute(
+        select(APIKey).where(APIKey.user_id == current_user.id).order_by(APIKey.id)
+    )).scalars().all()
+    return [
+        {
+            "id": row.id,
+            "name": row.name,
+            "permissions": list(row.permissions or []),
+            "is_active": bool(row.is_active),
+            "key_suffix": row.key[-4:],
+        }
+        for row in rows
+    ]
+
+
 @api_key_router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_api_key(
     request: APIKeyRequest,
-    user_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    """Create an API key for the signed-in user"""
     service = APIKeyService()
     result = await service.create_api_key(
         db,
-        user_id,
+        current_user.id,
         request.name,
         request.permissions,
     )
@@ -405,7 +466,7 @@ async def create_api_key(
 async def validate_api_key(
     key: str,
     db: AsyncSession = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     service = APIKeyService()
     result = await service.validate_api_key(db, key)
     if not result:
@@ -417,7 +478,14 @@ async def validate_api_key(
 async def revoke_api_key(
     key_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    """Revoke one of the signed-in user's own API keys"""
+    owned = (await db.execute(
+        select(APIKey).where(APIKey.id == key_id, APIKey.user_id == current_user.id)
+    )).scalar_one_or_none()
+    if owned is None:
+        raise HTTPException(status_code=404, detail="API key not found")
     service = APIKeyService()
     try:
         result = await service.revoke_api_key(db, key_id)
@@ -431,6 +499,7 @@ async def revoke_api_key(
 async def create_personalization_profile(
     request: PersonalizationProfileRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = PersonalizationService()
     result = await service.create_personalization_profile(
@@ -446,6 +515,7 @@ async def create_personalization_profile(
 async def update_user_interests(
     request: UserInterestsRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = PersonalizationService()
     try:
@@ -463,7 +533,7 @@ async def update_user_interests(
 async def get_personalization_score(
     user_id: int,
     db: AsyncSession = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     service = PersonalizationService()
     score = await service.calculate_personalization_score(db, user_id)
     return {"user_id": user_id, "personalization_score": score}

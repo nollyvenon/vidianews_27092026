@@ -3,7 +3,7 @@
 from fastapi import APIRouter
 
 # Import endpoints
-from app.api.v1 import auth, health, tenants, organizations, profiles, settings, notifications, activity, content, ai_providers, ai_core, ai_advanced, integrations, advanced_features, monetization, security_performance, api_monitoring, logging_analytics, social_messaging, streaming_premium, community_compliance, content_quality, publishing_distribution, user_management, enterprise_features, analytics_reporting, platform_completion, advanced_platform, ecommerce, ecommerce_extended, marketing, memberships, courses, analytics_admin, social_auth, billing_admin, outbound_webhooks, test_reports
+from app.api.v1 import overview, auth, health, tenants, organizations, profiles, settings, notifications, activity, content, ai_providers, ai_core, ai_advanced, integrations, advanced_features, monetization, security_performance, api_monitoring, logging_analytics, social_messaging, streaming_premium, community_compliance, content_quality, publishing_distribution, user_management, enterprise_features, analytics_reporting, platform_completion, advanced_platform, ecommerce, ecommerce_extended, marketing, memberships, courses, analytics_admin, social_auth, billing_admin, outbound_webhooks, test_reports, rbac
 
 api_router = APIRouter()
 
@@ -31,6 +31,7 @@ api_router.include_router(streaming_premium.router, tags=["streaming-premium"])
 api_router.include_router(community_compliance.router, tags=["community-compliance"])
 api_router.include_router(content_quality.router, tags=["content-quality"])
 api_router.include_router(publishing_distribution.router, tags=["publishing-distribution"])
+api_router.include_router(overview.router, tags=["overview"])
 # These modules expose several named routers (each with its own tags) instead of one `router`.
 for _sub_router in (
     user_management.email_router, user_management.segment_router, user_management.subscriber_router,
@@ -56,6 +57,7 @@ api_router.include_router(platform_completion.router, tags=["platform-completion
 for _sub_router in (
     advanced_platform.websocket_router, advanced_platform.jobs_router,
     advanced_platform.pipeline_router, advanced_platform.cache_router,
+    advanced_platform.cache_summary_router, advanced_platform.cache_metrics_router,
     advanced_platform.api_docs_router,
 ):
     api_router.include_router(_sub_router)
@@ -72,3 +74,4 @@ api_router.include_router(social_auth.admin_router, tags=["social-auth-admin"])
 api_router.include_router(billing_admin.router, tags=["billing-admin"])
 api_router.include_router(outbound_webhooks.router, tags=["outbound-webhooks"])
 api_router.include_router(test_reports.router, tags=["test-reports"])
+api_router.include_router(rbac.router, tags=["rbac"])

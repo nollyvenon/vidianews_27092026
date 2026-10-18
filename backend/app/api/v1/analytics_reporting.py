@@ -1,5 +1,6 @@
 from app.core.security import get_current_user
 from app.models.user import User
+from app.core.admin_access import require_admin
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
@@ -332,7 +333,7 @@ async def create_analytics_report(
 async def get_analytics_report(
     report_id: int,
     service: AnalyticsReportService = Depends(_service(AnalyticsReportService))
-):
+, current_user: User = Depends(get_current_user)):
     """Get analytics report by ID"""
     report = await service.get_analytics_report(report_id)
     if not report:
@@ -344,7 +345,7 @@ async def get_daily_analytics(
     start_date: datetime = Query(...),
     end_date: datetime = Query(...),
     service: AnalyticsReportService = Depends(_service(AnalyticsReportService))
-):
+, current_user: User = Depends(get_current_user)):
     """Get daily analytics for date range"""
     return await service.get_daily_analytics(start_date, end_date)
 
@@ -354,7 +355,7 @@ async def get_top_content(
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
     service: AnalyticsReportService = Depends(_service(AnalyticsReportService))
-):
+, current_user: User = Depends(get_current_user)):
     """Get top content by pageviews"""
     return await service.get_top_content(
         limit=limit,
@@ -386,7 +387,7 @@ async def record_user_event(
 async def get_user_behavior_summary(
     user_id: int,
     service: UserBehaviorService = Depends(_service(UserBehaviorService))
-):
+, current_user: User = Depends(get_current_user)):
     """Get user behavior summary"""
     summary = await service.get_user_behavior_summary(user_id)
     if not summary:
@@ -398,7 +399,7 @@ async def get_user_events(
     user_id: int,
     limit: int = Query(100, ge=1, le=1000),
     service: UserBehaviorService = Depends(_service(UserBehaviorService))
-):
+, current_user: User = Depends(get_current_user)):
     """Get user events"""
     return await service.get_user_events(user_id, limit)
 
@@ -422,7 +423,7 @@ async def create_heatmap(
 async def get_heatmap(
     content_id: int,
     service: HeatmapService = Depends(_service(HeatmapService))
-):
+, current_user: User = Depends(get_current_user)):
     """Get heatmap for content"""
     heatmap = await service.get_heatmap(content_id)
     if not heatmap:
@@ -452,7 +453,7 @@ async def search_content(
     query: str = Query(..., min_length=1, max_length=255),
     limit: int = Query(20, ge=1, le=100),
     service: SearchService = Depends(_service(SearchService))
-):
+, current_user: User = Depends(get_current_user)):
     """Search indexed content"""
     return await service.search(query, limit)
 
@@ -460,7 +461,7 @@ async def search_content(
 async def get_search_query(
     query_id: int,
     service: SearchService = Depends(_service(SearchService))
-):
+, current_user: User = Depends(get_current_user)):
     """Get search query details"""
     query = await service.get_search_query(query_id)
     if not query:
@@ -472,7 +473,7 @@ async def get_trending_searches(
     days: int = Query(7, ge=1, le=90),
     limit: int = Query(10, ge=1, le=100),
     service: SearchService = Depends(_service(SearchService))
-):
+, current_user: User = Depends(get_current_user)):
     """Get trending searches"""
     return await service.get_trending_searches(days, limit)
 
@@ -480,7 +481,7 @@ async def get_trending_searches(
 async def get_indexed_content(
     content_id: int,
     service: SearchService = Depends(_service(SearchService))
-):
+, current_user: User = Depends(get_current_user)):
     """Get indexed content status"""
     indexed = await service.get_indexed_content(content_id)
     if not indexed:
@@ -506,7 +507,7 @@ async def set_cache(
 async def get_cache(
     cache_key: str,
     service: CacheService = Depends(_service(CacheService))
-):
+, current_user: User = Depends(get_current_user)):
     """Get cache entry"""
     entry = await service.get_cache(cache_key)
     if not entry:
@@ -532,10 +533,29 @@ async def clear_all_cache(
 
 @cache_router.get("/stats/summary", response_model=CacheStatsResponse)
 async def get_cache_stats(
-    service: CacheService = Depends(_service(CacheService))
+    service: CacheService = Depends(_service(CacheService)),
+    current_user: User = Depends(get_current_user),
 ):
     """Get cache statistics"""
     return await service.get_cache_stats()
+
+
+@cache_router.post("/flush", response_model=dict)
+async def flush_cache(
+    service: CacheService = Depends(_service(CacheService)),
+    admin: User = Depends(require_admin("cache")),
+):
+    """Remove every cache entry (administrators only)"""
+    return {"removed": await service.flush()}
+
+
+@cache_router.post("/optimize", response_model=dict)
+async def optimize_cache(
+    service: CacheService = Depends(_service(CacheService)),
+    admin: User = Depends(require_admin("cache")),
+):
+    """Remove expired cache entries (administrators only)"""
+    return await service.optimize()
 
 # Performance Endpoints
 
@@ -559,7 +579,7 @@ async def get_endpoint_stats(
     endpoint_path: str,
     method: str = Query(..., min_length=3, max_length=10),
     service: PerformanceService = Depends(_service(PerformanceService))
-):
+, current_user: User = Depends(get_current_user)):
     """Get endpoint performance statistics"""
     stats = await service.get_endpoint_stats(endpoint_path, method)
     if not stats:
@@ -569,7 +589,7 @@ async def get_endpoint_stats(
 @performance_router.get("/summary", response_model=dict)
 async def get_performance_summary(
     service: PerformanceService = Depends(_service(PerformanceService))
-):
+, current_user: User = Depends(get_current_user)):
     """Get overall performance summary"""
     return await service.get_performance_summary()
 
@@ -596,7 +616,7 @@ async def get_audit_logs(
     offset: int = Query(0, ge=0),
     admin_id: Optional[int] = None,
     service: AdminService = Depends(_service(AdminService))
-):
+, current_user: User = Depends(get_current_user)):
     """Get audit logs"""
     return await service.get_audit_logs(limit, offset, admin_id)
 
@@ -604,7 +624,7 @@ async def get_audit_logs(
 async def get_audit_log(
     log_id: int,
     service: AdminService = Depends(_service(AdminService))
-):
+, current_user: User = Depends(get_current_user)):
     """Get specific audit log"""
     log = await service.get_audit_log(log_id)
     if not log:
@@ -614,7 +634,7 @@ async def get_audit_log(
 @admin_router.get("/health", response_model=SystemHealthResponse)
 async def check_system_health(
     service: AdminService = Depends(_service(AdminService))
-):
+, current_user: User = Depends(get_current_user)):
     """Check overall system health"""
     return await service.check_system_health()
 
@@ -622,7 +642,7 @@ async def check_system_health(
 async def check_service_health(
     service_name: str,
     service: AdminService = Depends(_service(AdminService))
-):
+, current_user: User = Depends(get_current_user)):
     """Check specific service health"""
     health = await service.get_service_health(service_name)
     if not health:
@@ -668,7 +688,7 @@ async def set_configuration(
 async def get_configuration(
     config_key: str,
     service: AdminService = Depends(_service(AdminService))
-):
+, current_user: User = Depends(get_current_user)):
     """Get configuration setting"""
     config = await service.get_configuration(config_key)
     if not config:
@@ -678,7 +698,7 @@ async def get_configuration(
 @admin_router.get("/config", response_model=List[ConfigurationSettingResponse])
 async def list_configurations(
     service: AdminService = Depends(_service(AdminService))
-):
+, current_user: User = Depends(get_current_user)):
     """List all configurations"""
     return await service.list_configurations()
 
@@ -713,7 +733,7 @@ async def create_feature_flag(
 async def get_feature_flag(
     flag_name: str,
     service: FeatureFlagService = Depends(_service(FeatureFlagService))
-):
+, current_user: User = Depends(get_current_user)):
     """Get feature flag"""
     flag = await service.get_feature_flag(flag_name)
     if not flag:
@@ -726,7 +746,7 @@ async def is_feature_enabled(
     flag_name: str,
     user_id: Optional[int] = None,
     service: FeatureFlagService = Depends(_service(FeatureFlagService))
-):
+, current_user: User = Depends(get_current_user)):
     """Check if feature is enabled for user"""
     enabled = await service.is_feature_enabled(flag_name, user_id)
     return {"flag_name": flag_name, "enabled": enabled}
@@ -762,6 +782,6 @@ async def delete_feature_flag(
 @featureflag_router.get("", response_model=List[FeatureFlagResponse])
 async def list_feature_flags(
     service: FeatureFlagService = Depends(_service(FeatureFlagService))
-):
+, current_user: User = Depends(get_current_user)):
     """List all feature flags"""
     return await service.list_feature_flags()

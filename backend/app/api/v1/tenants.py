@@ -11,7 +11,7 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from datetime import datetime
 
-router = APIRouter(prefix="/api/v1/tenants", tags=["tenants"])
+router = APIRouter(prefix="/tenants", tags=["tenants"])
 
 
 # Request/Response schemas

@@ -10,7 +10,7 @@ from app.models.notifications import NotificationType
 from pydantic import BaseModel
 from typing import List, Optional
 
-router = APIRouter(prefix="/api/v1/notifications", tags=["notifications"])
+router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 
 # Schemas

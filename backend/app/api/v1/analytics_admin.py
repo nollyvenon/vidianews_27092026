@@ -17,6 +17,13 @@ from datetime import datetime
 
 router = APIRouter()
 
+def tenant_scope(current_user: User) -> int:
+    """Tenant of the signed-in user; the data read here is scoped to it."""
+    if current_user.tenant_id is None:
+        raise HTTPException(status_code=422, detail="Your account has no workspace yet. Create a tenant first.")
+    return current_user.tenant_id
+
+
 
 class AnalyticsEventRequest(BaseModel):
     event_type: str
@@ -106,7 +113,7 @@ def get_revenue_metrics(
     db: Session = Depends(get_db)
 ):
     """Get revenue metrics"""
-    return RevenueMetricService.get_revenue_range(db, 1, start_date, end_date)
+    return RevenueMetricService.get_revenue_range(db, tenant_scope(current_user), start_date, end_date)
 
 
 @router.get("/analytics/engagement")
@@ -116,10 +123,10 @@ def get_engagement_metrics(
     db: Session = Depends(get_db)
 ):
     """Get engagement trend"""
-    return EngagementMetricService.get_engagement_trend(db, 1, days)
+    return EngagementMetricService.get_engagement_trend(db, tenant_scope(current_user), days)
 
 
-@router.post("/reports")
+@router.post("/admin/reports")
 def create_report(
     req: ReportRequest,
     current_user: User = Depends(get_current_user),
@@ -152,7 +159,7 @@ def get_admin_logs(
     db: Session = Depends(get_db)
 ):
     """Get admin logs"""
-    return AdminLogService.get_admin_logs(db, 1, limit)
+    return AdminLogService.get_admin_logs(db, tenant_scope(current_user), limit)
 
 
 @router.get("/system/health")
@@ -161,7 +168,7 @@ def get_system_health(
     db: Session = Depends(get_db)
 ):
     """Get system health"""
-    health = SystemHealthService.get_latest_health(db, 1)
+    health = SystemHealthService.get_latest_health(db, tenant_scope(current_user))
     if not health:
         raise HTTPException(status_code=404, detail="No health data available")
     return health
@@ -174,7 +181,7 @@ def get_system_health_history(
     db: Session = Depends(get_db)
 ):
     """Get system health history"""
-    return SystemHealthService.get_health_history(db, 1, hours)
+    return SystemHealthService.get_health_history(db, tenant_scope(current_user), hours)
 
 
 @router.post("/notifications/preferences")
@@ -204,4 +211,4 @@ def get_system_alerts(
     db: Session = Depends(get_db)
 ):
     """Get active system alerts"""
-    return SystemAlertService.get_active_alerts(db, 1)
+    return SystemAlertService.get_active_alerts(db, tenant_scope(current_user))

@@ -1,3 +1,6 @@
+from app.core.security import get_current_user
+from app.core.admin_access import admin_status, require_admin
+from app.models.user import User
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional, List
@@ -11,7 +14,7 @@ from app.services.enterprise_features_service import (
 )
 from app.models.enterprise_features import (
     AccessLevel, PermissionType, ModerationStatus,
-    NotificationType, ReportFormat
+    NotificationType, ReportFormat, RateLimitConfig
 )
 
 
@@ -305,7 +308,7 @@ class ExportJobResponse(BaseModel):
 security_router = APIRouter(prefix="/security", tags=["security"])
 moderation_router = APIRouter(prefix="/moderation", tags=["moderation"])
 rate_limit_router = APIRouter(prefix="/rate-limits", tags=["rate-limiting"])
-notification_router = APIRouter(prefix="/notifications", tags=["notifications"])
+notification_router = APIRouter(prefix="/enterprise/notifications", tags=["notifications"])
 reporting_router = APIRouter(prefix="/reports", tags=["reporting"])
 
 
@@ -318,7 +321,14 @@ async def get_audit_logs(
     days: int = Query(30),
     limit: int = Query(100),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    caller_is_admin: bool = Depends(admin_status("security")),
 ):
+    """Audit entries. Administrators see every user's entries; everyone else sees only their own."""
+    if not caller_is_admin:
+        if user_id is not None and user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="You can only view your own audit log")
+        user_id = current_user.id
     service = SecurityService(db)
     return await service.get_audit_logs(user_id, action, severity, days, limit)
 
@@ -331,6 +341,7 @@ async def log_audit_event(
     resource_id: Optional[int] = None,
     severity: str = "info",
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = SecurityService(db)
     log = await service.log_audit_event(
@@ -344,6 +355,7 @@ async def grant_access(
     user_id: int,
     req: AccessControlRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = SecurityService(db)
     access = await service.grant_access(
@@ -364,6 +376,7 @@ async def revoke_access(
     resource_type: str,
     resource_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = SecurityService(db)
     success = await service.revoke_access(user_id, resource_type, resource_id)
@@ -379,6 +392,7 @@ async def check_permission(
     resource_id: int,
     permission: str,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = SecurityService(db)
     has_permission = await service.check_permission(
@@ -392,6 +406,7 @@ async def assign_role(
     user_id: int,
     req: RoleAssignmentRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = SecurityService(db)
     role = await service.assign_role(
@@ -411,7 +426,7 @@ async def assign_role(
 async def get_user_role(
     user_id: int,
     db: Session = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     service = SecurityService(db)
     role = await service.get_user_role(user_id)
     if not role:
@@ -424,6 +439,7 @@ async def get_user_role(
 async def submit_for_moderation(
     req: ModerationQueueRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = ModerationService(db)
     item = await service.submit_for_moderation(
@@ -436,7 +452,7 @@ async def submit_for_moderation(
 async def get_pending_items(
     limit: int = Query(50),
     db: Session = Depends(get_db),
-):
+    moderator: User = Depends(require_admin("moderation")),):
     service = ModerationService(db)
     return await service.get_pending_items(limit)
 
@@ -446,6 +462,7 @@ async def assign_moderator(
     item_id: int,
     moderator_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = ModerationService(db)
     item = await service.assign_moderator(item_id, moderator_id)
@@ -457,12 +474,13 @@ async def assign_moderator(
 @moderation_router.post("/queue/{item_id}/review")
 async def review_content(
     item_id: int,
-    reviewer_id: int,
     req: ModerationReviewRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = ModerationService(db)
-    item = await service.review_content(item_id, reviewer_id, req.status, req.decision)
+    # The reviewer is the authenticated caller, never a client-supplied id.
+    item = await service.review_content(item_id, current_user.id, req.status, req.decision)
     if not item:
         raise HTTPException(status_code=404, detail="Moderation item not found")
     return {"reviewed": True, "status": req.status.value}
@@ -472,6 +490,7 @@ async def review_content(
 async def create_compliance_rule(
     req: ComplianceRuleRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = ModerationService(db)
     rule = await service.add_compliance_rule(
@@ -490,6 +509,7 @@ async def create_compliance_rule(
 async def check_compliance(
     req: ComplianceCheckRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = ModerationService(db)
     return await service.check_compliance(req.text)
@@ -502,9 +522,32 @@ async def check_rate_limit(
     ip_address: Optional[str] = None,
     endpoint: str = "*",
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = RateLimitService(db)
     return await service.check_rate_limit(user_id, ip_address, endpoint)
+
+
+@rate_limit_router.get("/configs")
+def list_rate_limit_configs(
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin("rate_limits")),
+):
+    """Every configured rate limit (administrators only)"""
+    rows = db.query(RateLimitConfig).order_by(RateLimitConfig.endpoint, RateLimitConfig.id).all()
+    return [
+        {
+            "id": row.id,
+            "endpoint": row.endpoint,
+            "user_id": row.user_id,
+            "ip_address": row.ip_address,
+            "requests_per_minute": row.requests_per_minute,
+            "requests_per_hour": row.requests_per_hour,
+            "requests_per_day": row.requests_per_day,
+            "burst_limit": row.burst_limit,
+        }
+        for row in rows
+    ]
 
 
 @rate_limit_router.post("/config", response_model=dict)
@@ -513,6 +556,7 @@ async def create_rate_limit_config(
     user_id: Optional[int] = None,
     ip_address: Optional[str] = None,
     db: Session = Depends(get_db),
+    admin: User = Depends(require_admin("rate_limits")),
 ):
     service = RateLimitService(db)
     config = await service.create_rate_limit_config(
@@ -532,7 +576,7 @@ async def create_rate_limit_config(
 async def get_preferences(
     user_id: int,
     db: Session = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     service = NotificationService(db)
     prefs = await service.get_preferences(user_id)
     if not prefs:
@@ -545,6 +589,7 @@ async def update_preferences(
     user_id: int,
     req: NotificationPreferenceRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = NotificationService(db)
     return await service.update_preferences(
@@ -564,6 +609,7 @@ async def create_notification(
     user_id: int,
     req: NotificationRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = NotificationService(db)
     notification = await service.create_notification(
@@ -580,19 +626,26 @@ async def create_notification(
 
 @notification_router.get("/", response_model=List[NotificationResponse])
 async def get_notifications(
-    user_id: int,
+    user_id: Optional[int] = Query(None),
     unread_only: bool = Query(False),
     limit: int = Query(50),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    caller_is_admin: bool = Depends(admin_status("notifications")),
 ):
+    """The caller's own notifications. Reading another user's needs administrator access."""
+    target = user_id if user_id is not None else current_user.id
+    if target != current_user.id and not caller_is_admin:
+        raise HTTPException(status_code=403, detail="You can only view your own notifications")
     service = NotificationService(db)
-    return await service.get_user_notifications(user_id, unread_only, limit)
+    return await service.get_user_notifications(target, unread_only, limit)
 
 
 @notification_router.post("/{notification_id}/mark-read")
 async def mark_notification_read(
     notification_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = NotificationService(db)
     notif = await service.mark_as_read(notification_id)
@@ -606,6 +659,7 @@ async def create_alert_config(
     user_id: int,
     req: AlertConfigRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = NotificationService(db)
     config = await service.create_alert_config(
@@ -624,6 +678,7 @@ async def create_report(
     user_id: int,
     req: ReportRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = ReportingService(db)
     report = await service.create_report(
@@ -634,18 +689,25 @@ async def create_report(
 
 @reporting_router.get("/", response_model=List[ReportResponse])
 async def get_reports(
-    user_id: int,
+    user_id: Optional[int] = Query(None),
     limit: int = Query(50),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    caller_is_admin: bool = Depends(admin_status("reports")),
 ):
+    """The caller's own reports. Reading another user's needs administrator access."""
+    target = user_id if user_id is not None else current_user.id
+    if target != current_user.id and not caller_is_admin:
+        raise HTTPException(status_code=403, detail="You can only view your own reports")
     service = ReportingService(db)
-    return await service.get_user_reports(user_id, limit)
+    return await service.get_user_reports(target, limit)
 
 
 @reporting_router.post("/templates", response_model=ReportTemplateResponse)
 async def create_report_template(
     req: ReportTemplateRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = ReportingService(db)
     template = await service.create_template(
@@ -659,6 +721,7 @@ async def create_scheduled_report(
     user_id: int,
     req: ScheduledReportRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = ReportingService(db)
     schedule = await service.create_scheduled_report(
@@ -672,6 +735,7 @@ async def create_export_job(
     user_id: int,
     req: ExportJobRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = ReportingService(db)
     job = await service.create_export_job(user_id, req.export_type, req.format, req.filters)
@@ -682,7 +746,7 @@ async def create_export_job(
 async def get_export_job(
     job_id: int,
     db: Session = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     service = ReportingService(db)
     job = await service.get_export_job(job_id)
     if not job:
@@ -696,6 +760,7 @@ async def update_export_progress(
     progress: int,
     record_count: int = 0,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     service = ReportingService(db)
     job = await service.update_export_progress(job_id, progress, record_count)

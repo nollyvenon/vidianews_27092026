@@ -7,37 +7,54 @@ from app.core.security import get_current_user
 from app.models.user import User
 from app.services.settings_service import SettingsService
 from app.utils.exceptions import NotFoundError
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Literal, Optional
 
-router = APIRouter(prefix="/api/v1/settings", tags=["settings"])
+router = APIRouter(prefix="/settings", tags=["settings"])
 
 
 # Schemas
+HH_MM = r"^([01]\d|2[0-3]):[0-5]\d$"
+
+
 class NotificationPreferencesUpdate(BaseModel):
     email_on_activity: Optional[bool] = None
     email_on_mention: Optional[bool] = None
     email_on_message: Optional[bool] = None
-    email_digest: Optional[str] = None
+    email_digest: Optional[Literal["never", "daily", "weekly", "realtime"]] = None
     push_enabled: Optional[bool] = None
+    push_on_activity: Optional[bool] = None
+    push_on_message: Optional[bool] = None
     inapp_enabled: Optional[bool] = None
+    inapp_sound: Optional[bool] = None
+    dnd_enabled: Optional[bool] = None
+    dnd_start_time: Optional[str] = Field(None, pattern=HH_MM)
+    dnd_end_time: Optional[str] = Field(None, pattern=HH_MM)
 
 
 class PrivacySettingsUpdate(BaseModel):
-    profile_visibility: Optional[str] = None
+    profile_visibility: Optional[Literal["public", "friends_only", "private"]] = None
     show_email: Optional[bool] = None
     show_phone: Optional[bool] = None
     show_activity: Optional[bool] = None
-    allow_messages: Optional[str] = None
+    show_last_seen: Optional[bool] = None
+    allow_messages: Optional[Literal["everyone", "friends_only", "nobody"]] = None
+    allow_search: Optional[bool] = None
     allow_analytics: Optional[bool] = None
+    allow_marketing_emails: Optional[bool] = None
+    allow_third_party_sharing: Optional[bool] = None
 
 
 class DisplaySettingsUpdate(BaseModel):
-    theme: Optional[str] = None
-    language: Optional[str] = None
-    timezone: Optional[str] = None
-    date_format: Optional[str] = None
-    time_format: Optional[str] = None
+    theme: Optional[Literal["light", "dark", "auto"]] = None
+    language: Optional[str] = Field(None, min_length=2, max_length=10)
+    timezone: Optional[str] = Field(None, min_length=1, max_length=50)
+    date_format: Optional[str] = Field(None, min_length=1, max_length=50)
+    time_format: Optional[Literal["24h", "12h"]] = None
+    sidebar_collapsed: Optional[bool] = None
+    compact_mode: Optional[bool] = None
+    animations_enabled: Optional[bool] = None
+    font_size: Optional[Literal["small", "medium", "large"]] = None
 
 
 class AllSettingsUpdate(BaseModel):

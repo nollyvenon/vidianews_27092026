@@ -78,7 +78,7 @@ async def list_subscriptions(
     limit: int = Query(50, ge=1, le=200),
     _admin: User = Depends(require_billing_admin),
     session: AsyncSession = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     """Every subscription with the account email, newest first."""
     items, total = await BillingAdminService(session).list_subscriptions(
         is_active=is_active, tier=tier, user_id=user_id, skip=skip, limit=limit,
@@ -130,7 +130,7 @@ async def list_transactions(
     limit: int = Query(50, ge=1, le=200),
     _admin: User = Depends(require_billing_admin),
     session: AsyncSession = Depends(get_db),
-):
+ current_user: User = Depends(get_current_user),):
     """Subscription payments and checkout payments, newest first.
 
     ``source`` selects one side or both (``all``). ``status`` is matched against each

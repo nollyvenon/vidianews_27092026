@@ -11,7 +11,7 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from datetime import datetime
 
-router = APIRouter(prefix="/api/v1/organizations", tags=["organizations"])
+router = APIRouter(prefix="/organizations", tags=["organizations"])
 
 
 # Schemas
@@ -265,10 +265,11 @@ async def get_hierarchy(
     try:
         service = OrganizationService(session)
         result = await service.get_organization_hierarchy(org_id)
+        parent = result["parent"]
         return {
-            "organization": result["organization"],
-            "parent": result["parent"],
-            "children": result["children"],
+            "organization": OrganizationResponse.model_validate(result["organization"]),
+            "parent": OrganizationResponse.model_validate(parent) if parent else None,
+            "children": [OrganizationResponse.model_validate(child) for child in result["children"]],
         }
     except NotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

@@ -1,5 +1,7 @@
 """RBAC endpoints"""
 
+from app.core.security import get_current_user
+from app.models.user import User
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_session
@@ -60,6 +62,7 @@ async def get_current_user_id(authorization: str = None) -> int:
 async def create_permission(
     request: PermissionCreate,
     session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ):
     """Create new permission"""
     rbac = RBACService(session)
@@ -77,7 +80,7 @@ async def list_permissions(
     skip: int = 0,
     limit: int = 100,
     session: AsyncSession = Depends(get_session),
-):
+ current_user: User = Depends(get_current_user),):
     """List all permissions"""
     rbac = RBACService(session)
     return await rbac.get_permissions(skip, limit)
@@ -87,6 +90,7 @@ async def list_permissions(
 async def create_role(
     request: RoleCreate,
     session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ):
     """Create new role"""
     rbac = RBACService(session)
@@ -98,7 +102,7 @@ async def list_roles(
     skip: int = 0,
     limit: int = 100,
     session: AsyncSession = Depends(get_session),
-):
+ current_user: User = Depends(get_current_user),):
     """List all roles"""
     rbac = RBACService(session)
     return await rbac.get_roles(skip, limit)
@@ -109,6 +113,7 @@ async def grant_permission_to_role(
     role_id: int,
     permission_id: int,
     session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ):
     """Grant permission to role"""
     rbac = RBACService(session)
@@ -121,6 +126,7 @@ async def revoke_permission_from_role(
     role_id: int,
     permission_id: int,
     session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ):
     """Revoke permission from role"""
     rbac = RBACService(session)
@@ -133,6 +139,7 @@ async def assign_role_to_user(
     user_id: int,
     role_id: int,
     session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ):
     """Assign role to user"""
     rbac = RBACService(session)
@@ -145,6 +152,7 @@ async def revoke_role_from_user(
     user_id: int,
     role_id: int,
     session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ):
     """Revoke role from user"""
     rbac = RBACService(session)
@@ -156,7 +164,7 @@ async def revoke_role_from_user(
 async def get_user_roles(
     user_id: int,
     session: AsyncSession = Depends(get_session),
-):
+ current_user: User = Depends(get_current_user),):
     """Get user roles"""
     rbac = RBACService(session)
     return await rbac.get_user_roles(user_id)
@@ -168,6 +176,7 @@ async def check_permission(
     action: str,
     authorization: str = None,
     session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ):
     """Check if user has permission"""
     user_id = await get_current_user_id(authorization)

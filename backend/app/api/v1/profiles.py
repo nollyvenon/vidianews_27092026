@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 
-router = APIRouter(prefix="/api/v1/profiles", tags=["profiles"])
+router = APIRouter(prefix="/profiles", tags=["profiles"])
 
 
 # Schemas
@@ -159,7 +159,8 @@ async def get_profile_summary(
     """Get profile summary"""
     try:
         service = ProfileService(session)
-        return await service.get_profile_summary(user_id)
+        summary = await service.get_profile_summary(user_id)
+        return {**summary, "profile": ProfileResponse.model_validate(summary["profile"])}
     except NotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 

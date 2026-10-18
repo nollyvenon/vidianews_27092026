@@ -1,11 +1,15 @@
+from app.core.security import get_current_user
+from app.models.user import User
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel
 
-from app.database import get_db
+from app.db.session import get_db
+from app.models.advanced_features import RecommendationType
 from app.services.advanced_features_service import (
+    AdvancedSummaryService,
     AdvancedPersonalizationService,
     RecommendationService,
     RetentionService,
@@ -15,7 +19,7 @@ from app.services.advanced_features_service import (
     PredictionService,
 )
 
-router = APIRouter(prefix="/api/v1", tags=["advanced_features"])
+router = APIRouter(tags=["advanced_features"])
 
 
 # Pydantic schemas
@@ -100,7 +104,7 @@ class PredictionModelRequest(BaseModel):
 
 # Personalization endpoints
 @router.post("/personalization/profile/{user_id}", tags=["personalization"])
-async def create_personalization_profile(user_id: int, db: AsyncSession = Depends(get_db)):
+async def create_personalization_profile(user_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = AdvancedPersonalizationService(db)
     profile = await service.create_profile(user_id)
     return {"id": profile.id, "user_id": user_id, "personalization_score": profile.personalization_score}
@@ -108,7 +112,7 @@ async def create_personalization_profile(user_id: int, db: AsyncSession = Depend
 
 @router.put("/personalization/profile/{user_id}", tags=["personalization"])
 async def update_personalization_preferences(
-    user_id: int, request: PersonalizationProfileRequest, db: AsyncSession = Depends(get_db)
+    user_id: int, request: PersonalizationProfileRequest, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     service = AdvancedPersonalizationService(db)
     profile = await service.update_preferences(
@@ -120,7 +124,7 @@ async def update_personalization_preferences(
 
 
 @router.get("/personalization/profile/{user_id}", tags=["personalization"])
-async def get_personalization_profile(user_id: int, db: AsyncSession = Depends(get_db)):
+async def get_personalization_profile(user_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = AdvancedPersonalizationService(db)
     profile = await service.get_profile(user_id)
     if not profile:
@@ -136,7 +140,7 @@ async def get_personalization_profile(user_id: int, db: AsyncSession = Depends(g
 
 
 @router.post("/personalization/profile/{user_id}/calculate-score", tags=["personalization"])
-async def calculate_personalization_score(user_id: int, db: AsyncSession = Depends(get_db)):
+async def calculate_personalization_score(user_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = AdvancedPersonalizationService(db)
     profile = await service.calculate_personalization_score(user_id)
     if not profile:
@@ -147,7 +151,7 @@ async def calculate_personalization_score(user_id: int, db: AsyncSession = Depen
 # Recommendation endpoints
 @router.post("/recommendations/{user_id}", tags=["recommendations"])
 async def create_recommendation(
-    user_id: int, request: RecommendationRequest, db: AsyncSession = Depends(get_db)
+    user_id: int, request: RecommendationRequest, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     service = RecommendationService(db)
     rec = await service.create_recommendation(
@@ -162,7 +166,7 @@ async def create_recommendation(
 
 
 @router.get("/recommendations/{user_id}", tags=["recommendations"])
-async def get_recommendations(user_id: int, limit: int = 10, db: AsyncSession = Depends(get_db)):
+async def get_recommendations(user_id: int, limit: int = 10, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = RecommendationService(db)
     recs = await service.get_recommendations(user_id, limit)
     return [
@@ -180,8 +184,8 @@ async def get_recommendations(user_id: int, limit: int = 10, db: AsyncSession = 
 
 @router.get("/recommendations/{user_id}/type/{rec_type}", tags=["recommendations"])
 async def get_recommendations_by_type(
-    user_id: int, rec_type: str, limit: int = 10, db: AsyncSession = Depends(get_db)
-):
+    user_id: int, rec_type: RecommendationType, limit: int = 10, db: AsyncSession = Depends(get_db)
+, current_user: User = Depends(get_current_user)):
     service = RecommendationService(db)
     recs = await service.get_recommendations_by_type(user_id, rec_type, limit)
     return [
@@ -196,7 +200,7 @@ async def get_recommendations_by_type(
 
 
 @router.post("/recommendations/{recommendation_id}/click", tags=["recommendations"])
-async def record_recommendation_click(recommendation_id: int, db: AsyncSession = Depends(get_db)):
+async def record_recommendation_click(recommendation_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = RecommendationService(db)
     rec = await service.record_click(recommendation_id)
     if not rec:
@@ -205,7 +209,7 @@ async def record_recommendation_click(recommendation_id: int, db: AsyncSession =
 
 
 @router.get("/recommendations/{user_id}/effectiveness", tags=["recommendations"])
-async def get_recommendation_effectiveness(user_id: int, db: AsyncSession = Depends(get_db)):
+async def get_recommendation_effectiveness(user_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = RecommendationService(db)
     stats = await service.get_recommendation_effectiveness(user_id)
     return stats
@@ -213,7 +217,7 @@ async def get_recommendation_effectiveness(user_id: int, db: AsyncSession = Depe
 
 # Retention endpoints
 @router.post("/retention/metrics/{user_id}", tags=["retention"])
-async def create_retention_metric(user_id: int, db: AsyncSession = Depends(get_db)):
+async def create_retention_metric(user_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = RetentionService(db)
     metric = await service.create_retention_metric(user_id)
     return {"id": metric.id, "user_id": user_id, "status": metric.status}
@@ -221,7 +225,7 @@ async def create_retention_metric(user_id: int, db: AsyncSession = Depends(get_d
 
 @router.put("/retention/metrics/{user_id}/churn", tags=["retention"])
 async def update_churn_probability(
-    user_id: int, probability: float, db: AsyncSession = Depends(get_db)
+    user_id: int, probability: float, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     service = RetentionService(db)
     metric = await service.update_churn_probability(user_id, probability)
@@ -231,14 +235,14 @@ async def update_churn_probability(
 
 
 @router.get("/retention/at-risk", tags=["retention"])
-async def get_at_risk_users(churn_threshold: float = 0.6, db: AsyncSession = Depends(get_db)):
+async def get_at_risk_users(churn_threshold: float = 0.6, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = RetentionService(db)
     users = await service.get_at_risk_users(churn_threshold)
     return [{"user_id": u.user_id, "churn_probability": u.churn_probability} for u in users]
 
 
 @router.post("/retention/campaigns", tags=["retention"])
-async def create_retention_campaign(request: RetentionCampaignRequest, db: AsyncSession = Depends(get_db)):
+async def create_retention_campaign(request: RetentionCampaignRequest, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = RetentionService(db)
     campaign = await service.create_campaign(
         request.name, request.description, request.target_segment, request.campaign_type, request.budget
@@ -247,7 +251,7 @@ async def create_retention_campaign(request: RetentionCampaignRequest, db: Async
 
 
 @router.get("/retention/campaigns/{campaign_id}", tags=["retention"])
-async def get_retention_campaign(campaign_id: int, db: AsyncSession = Depends(get_db)):
+async def get_retention_campaign(campaign_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = RetentionService(db)
     campaign = await service.get_campaign(campaign_id)
     if not campaign:
@@ -263,7 +267,7 @@ async def get_retention_campaign(campaign_id: int, db: AsyncSession = Depends(ge
 
 
 @router.get("/retention/campaigns", tags=["retention"])
-async def get_retention_campaigns(status: Optional[str] = None, db: AsyncSession = Depends(get_db)):
+async def get_retention_campaigns(status: Optional[str] = None, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = RetentionService(db)
     campaigns = await service.get_campaigns(status)
     return [
@@ -273,7 +277,7 @@ async def get_retention_campaigns(status: Optional[str] = None, db: AsyncSession
 
 # A/B Testing endpoints
 @router.post("/ab-tests", tags=["ab_testing"])
-async def create_ab_test(request: ABTestRequest, db: AsyncSession = Depends(get_db)):
+async def create_ab_test(request: ABTestRequest, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = ABTestingService(db)
     test = await service.create_test(
         request.name,
@@ -288,12 +292,7 @@ async def create_ab_test(request: ABTestRequest, db: AsyncSession = Depends(get_
     return {"id": test.id, "name": test.name, "status": test.status}
 
 
-@router.get("/ab-tests/{test_id}", tags=["ab_testing"])
-async def get_ab_test(test_id: int, db: AsyncSession = Depends(get_db)):
-    service = ABTestingService(db)
-    test = await service.get_test(test_id)
-    if not test:
-        raise HTTPException(status_code=404, detail="Test not found")
+def _ab_test_response(test) -> ABTestResponse:
     return ABTestResponse(
         id=test.id,
         name=test.name,
@@ -305,8 +304,30 @@ async def get_ab_test(test_id: int, db: AsyncSession = Depends(get_db)):
     )
 
 
+@router.get("/advanced/summary", tags=["advanced"])
+async def get_advanced_summary(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Aggregates behind the advanced features dashboard: recommendations, retention, personalization, predictions and performance"""
+    return await AdvancedSummaryService(db).summary()
+
+
+@router.get("/ab-tests", tags=["ab_testing"])
+async def list_ab_tests(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Every A/B test, newest first"""
+    tests = await ABTestingService(db).list_tests()
+    return [_ab_test_response(test) for test in tests]
+
+
+@router.get("/ab-tests/{test_id}", tags=["ab_testing"])
+async def get_ab_test(test_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    service = ABTestingService(db)
+    test = await service.get_test(test_id)
+    if not test:
+        raise HTTPException(status_code=404, detail="Test not found")
+    return _ab_test_response(test)
+
+
 @router.post("/ab-tests/{test_id}/start", tags=["ab_testing"])
-async def start_ab_test(test_id: int, db: AsyncSession = Depends(get_db)):
+async def start_ab_test(test_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = ABTestingService(db)
     test = await service.start_test(test_id)
     if not test:
@@ -315,7 +336,7 @@ async def start_ab_test(test_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/ab-tests/{test_id}/end", tags=["ab_testing"])
-async def end_ab_test(test_id: int, db: AsyncSession = Depends(get_db)):
+async def end_ab_test(test_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = ABTestingService(db)
     test = await service.end_test(test_id)
     if not test:
@@ -332,7 +353,7 @@ async def end_ab_test(test_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/ab-tests/{test_id}/assign-user/{user_id}", tags=["ab_testing"])
-async def assign_user_to_variant(test_id: int, user_id: int, db: AsyncSession = Depends(get_db)):
+async def assign_user_to_variant(test_id: int, user_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = ABTestingService(db)
     variant = await service.assign_user_to_variant(test_id, user_id)
     if not variant:
@@ -342,7 +363,7 @@ async def assign_user_to_variant(test_id: int, user_id: int, db: AsyncSession = 
 
 # Insights endpoints
 @router.post("/insights", tags=["insights"])
-async def create_insight(request: InsightRequest, db: AsyncSession = Depends(get_db)):
+async def create_insight(request: InsightRequest, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = InsightService(db)
     insight = await service.create_insight(
         request.insight_type,
@@ -356,7 +377,7 @@ async def create_insight(request: InsightRequest, db: AsyncSession = Depends(get
 
 
 @router.get("/insights", tags=["insights"])
-async def get_insights(limit: int = 10, db: AsyncSession = Depends(get_db)):
+async def get_insights(limit: int = 10, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = InsightService(db)
     insights = await service.get_insights(limit)
     return [
@@ -366,7 +387,7 @@ async def get_insights(limit: int = 10, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/insights/actionable", tags=["insights"])
-async def get_actionable_insights(limit: int = 10, db: AsyncSession = Depends(get_db)):
+async def get_actionable_insights(limit: int = 10, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = InsightService(db)
     insights = await service.get_actionable_insights(limit)
     return [
@@ -376,7 +397,7 @@ async def get_actionable_insights(limit: int = 10, db: AsyncSession = Depends(ge
 
 
 @router.get("/insights/type/{insight_type}", tags=["insights"])
-async def get_insights_by_type(insight_type: str, limit: int = 10, db: AsyncSession = Depends(get_db)):
+async def get_insights_by_type(insight_type: str, limit: int = 10, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = InsightService(db)
     insights = await service.get_insights_by_type(insight_type, limit)
     return [{"id": i.id, "title": i.title, "confidence_level": i.confidence_level} for i in insights]
@@ -384,14 +405,14 @@ async def get_insights_by_type(insight_type: str, limit: int = 10, db: AsyncSess
 
 # Cohort endpoints
 @router.post("/cohorts", tags=["cohorts"])
-async def create_cohort(request: UserCohortRequest, db: AsyncSession = Depends(get_db)):
+async def create_cohort(request: UserCohortRequest, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = CohortService(db)
     cohort = await service.create_cohort(request.name, request.cohort_type, request.criteria, request.description)
     return {"id": cohort.id, "name": cohort.name, "user_count": cohort.user_count}
 
 
 @router.get("/cohorts/{cohort_id}", tags=["cohorts"])
-async def get_cohort(cohort_id: int, db: AsyncSession = Depends(get_db)):
+async def get_cohort(cohort_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = CohortService(db)
     cohort = await service.get_cohort(cohort_id)
     if not cohort:
@@ -400,7 +421,7 @@ async def get_cohort(cohort_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/cohorts/{cohort_id}/add-user/{user_id}", tags=["cohorts"])
-async def add_user_to_cohort(cohort_id: int, user_id: int, db: AsyncSession = Depends(get_db)):
+async def add_user_to_cohort(cohort_id: int, user_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = CohortService(db)
     membership = await service.add_user_to_cohort(cohort_id, user_id)
     if not membership:
@@ -409,14 +430,14 @@ async def add_user_to_cohort(cohort_id: int, user_id: int, db: AsyncSession = De
 
 
 @router.get("/cohorts/{cohort_id}/members", tags=["cohorts"])
-async def get_cohort_members(cohort_id: int, limit: int = 100, db: AsyncSession = Depends(get_db)):
+async def get_cohort_members(cohort_id: int, limit: int = 100, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = CohortService(db)
     members = await service.get_cohort_members(cohort_id, limit)
     return {"cohort_id": cohort_id, "member_count": len(members), "members": members}
 
 
 @router.get("/cohorts", tags=["cohorts"])
-async def get_cohorts(cohort_type: Optional[str] = None, db: AsyncSession = Depends(get_db)):
+async def get_cohorts(cohort_type: Optional[str] = None, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = CohortService(db)
     cohorts = await service.get_cohorts(cohort_type)
     return [{"id": c.id, "name": c.name, "user_count": c.user_count} for c in cohorts]
@@ -424,7 +445,7 @@ async def get_cohorts(cohort_type: Optional[str] = None, db: AsyncSession = Depe
 
 # Prediction endpoints
 @router.post("/predictions/models", tags=["predictions"])
-async def create_prediction_model(request: PredictionModelRequest, db: AsyncSession = Depends(get_db)):
+async def create_prediction_model(request: PredictionModelRequest, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = PredictionService(db)
     model = await service.create_model(
         request.name, request.model_type, request.target_metric, request.features_used, request.training_data_size
@@ -432,8 +453,15 @@ async def create_prediction_model(request: PredictionModelRequest, db: AsyncSess
     return {"id": model.id, "name": model.name, "deployed": model.deployed}
 
 
+@router.get("/predictions/models/deployed", tags=["predictions"])
+async def get_deployed_models(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    service = PredictionService(db)
+    models = await service.get_deployed_models()
+    return [{"id": m.id, "name": m.name, "model_type": m.model_type} for m in models]
+
+
 @router.get("/predictions/models/{model_id}", tags=["predictions"])
-async def get_prediction_model(model_id: int, db: AsyncSession = Depends(get_db)):
+async def get_prediction_model(model_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = PredictionService(db)
     model = await service.get_model(model_id)
     if not model:
@@ -451,7 +479,7 @@ async def get_prediction_model(model_id: int, db: AsyncSession = Depends(get_db)
 
 
 @router.post("/predictions/models/{model_id}/deploy", tags=["predictions"])
-async def deploy_prediction_model(model_id: int, db: AsyncSession = Depends(get_db)):
+async def deploy_prediction_model(model_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = PredictionService(db)
     model = await service.deploy_model(model_id)
     if not model:
@@ -461,7 +489,7 @@ async def deploy_prediction_model(model_id: int, db: AsyncSession = Depends(get_
 
 @router.post("/predictions/user/{user_id}", tags=["predictions"])
 async def create_user_prediction(
-    user_id: int, model_id: int, prediction_score: float, db: AsyncSession = Depends(get_db)
+    user_id: int, model_id: int, prediction_score: float, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     service = PredictionService(db)
     prediction = await service.create_prediction(user_id, model_id, prediction_score)
@@ -469,14 +497,7 @@ async def create_user_prediction(
 
 
 @router.get("/predictions/user/{user_id}", tags=["predictions"])
-async def get_user_predictions(user_id: int, limit: int = 10, db: AsyncSession = Depends(get_db)):
+async def get_user_predictions(user_id: int, limit: int = 10, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     service = PredictionService(db)
     predictions = await service.get_user_predictions(user_id, limit)
     return [{"id": p.id, "prediction_score": p.prediction_score, "confidence": p.confidence} for p in predictions]
-
-
-@router.get("/predictions/models/deployed", tags=["predictions"])
-async def get_deployed_models(db: AsyncSession = Depends(get_db)):
-    service = PredictionService(db)
-    models = await service.get_deployed_models()
-    return [{"id": m.id, "name": m.name, "model_type": m.model_type} for m in models]

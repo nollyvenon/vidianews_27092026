@@ -1,21 +1,30 @@
 """Authentication endpoints"""
 
-from fastapi import APIRouter, Depends, Header, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_session
 from app.schemas.auth import *
 from app.services.auth_service import AuthService
+from app.services.mfa_service import generate_secret, provisioning_uri, verify_code
+from app.services.email_sender import send_password_reset_email, reset_url_for, send_verification_email, verification_url_for
+from app.core.config import settings
 from app.models.user import User
-from app.core.security import decode_token, verify_token_not_expired
-from app.utils.exceptions import UnauthorizedError, ValidationError
+from app.core.security import decode_token, get_current_user, verify_token_not_expired
+from app.utils.exceptions import ConflictError, UnauthorizedError, ValidationError
 from app.utils.logger import logger
 
 router = APIRouter()
 
 
-@router.post("/register", response_model=TokenResponse)
+@router.post("/register", status_code=201, response_model=RegisterResponse)
 async def register(request: RegisterRequest, session: AsyncSession = Depends(get_session)):
-    """Register new user"""
+    """Register a new user.
+
+    With verification required (the default) the account stays inactive and a confirmation
+    link is emailed; the caller must confirm it before signing in. With verification disabled
+    the account is activated and a session is returned immediately.
+    """
     if request.password != request.password_confirm:
         raise ValidationError("Passwords do not match")
 
@@ -27,21 +36,28 @@ async def register(request: RegisterRequest, session: AsyncSession = Depends(get
             request.first_name,
             request.last_name,
         )
-
-        # Log registration
         logger.info(f"User registered: {user.email}")
+        await auth_service.provision_personal_workspace(user)
 
-        # Auto-login after registration
+        if settings.EMAIL_VERIFICATION_REQUIRED:
+            await send_verification_email(user.email, verification_url_for(verification_token))
+            return RegisterResponse(
+                requires_verification=True,
+                message="Check your email to confirm your account before signing in.",
+            )
+
+        await auth_service.activate_user(user.id)
         access_token, refresh_token, _ = await auth_service.login_user(
             request.email,
             request.password,
             "0.0.0.0",
         )
-
-        return {
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-        }
+        return RegisterResponse(
+            requires_verification=False,
+            message="Account created.",
+            access_token=access_token,
+            refresh_token=refresh_token,
+        )
     except Exception as e:
         logger.error(f"Registration error: {str(e)}")
         raise
@@ -62,6 +78,7 @@ async def login(
             request.email,
             request.password,
             ip_address,
+            request.otp_code,
         )
 
         return {
@@ -71,6 +88,78 @@ async def login(
     except Exception as e:
         logger.error(f"Login error: {str(e)}")
         raise
+
+
+class MfaCodeRequest(BaseModel):
+    code: str = Field(..., pattern=r"^\d{6}$")
+
+
+async def _signed_in_user(session: AsyncSession, current_user: User) -> User:
+    user = await session.get(User, current_user.id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+
+@router.get("/mfa")
+async def mfa_status(
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Whether two-factor authentication is on for the signed-in user"""
+    user = await _signed_in_user(session, current_user)
+    return {"enabled": bool(user.mfa_enabled)}
+
+
+@router.post("/mfa/setup")
+async def mfa_setup(
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Create a new authenticator secret. It becomes active only after a correct code is confirmed."""
+    user = await _signed_in_user(session, current_user)
+    if user.mfa_enabled:
+        raise ConflictError("Two-factor authentication is already enabled")
+    user.mfa_secret = generate_secret()
+    await session.commit()
+    return {"secret": user.mfa_secret, "otpauth_uri": provisioning_uri(user.mfa_secret, user.email)}
+
+
+@router.post("/mfa/enable")
+async def mfa_enable(
+    request: MfaCodeRequest,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Turn two-factor authentication on after confirming a code from the authenticator app"""
+    user = await _signed_in_user(session, current_user)
+    if user.mfa_enabled:
+        raise ConflictError("Two-factor authentication is already enabled")
+    if not user.mfa_secret:
+        raise ValidationError("Start the setup before confirming a code")
+    if not verify_code(user.mfa_secret, request.code):
+        raise ValidationError("Invalid authentication code")
+    user.mfa_enabled = True
+    await session.commit()
+    return {"enabled": True}
+
+
+@router.post("/mfa/disable")
+async def mfa_disable(
+    request: MfaCodeRequest,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Turn two-factor authentication off; a current code is required"""
+    user = await _signed_in_user(session, current_user)
+    if not user.mfa_enabled:
+        raise ConflictError("Two-factor authentication is not enabled")
+    if not verify_code(user.mfa_secret, request.code):
+        raise ValidationError("Invalid authentication code")
+    user.mfa_enabled = False
+    user.mfa_secret = None
+    await session.commit()
+    return {"enabled": False}
 
 
 @router.post("/verify-email")
@@ -101,9 +190,9 @@ async def forgot_password(
     try:
         auth_service = AuthService(session)
         token = await auth_service.request_password_reset(request.email)
-
-        # TODO: Send email with reset link
-        # In production: send token to user's email
+        if token is not None:
+            # Only accounts that exist receive a link; the response is the same either way.
+            await send_password_reset_email(request.email, reset_url_for(token))
 
         return {
             "message": "If email exists, password reset link has been sent",
