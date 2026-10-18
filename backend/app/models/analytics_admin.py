@@ -7,6 +7,11 @@ from enum import Enum
 from app.db.base import Base
 
 
+def utc_now_naive() -> datetime:
+    """Current UTC time as a naive value, matching these timezone-less DateTime columns."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 class AnalyticsEventType(str, Enum):
     PAGE_VIEW = "page_view"
     USER_SIGNUP = "user_signup"
@@ -48,7 +53,7 @@ class AnalyticsEvent(Base):
     ip_address = Column(String(45))
     user_agent = Column(String(500))
     referrer = Column(String(500))
-    created_at = Column(DateTime, default=datetime.now(timezone.utc), index=True)
+    created_at = Column(DateTime, default=utc_now_naive, index=True)
 
     user = relationship("User")
 
@@ -63,8 +68,8 @@ class AnalyticsDashboard(Base):
     widgets = Column(JSON, default=[])
     is_public = Column(Boolean, default=False)
     created_by = Column(Integer, ForeignKey("users.id"))
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utc_now_naive)
+    updated_at = Column(DateTime, default=utc_now_naive, onupdate=utc_now_naive)
 
 
 class UserMetric(Base):
@@ -79,8 +84,8 @@ class UserMetric(Base):
     courses_completed = Column(Integer, default=0)
     total_spend = Column(Float, default=0.0)
     engagement_score = Column(Float, default=0.0)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utc_now_naive)
+    updated_at = Column(DateTime, default=utc_now_naive, onupdate=utc_now_naive)
 
     user = relationship("User")
 
@@ -96,7 +101,7 @@ class RevenueMetric(Base):
     membership_revenue = Column(Float, default=0.0)
     transaction_count = Column(Integer, default=0)
     average_transaction = Column(Float, default=0.0)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utc_now_naive)
 
 
 class EngagementMetric(Base):
@@ -111,7 +116,7 @@ class EngagementMetric(Base):
     average_session_duration = Column(Integer, default=0)
     bounce_rate = Column(Float, default=0.0)
     pages_per_session = Column(Float, default=0.0)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utc_now_naive)
 
 
 class Report(Base):
@@ -129,7 +134,7 @@ class Report(Base):
     is_scheduled = Column(Boolean, default=False)
     schedule_frequency = Column(String(50))
     created_by = Column(Integer, ForeignKey("users.id"))
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utc_now_naive)
     generated_at = Column(DateTime)
 
 
@@ -145,7 +150,7 @@ class AdminLog(Base):
     changes = Column(JSON, default={})
     reason = Column(Text)
     ip_address = Column(String(45))
-    created_at = Column(DateTime, default=datetime.now(timezone.utc), index=True)
+    created_at = Column(DateTime, default=utc_now_naive, index=True)
 
 
 class SystemHealth(Base):
@@ -160,7 +165,7 @@ class SystemHealth(Base):
     error_rate = Column(Float)
     uptime_percentage = Column(Float)
     active_connections = Column(Integer)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc), index=True)
+    created_at = Column(DateTime, default=utc_now_naive, index=True)
 
 
 class UserBehavior(Base):
@@ -174,7 +179,7 @@ class UserBehavior(Base):
     device_type = Column(String(50))
     browser = Column(String(100))
     operating_system = Column(String(100))
-    created_at = Column(DateTime, default=datetime.now(timezone.utc), index=True)
+    created_at = Column(DateTime, default=utc_now_naive, index=True)
 
     user = relationship("User")
 
@@ -191,8 +196,8 @@ class NotificationPreference(Base):
     course_updates = Column(Boolean, default=True)
     order_updates = Column(Boolean, default=True)
     weekly_digest = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utc_now_naive)
+    updated_at = Column(DateTime, default=utc_now_naive, onupdate=utc_now_naive)
 
     user = relationship("User")
 
@@ -209,7 +214,7 @@ class ContentModeration(Base):
     moderator_id = Column(Integer, ForeignKey("users.id"))
     action_taken = Column(String(255))
     notes = Column(Text)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc), index=True)
+    created_at = Column(DateTime, default=utc_now_naive, index=True)
     resolved_at = Column(DateTime)
 
 
@@ -221,8 +226,8 @@ class PermissionPolicy(Base):
     description = Column(Text)
     permissions = Column(JSON, default={})
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utc_now_naive)
+    updated_at = Column(DateTime, default=utc_now_naive, onupdate=utc_now_naive)
 
 
 class UserRole(Base):
@@ -233,7 +238,7 @@ class UserRole(Base):
     role_name = Column(String(100), nullable=False)
     permission_policy_id = Column(Integer, ForeignKey("permission_policies.id"))
     assigned_by = Column(Integer, ForeignKey("users.id"))
-    assigned_at = Column(DateTime, default=datetime.now(timezone.utc))
+    assigned_at = Column(DateTime, default=utc_now_naive)
     expires_at = Column(DateTime)
 
 
@@ -246,5 +251,5 @@ class SystemAlert(Base):
     severity = Column(String(50), default="warning")
     message = Column(Text, nullable=False)
     is_resolved = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc), index=True)
+    created_at = Column(DateTime, default=utc_now_naive, index=True)
     resolved_at = Column(DateTime)

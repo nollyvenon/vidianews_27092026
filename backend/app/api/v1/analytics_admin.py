@@ -1,21 +1,39 @@
-"""Analytics and admin API endpoints"""
+"""Analytics and admin API endpoints.
+
+Access rules:
+- A user reads and writes only their own events, metrics and notification preferences,
+  unless they are an analytics administrator.
+- Business and operational data (revenue, engagement, health, alerts, admin logs, reports)
+  is available to analytics administrators, and is always limited to the caller's tenant.
+"""
+
+from datetime import datetime
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from app.database import get_db
-from app.core.security import get_current_user
-from app.services.analytics_admin_service import (
-    AnalyticsEventService, UserMetricService, RevenueMetricService,
-    EngagementMetricService, ReportService, AdminLogService,
-    SystemHealthService, UserBehaviorService, NotificationPreferenceService,
-    PermissionPolicyService, SystemAlertService
-)
-from app.models.user import User
 from pydantic import BaseModel
-from typing import List, Optional
-from datetime import datetime
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.admin_access import is_admin, require_admin
+from app.core.security import get_current_user
+from app.db.session import get_db
+from app.models.user import User
+from app.services.analytics_admin_service import (
+    AdminLogService,
+    AnalyticsEventService,
+    EngagementMetricService,
+    NotificationPreferenceService,
+    ReportService,
+    RevenueMetricService,
+    SystemAlertService,
+    SystemHealthService,
+    UserMetricService,
+)
 
 router = APIRouter()
+
+require_analytics_admin = require_admin("analytics")
+
 
 def tenant_scope(current_user: User) -> int:
     """Tenant of the signed-in user; the data read here is scoped to it."""
@@ -23,6 +41,13 @@ def tenant_scope(current_user: User) -> int:
         raise HTTPException(status_code=422, detail="Your account has no workspace yet. Create a tenant first.")
     return current_user.tenant_id
 
+
+async def _self_or_admin(session: AsyncSession, current_user: User, user_id: int) -> None:
+    if user_id == current_user.id:
+        return
+    if await is_admin(session, current_user.id, "analytics"):
+        return
+    raise HTTPException(status_code=403, detail="You can only access your own records")
 
 
 class AnalyticsEventRequest(BaseModel):
@@ -50,165 +75,168 @@ class NotificationPreferenceRequest(BaseModel):
 
 
 @router.post("/analytics/events")
-def log_event(
+async def log_event(
     req: AnalyticsEventRequest,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Log analytics event"""
-    return AnalyticsEventService.log_event(
-        db, 1, current_user.id, req.event_type, req.event_data,
-        req.session_id, req.ip_address, req.user_agent
+    """Log an analytics event for the signed-in user, in their tenant"""
+    return await AnalyticsEventService(session).log_event(
+        tenant_scope(current_user), current_user.id, req.event_type, req.event_data,
+        req.session_id, req.ip_address, req.user_agent,
     )
 
 
 @router.get("/analytics/events/user/{user_id}")
-def get_user_events(
+async def get_user_events(
     user_id: int,
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, ge=1, le=1000),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Get events by user"""
-    return AnalyticsEventService.get_events_by_user(db, user_id, limit)
+    """Events of a user (own events, or any user's for an analytics administrator)"""
+    await _self_or_admin(session, current_user, user_id)
+    return await AnalyticsEventService(session).get_events_by_user(user_id, limit)
 
 
 @router.get("/analytics/metrics/user/{user_id}")
-def get_user_metrics(
+async def get_user_metrics(
     user_id: int,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Get user metrics"""
-    metrics = UserMetricService.get_or_create_user_metric(db, user_id)
-    return metrics
+    await _self_or_admin(session, current_user, user_id)
+    return await UserMetricService(session).get_or_create_user_metric(user_id)
 
 
 @router.put("/analytics/metrics/user/{user_id}")
-def update_user_metrics(
+async def update_user_metrics(
     user_id: int,
-    total_logins: Optional[int] = None,
-    courses_enrolled: Optional[int] = None,
-    courses_completed: Optional[int] = None,
+    total_logins: Optional[int] = Query(None, ge=0),
+    courses_enrolled: Optional[int] = Query(None, ge=0),
+    courses_completed: Optional[int] = Query(None, ge=0),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Update user metrics"""
+    await _self_or_admin(session, current_user, user_id)
     update_data = {}
     if total_logins is not None:
-        update_data['total_logins'] = total_logins
+        update_data["total_logins"] = total_logins
     if courses_enrolled is not None:
-        update_data['courses_enrolled'] = courses_enrolled
+        update_data["courses_enrolled"] = courses_enrolled
     if courses_completed is not None:
-        update_data['courses_completed'] = courses_completed
-
-    return UserMetricService.update_user_metric(db, user_id, **update_data)
+        update_data["courses_completed"] = courses_completed
+    return await UserMetricService(session).update_user_metric(user_id, **update_data)
 
 
 @router.get("/analytics/revenue")
-def get_revenue_metrics(
+async def get_revenue_metrics(
     start_date: datetime,
     end_date: datetime,
+    _admin: User = Depends(require_analytics_admin),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Get revenue metrics"""
-    return RevenueMetricService.get_revenue_range(db, tenant_scope(current_user), start_date, end_date)
+    """Revenue for the administrator's tenant"""
+    return await RevenueMetricService(session).get_revenue_range(tenant_scope(current_user), start_date, end_date)
 
 
 @router.get("/analytics/engagement")
-def get_engagement_metrics(
+async def get_engagement_metrics(
     days: int = Query(30, ge=1, le=365),
+    _admin: User = Depends(require_analytics_admin),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Get engagement trend"""
-    return EngagementMetricService.get_engagement_trend(db, tenant_scope(current_user), days)
+    """Engagement trend for the administrator's tenant"""
+    return await EngagementMetricService(session).get_engagement_trend(tenant_scope(current_user), days)
 
 
-@router.post("/admin/reports")
-def create_report(
+@router.post("/admin/reports", status_code=201)
+async def create_report(
     req: ReportRequest,
+    _admin: User = Depends(require_analytics_admin),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Create report"""
-    return ReportService.create_report(
-        db, 1, req.report_type, req.title, req.start_date, req.end_date,
-        current_user.id, req.data
+    """Create a report for the administrator's tenant"""
+    return await ReportService(session).create_report(
+        tenant_scope(current_user), req.report_type, req.title, req.start_date, req.end_date,
+        current_user.id, req.data,
     )
 
 
 @router.get("/reports/{report_id}")
-def get_report(
+async def get_report(
     report_id: int,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Get report"""
-    report = ReportService.get_report(db, report_id)
-    if not report:
+    """A report of the caller's tenant, for an analytics administrator"""
+    if not await is_admin(session, current_user.id, "analytics"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    report = await ReportService(session).get_report(report_id)
+    if report is None or report.organization_id != tenant_scope(current_user):
         raise HTTPException(status_code=404, detail="Report not found")
     return report
 
 
 @router.get("/admin/logs")
-def get_admin_logs(
-    limit: int = Query(100, le=1000),
+async def get_admin_logs(
+    limit: int = Query(100, ge=1, le=1000),
+    _admin: User = Depends(require_analytics_admin),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Get admin logs"""
-    return AdminLogService.get_admin_logs(db, tenant_scope(current_user), limit)
+    """Admin activity for the administrator's tenant"""
+    return await AdminLogService(session).get_admin_logs(tenant_scope(current_user), limit)
 
 
 @router.get("/system/health")
-def get_system_health(
+async def get_system_health(
+    _admin: User = Depends(require_analytics_admin),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Get system health"""
-    health = SystemHealthService.get_latest_health(db, tenant_scope(current_user))
-    if not health:
+    health = await SystemHealthService(session).get_latest_health(tenant_scope(current_user))
+    if health is None:
         raise HTTPException(status_code=404, detail="No health data available")
     return health
 
 
 @router.get("/system/health/history")
-def get_system_health_history(
+async def get_system_health_history(
     hours: int = Query(24, ge=1, le=720),
+    _admin: User = Depends(require_analytics_admin),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Get system health history"""
-    return SystemHealthService.get_health_history(db, tenant_scope(current_user), hours)
+    return await SystemHealthService(session).get_health_history(tenant_scope(current_user), hours)
 
 
 @router.post("/notifications/preferences")
-def update_notification_preferences(
+async def update_notification_preferences(
     req: NotificationPreferenceRequest,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Update notification preferences"""
-    return NotificationPreferenceService.update_preference(
-        db, current_user.id, **req.dict()
-    )
+    """The signed-in user's own notification preferences"""
+    return await NotificationPreferenceService(session).update_preference(current_user.id, **req.model_dump())
 
 
 @router.get("/notifications/preferences")
-def get_notification_preferences(
+async def get_notification_preferences(
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Get notification preferences"""
-    return NotificationPreferenceService.get_or_create_preference(db, current_user.id)
+    return await NotificationPreferenceService(session).get_or_create_preference(current_user.id)
 
 
 @router.get("/system/alerts")
-def get_system_alerts(
+async def get_system_alerts(
+    _admin: User = Depends(require_analytics_admin),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Get active system alerts"""
-    return SystemAlertService.get_active_alerts(db, tenant_scope(current_user))
+    """Unresolved system alerts for the administrator's tenant"""
+    return await SystemAlertService(session).get_active_alerts(tenant_scope(current_user))
