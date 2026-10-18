@@ -7,6 +7,11 @@ from enum import Enum
 from app.db.base import Base
 
 
+def utc_now_naive() -> datetime:
+    """Current UTC time as a naive value, matching these timezone-less DateTime columns."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 # Many-to-many link between courses and bundles
 course_bundle_items = Table(
     "course_bundle_items",
@@ -74,8 +79,8 @@ class Course(Base):
     prerequisites = Column(JSON, default=[])
     learning_objectives = Column(JSON, default=[])
     requirements = Column(JSON, default=[])
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utc_now_naive)
+    updated_at = Column(DateTime, default=utc_now_naive, onupdate=utc_now_naive)
 
     instructor = relationship("User")
     lessons = relationship("Lesson", back_populates="course", cascade="all, delete-orphan")
@@ -101,8 +106,8 @@ class Lesson(Base):
     is_preview = Column(Boolean, default=False)
     status = Column(SQLEnum(LessonStatus), default=LessonStatus.LOCKED)
     release_date = Column(DateTime)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utc_now_naive)
+    updated_at = Column(DateTime, default=utc_now_naive, onupdate=utc_now_naive)
 
     course = relationship("Course", back_populates="lessons")
     section = relationship("CourseSection", back_populates="lessons")
@@ -117,7 +122,7 @@ class CourseSection(Base):
     title = Column(String(255), nullable=False)
     description = Column(Text)
     order = Column(Integer)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utc_now_naive)
 
     course = relationship("Course")
     lessons = relationship("Lesson", back_populates="section")
@@ -130,15 +135,15 @@ class CourseEnrollment(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=False, index=True)
     status = Column(SQLEnum(EnrollmentStatus), default=EnrollmentStatus.ACTIVE)
-    enrolled_date = Column(DateTime, default=datetime.now(timezone.utc))
+    enrolled_date = Column(DateTime, default=utc_now_naive)
     completed_date = Column(DateTime)
     progress_percentage = Column(Float, default=0.0)
     lessons_completed = Column(Integer, default=0)
     total_lessons = Column(Integer)
     certificate_issued = Column(Boolean, default=False)
     certificate_url = Column(String(500))
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utc_now_naive)
+    updated_at = Column(DateTime, default=utc_now_naive, onupdate=utc_now_naive)
 
     user = relationship("User")
     course = relationship("Course", back_populates="enrollments")
@@ -155,8 +160,8 @@ class StudentLessonProgress(Base):
     video_watch_time = Column(Integer, default=0)
     completion_percentage = Column(Float, default=0.0)
     completed_date = Column(DateTime)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utc_now_naive)
+    updated_at = Column(DateTime, default=utc_now_naive, onupdate=utc_now_naive)
 
     enrollment = relationship("CourseEnrollment", back_populates="progress_records")
     lesson = relationship("Lesson", back_populates="progress_records")
@@ -173,8 +178,8 @@ class CourseReview(Base):
     content = Column(Text)
     verified_purchase = Column(Boolean, default=False)
     helpful_count = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utc_now_naive)
+    updated_at = Column(DateTime, default=utc_now_naive, onupdate=utc_now_naive)
 
     course = relationship("Course", back_populates="reviews")
     user = relationship("User")
@@ -191,7 +196,7 @@ class CourseBundle(Base):
     price = Column(Float, nullable=False)
     discount_percentage = Column(Float, default=0.0)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utc_now_naive)
 
     courses = relationship("Course", secondary="course_bundle_items", back_populates="bundles")
 
@@ -209,7 +214,7 @@ class Assignment(Base):
     due_date = Column(DateTime)
     max_score = Column(Float, default=100.0)
     is_graded = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utc_now_naive)
 
     course = relationship("Course", back_populates="assignments")
     submissions = relationship("AssignmentSubmission", back_populates="assignment")
@@ -229,7 +234,7 @@ class AssignmentSubmission(Base):
     feedback = Column(Text)
     graded_date = Column(DateTime)
     graded_by = Column(Integer, ForeignKey("users.id"))
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utc_now_naive)
 
     assignment = relationship("Assignment", back_populates="submissions")
     user = relationship("User", foreign_keys=[user_id])
@@ -244,10 +249,10 @@ class Certificate(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     certificate_number = Column(String(255), unique=True, nullable=False)
     certificate_url = Column(String(500))
-    issue_date = Column(DateTime, default=datetime.now(timezone.utc))
+    issue_date = Column(DateTime, default=utc_now_naive)
     expiry_date = Column(DateTime)
     is_valid = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utc_now_naive)
 
     course = relationship("Course")
     user = relationship("User")
