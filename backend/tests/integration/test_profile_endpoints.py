@@ -29,6 +29,8 @@ class TestProfileAPI:
     async def test_get_profile(self, async_client: AsyncClient, auth_user):
         """Test getting profile"""
         headers = {"Authorization": f"Bearer {auth_user['token']}"}
+        # A profile is created on first update; GET of a user without one is 404.
+        await async_client.put("/api/v1/profiles/me", json={"bio": "Profile bio"}, headers=headers)
 
         response = await async_client.get(
             f"/api/v1/profiles/{auth_user['user'].id}",
@@ -59,6 +61,7 @@ class TestProfileAPI:
     async def test_get_profile_summary(self, async_client: AsyncClient, auth_user):
         """Test getting profile summary"""
         headers = {"Authorization": f"Bearer {auth_user['token']}"}
+        await async_client.put("/api/v1/profiles/me", json={"bio": "Profile bio"}, headers=headers)
 
         response = await async_client.get(
             f"/api/v1/profiles/{auth_user['user'].id}/summary",

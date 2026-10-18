@@ -438,8 +438,12 @@ class TestPublishingWorkflow:
             creator_user_id=1
         )
 
+        scheduler = User(email="scheduler@example.com", password_hash="hash")
+        service.session.add(scheduler)
+        await service.session.commit()
+
         scheduled_time = datetime.now(timezone.utc) + timedelta(hours=1)
-        scheduled = await service.schedule_content(content.id, scheduled_time)
+        scheduled = await service.schedule_content(content.id, scheduled_time, scheduler.id)
         assert scheduled.status == ContentStatus.SCHEDULED
 
     async def test_archive_content(self, service):

@@ -4,7 +4,7 @@ import asyncio
 import os
 
 import pytest
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.pool import NullPool
@@ -80,10 +80,8 @@ def reference_data(isolate_database, reset_test_database):
 @pytest.fixture
 async def test_engine():
     """Create test database engine"""
+    # The schema is created once per session by reset_test_database.
     engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
 
     yield engine
 
@@ -113,27 +111,39 @@ async def async_client(test_session):
     async def override_get_db():
         yield test_session
 
-    from app.db.session import get_db
+    # The app has two async session dependencies (get_db and get_session); route
+    # every request through the test session so writes made by fixtures are visible.
+    from app.db.session import get_db, get_session
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_session] = override_get_db
 
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    # ASGITransport replaces the `app=` argument, which httpx 0.28 removed; it works on the pinned 0.25 too.
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         yield client
 
     app.dependency_overrides.clear()
 
 
 @pytest.fixture
-async def session(test_engine):
-    """Async session on the per-test database"""
-    factory = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
-    async with factory() as db_session:
-        yield db_session
+async def session(test_session):
+    """The per-test async session, shared with async_client so fixture writes are visible to requests"""
+    yield test_session
 
 
 @pytest.fixture
 async def db(session):
     """Alias of `session` for tests that name the async session `db`"""
     yield session
+
+
+@pytest.fixture(autouse=True)
+def _isolated_usage_recorder():
+    """Counts are batched in one process-wide recorder; drop anything a previous test left unwritten."""
+    from app.main import api_usage_recorder
+
+    api_usage_recorder.discard_pending()
+    yield
+    api_usage_recorder.discard_pending()
 
 
 @pytest.fixture

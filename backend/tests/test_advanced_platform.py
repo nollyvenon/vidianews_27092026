@@ -268,15 +268,30 @@ async def test_get_cache(cache_service, mock_db):
     mock_entry = Mock(spec=CacheEntry)
     mock_entry.cache_value = {"id": 123}
     mock_entry.expires_at = None
+    mock_entry.hit_count = 0
     mock_query = Mock()
     mock_query.filter.return_value = mock_query
     mock_query.first.return_value = mock_entry
-    mock_db.query.return_value = mock_query
+
+    metrics_row = Mock(spec=CacheMetrics)
+    metrics_row.total_requests = 0
+    metrics_row.total_hits = 0
+    metrics_row.total_misses = 0
+    metrics_row.average_response_time_ms = 0.0
+    metrics_row.memory_usage_mb = 0.0
+    metrics_query = Mock()
+    metrics_query.order_by.return_value = metrics_query
+    metrics_query.first.return_value = metrics_row
+
+    mock_db.query.side_effect = lambda model: metrics_query if model is CacheMetrics else mock_query
     mock_db.commit = Mock()
 
     result = await cache_service.get_cache("user:123")
 
     assert result == {"id": 123}
+    assert mock_entry.hit_count == 1
+    assert metrics_row.total_hits == 1
+    assert metrics_row.total_requests == 1
 
 
 @pytest.mark.asyncio
@@ -333,6 +348,8 @@ async def test_record_usage(api_service, mock_db):
     mock_metrics.call_count = 0
     mock_metrics.error_count = 0
     mock_metrics.average_response_time_ms = 0
+    mock_metrics.max_response_time_ms = None
+    mock_metrics.min_response_time_ms = None
     mock_query = Mock()
     mock_query.filter.return_value = mock_query
     mock_query.first.return_value = mock_metrics

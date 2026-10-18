@@ -1,9 +1,6 @@
 """Tests for Streaming, Analytics & Premium services"""
 
 import pytest
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from tests.db_config import TEST_DATABASE_URL
-from sqlalchemy.pool import NullPool
 from app.models.streaming_premium import *
 from app.services.streaming_premium_service import *
 
@@ -15,14 +12,26 @@ def _seed_reference(reference_data):
 
 
 @pytest.fixture
-async def db():
-    engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+def extra_rows(reset_test_database):
+    """Commit user 3 and contents 5 and 10, which the premium and partnership tests reference."""
+    from sqlalchemy.orm import Session
+    from app.models.content import Content, ContentType
+    from app.models.user import User
 
-    async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    async with async_session() as session:
-        yield session
+    with Session(reset_test_database) as session:
+        session.add(User(id=3, email="seed-user-3@example.com", password_hash="seed-hash"))
+        session.flush()
+        for content_id in (5, 10):
+            session.add(
+                Content(
+                    id=content_id,
+                    title=f"Premium Content {content_id}",
+                    slug=f"premium-content-{content_id}",
+                    content_type=next(iter(ContentType)),
+                    creator_user_id=1,
+                )
+            )
+        session.commit()
 
 
 class TestLivestreamService:
@@ -125,7 +134,7 @@ class TestPartnershipService:
         assert partnership.partner_id == 2
 
     @pytest.mark.asyncio
-    async def test_get_creator_partnerships(self, db):
+    async def test_get_creator_partnerships(self, db, extra_rows):
         partnership = Partnership(creator_id=1, partner_id=3, partnership_type="sponsorship")
         db.add(partnership)
         await db.commit()
@@ -173,7 +182,7 @@ class TestPremiumService:
         assert paywall.price == 2.99
 
     @pytest.mark.asyncio
-    async def test_grant_premium_access(self, db):
+    async def test_grant_premium_access(self, db, extra_rows):
         service = PremiumService(db)
         access = await service.grant_premium_access(1, 5, 2.99)
 
@@ -181,7 +190,7 @@ class TestPremiumService:
         assert access.content_id == 5
 
     @pytest.mark.asyncio
-    async def test_check_premium_access(self, db):
+    async def test_check_premium_access(self, db, extra_rows):
         access = PremiumAccess(user_id=1, content_id=10, price_paid=3.99)
         db.add(access)
         await db.commit()

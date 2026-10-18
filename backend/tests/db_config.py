@@ -39,22 +39,47 @@ TEST_DATABASE_URL = _with_driver(
 TEST_SYNC_DATABASE_URL = _with_driver(TEST_DATABASE_URL, "psycopg2")
 
 
+# Runs on the server in one transaction. A table with no heap pages cannot hold
+# rows, so the catalog's pg_relation_size selects the tables that might contain
+# data in a single query, without planning a statement for each of the ~350
+# tables. Only those are emptied. Foreign-key triggers are disabled for the
+# transaction with SET LOCAL session_replication_role, so the tables can be
+# emptied in any order. TRUNCATE is not used: it cascades through every
+# referencing table and costs far more per table on this platform.
+# synchronous_commit is off because this database is disposable; skipping the
+# WAL flush at commit is safe here.
+_TRUNCATE_WRITTEN_TABLES_SQL = """
+BEGIN;
+SET LOCAL synchronous_commit = off;
+SET LOCAL session_replication_role = replica;
+DO $$
+DECLARE
+    tbl record;
+BEGIN
+    FOR tbl IN
+        SELECT c.relname
+        FROM pg_class c
+        WHERE c.relnamespace = 'public'::regnamespace
+          AND c.relkind = 'r'
+          AND pg_relation_size(c.oid) > 0
+    LOOP
+        EXECUTE 'DELETE FROM ' || quote_ident(tbl.relname);
+    END LOOP;
+END
+$$;
+COMMIT;
+"""
+
+
 def truncate_all_tables(connection) -> None:
     """Empty every table in the schema, keeping the schema itself.
 
-    Use an autocommit connection. Each DELETE then commits on its own and
-    releases its locks, so parallel workers never exhaust PostgreSQL's shared
-    lock table. Foreign-key triggers are skipped so tables can be emptied in
-    any order.
+    Use an autocommit connection. The reset is one transaction, so it either
+    empties every table or leaves the data untouched.
     """
-    from sqlalchemy import text
-
-    from app.db.base import Base
-
-    connection.execute(text("SET lock_timeout = '10s'"))
-    connection.execute(text("SET session_replication_role = replica"))
+    connection.exec_driver_sql("SET lock_timeout = '10s'")
     try:
-        for table in Base.metadata.sorted_tables:
-            connection.execute(text(f'DELETE FROM "{table.name}"'))
-    finally:
-        connection.execute(text("SET session_replication_role = origin"))
+        connection.exec_driver_sql(_TRUNCATE_WRITTEN_TABLES_SQL)
+    except Exception:
+        connection.exec_driver_sql("ROLLBACK")
+        raise

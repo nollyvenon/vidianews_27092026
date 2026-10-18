@@ -19,6 +19,25 @@ def _seed_reference(reference_data):
     yield
 
 
+@pytest.fixture
+def second_content(reset_test_database):
+    """Commit content 2 so tests can score two different pieces of content."""
+    from sqlalchemy.orm import Session
+    from app.models.content import Content, ContentType
+
+    with Session(reset_test_database) as session:
+        session.add(
+            Content(
+                id=2,
+                title="Second Content",
+                slug="second-content",
+                content_type=next(iter(ContentType)),
+                creator_user_id=1,
+            )
+        )
+        session.commit()
+
+
 class TestContentCalendarService:
     """Module 61: Content Calendar Integration Tests"""
 
@@ -239,7 +258,7 @@ class TestPlagiarismDetectionService:
         assert updated.status == PlagiarismCheckStatus.COMPLETED
 
     @pytest.mark.asyncio
-    async def test_plagiarism_risk_levels(self, db: AsyncSession):
+    async def test_plagiarism_risk_levels(self, db: AsyncSession, second_content):
         """Test plagiarism risk level classification"""
         service = PlagiarismDetectionService(db)
 
@@ -317,7 +336,7 @@ class TestReadabilityService:
         assert "grade" in updated.target_audience_grade_level.lower()
 
     @pytest.mark.asyncio
-    async def test_readability_levels(self, db: AsyncSession):
+    async def test_readability_levels(self, db: AsyncSession, second_content):
         """Test readability level classification"""
         service = ReadabilityService(db)
 

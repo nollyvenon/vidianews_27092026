@@ -39,6 +39,28 @@ def client(test_db):
     return TestClient(app)
 
 
+def verify_account(email: str) -> None:
+    """Confirm the account's email, as the link sent at registration would."""
+    from sqlalchemy import create_engine, text
+    from tests.db_config import TEST_SYNC_DATABASE_URL
+
+    engine = create_engine(TEST_SYNC_DATABASE_URL)
+    with engine.begin() as conn:
+        conn.execute(
+            text("UPDATE users SET status = 'active' WHERE email = :email"),
+            {"email": email},
+        )
+    engine.dispose()
+
+
+def login_token(client, email: str = "test@example.com", password: str = "TestPassword123!") -> str:
+    """Confirm the account, sign in, and return the access token."""
+    verify_account(email)
+    response = client.post("/api/v1/auth/login", json={"email": email, "password": password})
+    assert response.status_code == 200, response.text
+    return response.json()["access_token"]
+
+
 class TestAuthEndpoints:
     """Test authentication endpoints"""
 
@@ -55,11 +77,11 @@ class TestAuthEndpoints:
             },
         )
 
-        assert response.status_code == 200
+        assert response.status_code == 201
         data = response.json()
-        assert "access_token" in data
-        assert "refresh_token" in data
-        assert data["token_type"] == "bearer"
+        # Registration sends a confirmation email; no session is issued until the address is confirmed.
+        assert data["requires_verification"] is True
+        assert data["access_token"] is None
 
     def test_register_password_mismatch(self, client):
         """Test registration with mismatched passwords"""
@@ -115,6 +137,8 @@ class TestAuthEndpoints:
                 "last_name": "User",
             },
         )
+
+        verify_account("test@example.com")
 
         # Then login
         response = client.post(
@@ -178,7 +202,8 @@ class TestAuthEndpoints:
             },
         )
 
-        token = reg_response.json()["access_token"]
+        assert reg_response.status_code == 201
+        token = login_token(client)
 
         response = client.get(
             "/api/v1/auth/me",
@@ -218,7 +243,8 @@ class TestAuthEndpoints:
             },
         )
 
-        token = reg_response.json()["access_token"]
+        assert reg_response.status_code == 201
+        token = login_token(client)
 
         response = client.post(
             "/api/v1/auth/logout",

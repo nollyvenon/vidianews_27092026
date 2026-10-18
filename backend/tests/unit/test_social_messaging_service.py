@@ -1,9 +1,6 @@
 """Tests for Social, Messaging & Discovery services"""
 
 import pytest
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from tests.db_config import TEST_DATABASE_URL
-from sqlalchemy.pool import NullPool
 from app.models.social_messaging import *
 from app.services.social_messaging_service import *
 
@@ -15,14 +12,25 @@ def _seed_reference(reference_data):
 
 
 @pytest.fixture
-async def db():
-    engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+def extra_rows(reset_test_database):
+    """Commit user 3 and content 5, which the mention and recommendation tests reference."""
+    from sqlalchemy.orm import Session
+    from app.models.content import Content, ContentType
+    from app.models.user import User
 
-    async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    async with async_session() as session:
-        yield session
+    with Session(reset_test_database) as session:
+        session.add(User(id=3, email="seed-user-3@example.com", password_hash="seed-hash"))
+        session.flush()
+        session.add(
+            Content(
+                id=5,
+                title="Discovery Content",
+                slug="discovery-content",
+                content_type=next(iter(ContentType)),
+                creator_user_id=1,
+            )
+        )
+        session.commit()
 
 
 class TestModerationService:
@@ -64,7 +72,7 @@ class TestSocialService:
         assert len(followers) == 1
 
     @pytest.mark.asyncio
-    async def test_create_mention(self, db):
+    async def test_create_mention(self, db, extra_rows):
         service = SocialService(db)
         mention = await service.create_mention(1, 2, 3)
 
@@ -168,7 +176,7 @@ class TestDiscoveryService:
         assert search.user_id == 1
 
     @pytest.mark.asyncio
-    async def test_create_recommendation(self, db):
+    async def test_create_recommendation(self, db, extra_rows):
         service = DiscoveryService(db)
         rec = await service.create_recommendation(1, 5, 0.95, "Similar to your views")
 

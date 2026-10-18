@@ -1,6 +1,8 @@
 """Tests for advanced AI services (Modules 15-20)"""
 
 import pytest
+from unittest.mock import AsyncMock, patch
+from fastapi import HTTPException
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -9,6 +11,8 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from tests.db_config import TEST_DATABASE_URL
 from sqlalchemy.pool import NullPool
 from app.db.base import Base
+from app.models.ai_advanced import SafetyLevel
+from app.models.ai_core import Agent
 from app.models.ai_advanced import (
     Memory, ConversationMemory, AITemplate, Chat, ChatMessage,
     Document, ResearchQuery, UsageMetric, CostAlert,
@@ -28,17 +32,11 @@ def _seed_reference(reference_data):
 
 
 @pytest.fixture
-async def test_db():
-    engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-    async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-
-    async with async_session() as session:
-        yield session
-
-    await engine.dispose()
+async def test_db(session):
+    """Per-test session with agent 1 committed, since memory rows reference an agent."""
+    session.add(Agent(id=1, creator_user_id=1, name="Memory Agent", slug="memory-agent"))
+    await session.commit()
+    yield session
 
 
 # ==================== MODULE 15: MEMORY TESTS ====================
@@ -279,7 +277,7 @@ async def test_cost_alert_check(test_db):
 # ==================== MODULE 20: SAFETY TESTS ====================
 
 @pytest.mark.asyncio
-async def test_safety_check_content(test_db):
+async def test_safety_check_content(test_db, safety_analysis):
     service = SafetyService(test_db)
     check = await service.check_content("Test content")
 
@@ -288,7 +286,7 @@ async def test_safety_check_content(test_db):
 
 
 @pytest.mark.asyncio
-async def test_safety_check_get(test_db):
+async def test_safety_check_get(test_db, safety_analysis):
     service = SafetyService(test_db)
     check = await service.check_content("Content")
 
@@ -298,7 +296,7 @@ async def test_safety_check_get(test_db):
 
 
 @pytest.mark.asyncio
-async def test_safety_approve_content(test_db):
+async def test_safety_approve_content(test_db, safety_analysis):
     service = SafetyService(test_db)
     check = await service.check_content("Content")
 
@@ -400,7 +398,7 @@ async def test_full_monitoring_workflow(test_db):
 
 
 @pytest.mark.asyncio
-async def test_full_safety_workflow(test_db):
+async def test_full_safety_workflow(test_db, safety_analysis):
     safety_service = SafetyService(test_db)
 
     # Check content
@@ -418,7 +416,7 @@ async def test_full_safety_workflow(test_db):
 
 
 @pytest.mark.asyncio
-async def test_cross_module_integration(test_db):
+async def test_cross_module_integration(test_db, safety_analysis):
     """Test interactions between different modules"""
     template_service = TemplateService(test_db)
     chat_service = ChatService(test_db)
@@ -438,3 +436,53 @@ async def test_cross_module_integration(test_db):
     assert template.id is not None
     assert chat.id is not None
     assert check.id is not None
+
+
+@pytest.fixture
+def safety_analysis():
+    """Stands in for the model provider, which is not configured in tests. Returns the mock so tests can set its answer."""
+    with patch(
+        "app.services.ai_advanced_service.complete_json",
+        new=AsyncMock(return_value={"severity": "low", "flags": []}),
+    ) as mock:
+        yield mock
+
+
+@pytest.mark.asyncio
+async def test_flagged_content_is_stored_with_its_severity_and_flags(test_db, safety_analysis):
+    safety_analysis.return_value = {"severity": "high", "flags": ["harassment"]}
+
+    check = await SafetyService(test_db).check_content("Insulting text")
+
+    assert check.severity == SafetyLevel.HIGH
+    assert check.flags == ["harassment"]
+    assert not check.is_approved
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "answer",
+    [
+        "not a json object",
+        {"severity": "extreme", "flags": []},
+        {"severity": "low", "flags": "harassment"},
+        {"severity": "low", "flags": [1]},
+    ],
+)
+async def test_malformed_safety_analysis_is_refused_and_nothing_is_stored(test_db, safety_analysis, answer):
+    safety_analysis.return_value = answer
+
+    with pytest.raises(HTTPException) as refused:
+        await SafetyService(test_db).check_content("Content")
+
+    assert refused.value.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_safety_check_needs_a_configured_model_provider(test_db):
+    unavailable = HTTPException(status_code=503, detail="AI features are not configured")
+    with patch("app.services.ai_chat_service.complete_text", new=AsyncMock(side_effect=unavailable)):
+        with pytest.raises(HTTPException) as refused:
+            await SafetyService(test_db).check_content("Content")
+
+    assert refused.value.status_code == 503

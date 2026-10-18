@@ -1,10 +1,7 @@
+import httpx
 import pytest
+import respx
 from datetime import datetime, timedelta
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
-
-from tests.db_config import TEST_DATABASE_URL
-from sqlalchemy.pool import NullPool
 from app.models.user_management import (
     EmailTemplate, EmailCampaign, UserSegment, SubscriberProfile,
     SubscriberActivity, NotificationLog, WebhookEndpoint, APIKey,
@@ -25,15 +22,12 @@ def _seed_reference(reference_data):
 
 
 @pytest.fixture
-async def db():
-    engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
-    async with engine.begin() as conn:
-        await conn.run_sync(lambda c: None)
-
-    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-
-    async with async_session() as session:
-        yield session
+async def email_template(db):
+    """A committed email template that campaigns can reference."""
+    template = await EmailTemplateService().create_email_template(
+        db, "Campaign Template", "Campaign Subject", "<p>Campaign body</p>"
+    )
+    return template["id"]
 
 
 class TestEmailTemplateService:
@@ -66,12 +60,12 @@ class TestEmailTemplateService:
 
 class TestEmailCampaignService:
     @pytest.mark.asyncio
-    async def test_create_email_campaign(self, db):
+    async def test_create_email_campaign(self, db, email_template):
         service = EmailCampaignService()
         result = await service.create_email_campaign(
             db,
             "Weekly Newsletter",
-            1,
+            email_template,
             "Your Weekly News",
             "newsletter@vidianews.com",
         )
@@ -80,14 +74,14 @@ class TestEmailCampaignService:
         assert result["status"] == CampaignStatus.DRAFT.value
 
     @pytest.mark.asyncio
-    async def test_add_campaign_recipients(self, db):
+    async def test_add_campaign_recipients(self, db, email_template):
         service = EmailCampaignService()
 
         # Create campaign first
         campaign_result = await service.create_email_campaign(
             db,
             "Test Campaign",
-            1,
+            email_template,
             "Subject",
             "from@example.com",
         )
@@ -106,13 +100,13 @@ class TestEmailCampaignService:
         assert result["recipient_count"] == 2
 
     @pytest.mark.asyncio
-    async def test_update_campaign_metrics(self, db):
+    async def test_update_campaign_metrics(self, db, email_template):
         service = EmailCampaignService()
 
         campaign_result = await service.create_email_campaign(
             db,
             "Test Campaign",
-            1,
+            email_template,
             "Subject",
             "from@example.com",
         )
@@ -129,13 +123,13 @@ class TestEmailCampaignService:
         assert result["click_rate"] == 0.0
 
     @pytest.mark.asyncio
-    async def test_send_campaign(self, db):
+    async def test_send_campaign(self, db, email_template):
         service = EmailCampaignService()
 
         campaign_result = await service.create_email_campaign(
             db,
             "Test Campaign",
-            1,
+            email_template,
             "Subject",
             "from@example.com",
         )
@@ -333,14 +327,19 @@ class TestWebhookService:
             ["user.created"],
         )
 
-        result = await service.trigger_webhook(
-            db,
-            webhook["id"],
-            "user.created",
-            {"user_id": 1, "email": "user@example.com"},
-        )
+        with respx.mock(assert_all_called=True) as mock:
+            mock.post("https://example.com/webhook").mock(return_value=httpx.Response(204))
+            result = await service.trigger_webhook(
+                db,
+                webhook["id"],
+                "user.created",
+                {"user_id": 1, "email": "user@example.com"},
+            )
 
         assert result["event_type"] == "user.created"
+        assert result["delivered"] is True
+        assert result["status_code"] == 204
+        assert result["error"] is None
 
     @pytest.mark.asyncio
     async def test_generate_signature(self):
@@ -462,7 +461,7 @@ class TestPersonalizationService:
 
 class TestIntegrationScenarios:
     @pytest.mark.asyncio
-    async def test_email_campaign_workflow(self, db):
+    async def test_email_campaign_workflow(self, db, email_template):
         email_service = EmailCampaignService()
         segment_service = UserSegmentService()
 
@@ -480,7 +479,7 @@ class TestIntegrationScenarios:
         campaign = await email_service.create_email_campaign(
             db,
             "Weekly Newsletter",
-            1,
+            email_template,
             "Your Weekly Update",
             "newsletter@example.com",
         )
@@ -545,15 +544,18 @@ class TestIntegrationScenarios:
         )
 
         # Trigger webhook
-        log = await webhook_service.trigger_webhook(
-            db,
-            webhook["id"],
-            "user.created",
-            {"user_id": 1, "email": "newuser@example.com"},
-        )
+        with respx.mock(assert_all_called=True) as mock:
+            mock.post("https://example.com/events").mock(return_value=httpx.Response(200, text="ok"))
+            log = await webhook_service.trigger_webhook(
+                db,
+                webhook["id"],
+                "user.created",
+                {"user_id": 1, "email": "newuser@example.com"},
+            )
 
         assert log["event_type"] == "user.created"
         assert log["webhook_id"] == webhook["id"]
+        assert log["delivered"] is True
 
     @pytest.mark.asyncio
     async def test_api_key_validation_workflow(self, db):
@@ -611,13 +613,13 @@ class TestEdgeCases:
         assert result["user_count"] == 0
 
     @pytest.mark.asyncio
-    async def test_large_campaign_recipients(self, db):
+    async def test_large_campaign_recipients(self, db, email_template):
         service = EmailCampaignService()
 
         campaign = await service.create_email_campaign(
             db,
             "Large Campaign",
-            1,
+            email_template,
             "Subject",
             "from@example.com",
         )

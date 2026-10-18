@@ -121,11 +121,13 @@ class TestCartService:
 class TestCheckoutService:
     """Checkout service tests"""
 
-    def test_create_checkout_session(self, db: Session, sample_user: User):
+    def test_create_checkout_session(self, db: Session, sample_user: User, sample_product: Product):
         """Test creating checkout session"""
         cart = CartService.get_or_create_cart(db, sample_user.id)
+        CartService.add_to_cart(db, cart.id, sample_product.id, 1)
 
         checkout_data = {
+            "shipping_method": "standard",
             "billing_address": {
                 "street": "123 Main St",
                 "city": "New York",
@@ -260,7 +262,6 @@ def sample_user(db: Session) -> User:
     """Create sample user"""
     user = User(
         email="test@example.com",
-        username="testuser",
         password_hash="password_hash"
     )
     db.add(user)

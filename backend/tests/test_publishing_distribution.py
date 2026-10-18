@@ -123,7 +123,7 @@ class TestDistributionService:
     @pytest.mark.asyncio
     async def test_syndicate_content(self, async_session):
         """Test content syndication logging"""
-        await DistributionService.create_syndication_profile(
+        profile = await DistributionService.create_syndication_profile(
             session=async_session,
             org_id=1,
             partner_name="News Agency",
@@ -135,7 +135,7 @@ class TestDistributionService:
             session=async_session,
             org_id=1,
             content_id=1,
-            profile_id=1,
+            profile_id=profile.id,
             syndication_url="https://newsagency.com/article",
         )
 
@@ -145,7 +145,7 @@ class TestDistributionService:
     @pytest.mark.asyncio
     async def test_track_syndication_performance(self, async_session):
         """Test tracking syndication performance"""
-        await DistributionService.create_syndication_profile(
+        profile = await DistributionService.create_syndication_profile(
             session=async_session,
             org_id=1,
             partner_name="News Agency",
@@ -157,7 +157,7 @@ class TestDistributionService:
             session=async_session,
             org_id=1,
             content_id=1,
-            profile_id=1,
+            profile_id=profile.id,
             syndication_url="https://newsagency.com/article",
         )
 

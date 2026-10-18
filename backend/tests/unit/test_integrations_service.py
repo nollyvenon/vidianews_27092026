@@ -6,6 +6,7 @@ from tests.db_config import TEST_DATABASE_URL
 from sqlalchemy.pool import NullPool
 from app.db.base import Base
 from app.models.integrations import *
+from app.models.user import User
 from app.services.integrations_service import *
 
 
@@ -30,7 +31,10 @@ async def test_db():
 @pytest.mark.asyncio
 async def test_create_report(test_db):
     service = AnalyticsService(test_db)
-    report = await service.create_report(1, "performance", "Q3 Report", {"data": "value"})
+    reporter = User(email="reporter@example.com", password_hash="hash")
+    test_db.add(reporter)
+    await test_db.commit()
+    report = await service.create_report(1, "performance", "Q3 Report", {"data": "value"}, reporter.id)
     assert report.id is not None
     assert report.report_type == "performance"
 

@@ -18,11 +18,9 @@ from app.services.platform_completion_service import (
 
 
 @pytest.fixture
-def db_session():
-    engine = create_engine(TEST_SYNC_DATABASE_URL)
-    Base.metadata.create_all(engine)
-    SessionLocal = sessionmaker(bind=engine)
-    db = SessionLocal()
+def db_session(reset_test_database):
+    """Blocking session on the shared per-session test engine (schema already created)."""
+    db = sessionmaker(bind=reset_test_database)()
     yield db
     db.close()
 

@@ -1,30 +1,39 @@
 """Integration tests for content API endpoints"""
 
 import pytest
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from datetime import datetime, timezone
+from sqlalchemy.orm import Session
+from app.core.security import create_access_token
 from app.models.content import ContentStatus, ContentAccessLevel, ContentType
+from app.models.user import User
 from app.main import app
+
+
+def _bearer(email: str, user_id: int) -> dict:
+    token = create_access_token({"sub": email, "user_id": user_id})
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture(autouse=True)
+def _seed_reference(reference_data):
+    """Users 1-2, tenant, organization and content 1 exist for every test in this module."""
+    yield
 
 
 @pytest.fixture
 async def client():
     """Create test client"""
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         yield client
 
 
 @pytest.fixture
-async def auth_headers(client):
-    """Get authentication headers"""
-    response = await client.post(
-        "/api/v1/auth/login",
-        json={"email": "test@example.com", "password": "testpass123"}
-    )
-    if response.status_code == 200:
-        token = response.json()["access_token"]
-        return {"Authorization": f"Bearer {token}"}
-    return {"Authorization": "Bearer fake-token"}
+def auth_headers(reference_data, reset_test_database):
+    """Bearer headers for user 1, a seeded account, so the routes that require sign-in admit the request"""
+    with Session(reset_test_database) as session:
+        email = session.get(User, 1).email
+    return _bearer(email, 1)
 
 
 class TestCategoryEndpoints:
@@ -39,15 +48,15 @@ class TestCategoryEndpoints:
         )
         assert response.status_code in [201, 401, 403]
 
-    async def test_list_categories(self, client):
+    async def test_list_categories(self, client, auth_headers):
         """Test listing categories"""
-        response = await client.get("/api/v1/content/categories")
+        response = await client.get("/api/v1/content/categories", headers=auth_headers)
         assert response.status_code == 200
         assert isinstance(response.json(), list)
 
-    async def test_get_category(self, client):
+    async def test_get_category(self, client, auth_headers):
         """Test getting category"""
-        response = await client.get("/api/v1/content/categories/1")
+        response = await client.get("/api/v1/content/categories/1", headers=auth_headers)
         assert response.status_code in [200, 404]
 
 
@@ -63,9 +72,9 @@ class TestTagEndpoints:
         )
         assert response.status_code in [201, 401, 403]
 
-    async def test_list_tags(self, client):
+    async def test_list_tags(self, client, auth_headers):
         """Test listing tags"""
-        response = await client.get("/api/v1/content/tags")
+        response = await client.get("/api/v1/content/tags", headers=auth_headers)
         assert response.status_code == 200
         assert isinstance(response.json(), list)
 
@@ -87,37 +96,37 @@ class TestContentEndpoints:
         )
         assert response.status_code in [201, 401, 403, 422]
 
-    async def test_list_content(self, client):
+    async def test_list_content(self, client, auth_headers):
         """Test listing content"""
-        response = await client.get("/api/v1/content/")
+        response = await client.get("/api/v1/content/", headers=auth_headers)
         assert response.status_code == 200
         assert "items" in response.json() or isinstance(response.json(), list)
 
-    async def test_search_content(self, client):
+    async def test_search_content(self, client, auth_headers):
         """Test searching content"""
-        response = await client.get("/api/v1/content/search?query=test")
+        response = await client.get("/api/v1/content/search?query=test", headers=auth_headers)
         assert response.status_code in [200, 422]
 
-    async def test_get_featured_content(self, client):
+    async def test_get_featured_content(self, client, auth_headers):
         """Test getting featured content"""
-        response = await client.get("/api/v1/content/featured")
+        response = await client.get("/api/v1/content/featured", headers=auth_headers)
         assert response.status_code == 200
         assert isinstance(response.json(), list)
 
-    async def test_get_trending_content(self, client):
+    async def test_get_trending_content(self, client, auth_headers):
         """Test getting trending content"""
-        response = await client.get("/api/v1/content/trending")
+        response = await client.get("/api/v1/content/trending", headers=auth_headers)
         assert response.status_code == 200
         assert isinstance(response.json(), list)
 
-    async def test_get_content_by_id(self, client):
+    async def test_get_content_by_id(self, client, auth_headers):
         """Test getting content by ID"""
-        response = await client.get("/api/v1/content/1")
+        response = await client.get("/api/v1/content/1", headers=auth_headers)
         assert response.status_code in [200, 404]
 
-    async def test_get_content_by_slug(self, client):
+    async def test_get_content_by_slug(self, client, auth_headers):
         """Test getting content by slug"""
-        response = await client.get("/api/v1/content/by-slug/test-slug")
+        response = await client.get("/api/v1/content/by-slug/test-slug", headers=auth_headers)
         assert response.status_code in [200, 404]
 
     async def test_update_content(self, client, auth_headers):
@@ -182,9 +191,9 @@ class TestVideoEndpoints:
         )
         assert response.status_code in [201, 404, 401, 403]
 
-    async def test_get_video(self, client):
+    async def test_get_video(self, client, auth_headers):
         """Test getting video"""
-        response = await client.get("/api/v1/content/1/videos")
+        response = await client.get("/api/v1/content/1/videos", headers=auth_headers)
         assert response.status_code in [200, 404]
 
 
@@ -205,9 +214,9 @@ class TestMediaEndpoints:
         )
         assert response.status_code in [201, 404, 401, 403]
 
-    async def test_get_media_files(self, client):
+    async def test_get_media_files(self, client, auth_headers):
         """Test getting media files"""
-        response = await client.get("/api/v1/content/1/media")
+        response = await client.get("/api/v1/content/1/media", headers=auth_headers)
         assert response.status_code in [200, 404]
 
 
@@ -222,18 +231,18 @@ class TestEngagementEndpoints:
         )
         assert response.status_code in [201, 404]
 
-    async def test_get_engagement(self, client):
+    async def test_get_engagement(self, client, auth_headers):
         """Test getting engagement"""
-        response = await client.get("/api/v1/content/1/engagement")
+        response = await client.get("/api/v1/content/1/engagement", headers=auth_headers)
         assert response.status_code in [200, 404]
 
 
 class TestStatsEndpoints:
     """Test statistics endpoints"""
 
-    async def test_get_content_stats(self, client):
+    async def test_get_content_stats(self, client, auth_headers):
         """Test getting content stats"""
-        response = await client.get("/api/v1/content/1/stats")
+        response = await client.get("/api/v1/content/1/stats", headers=auth_headers)
         assert response.status_code in [200, 404]
 
 
