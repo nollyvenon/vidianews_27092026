@@ -42,6 +42,9 @@ export default function DashboardPage() {
             <Link href="/dashboard/analytics" className="block p-3 bg-green-50 rounded hover:bg-green-100">
               📈 View Analytics
             </Link>
+            <Link href="/dashboard/ecommerce" className="block p-3 bg-amber-50 rounded hover:bg-amber-100">
+              🛒 Ecommerce
+            </Link>
           </div>
         </div>
 

@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { OrderSummary } from '@/components/ecommerce/order-summary'
+import { OrderShippingReturns } from '@/components/ecommerce/order-shipping-returns'
 
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -13,6 +14,7 @@ export default function OrderDetailPage() {
         ← Back to orders
       </Link>
       <OrderSummary orderId={id} />
+      <OrderShippingReturns orderId={id} />
     </div>
   )
 }
