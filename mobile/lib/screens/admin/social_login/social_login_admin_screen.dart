@@ -23,7 +23,11 @@ class _SocialLoginAdminScreenState extends State<SocialLoginAdminScreen> {
     _providers = widget.service.listProviders();
   }
 
-  void _reload() => setState(() => _providers = widget.service.listProviders());
+  void _reload() {
+    setState(() {
+      _providers = widget.service.listProviders();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

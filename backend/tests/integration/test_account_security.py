@@ -185,7 +185,7 @@ class TestPrivacyAndQuota:
         response = await async_client.get("/api/v1/quota/usage", headers=org_member)
 
         assert response.status_code == 200
-        assert response.json() == {"api_calls": 0, "storage_gb": 0.0, "bandwidth_gb": 0.0}
+        assert response.json() == {"api_calls": 0, "api_call_limit": 10000, "storage_gb": 0.0, "bandwidth_gb": 0.0}
 
     async def test_an_unsupported_oauth_provider_is_refused(self, async_client, org_member):
         response = await async_client.post(

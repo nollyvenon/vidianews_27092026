@@ -26,6 +26,9 @@ async def check_rate_limit(endpoint: str, db: AsyncSession = Depends(get_db), us
     return {"allowed": allowed}
 
 
+DEFAULT_MONTHLY_API_LIMIT = 10000
+
+
 @router.get("/quota/usage")
 async def get_quota(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     """Usage since the account was created: API calls and response bandwidth as recorded per request,
@@ -41,6 +44,7 @@ async def get_quota(db: AsyncSession = Depends(get_db), user: User = Depends(get
     )).scalar_one()
     return {
         "api_calls": int(usage.api_calls or 0) if usage else 0,
+        "api_call_limit": int(usage.monthly_limit or DEFAULT_MONTHLY_API_LIMIT) if usage else DEFAULT_MONTHLY_API_LIMIT,
         "storage_gb": round(int(stored_bytes) / BYTES_PER_GB, 9),
         "bandwidth_gb": round(float(usage.bandwidth_gb or 0.0), 9) if usage else 0.0,
     }
