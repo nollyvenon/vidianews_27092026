@@ -1,53 +1,71 @@
+// Admin audit trail, newest first. Only administrators can open it; others see the server's refusal.
+
 import 'package:flutter/material.dart';
+import '../models/audit_models.dart';
+import '../services/audit_service.dart';
+import '../services/authenticated_dio.dart';
 
 class AuditScreen extends StatefulWidget {
-  const AuditScreen({Key? key}) : super(key: key);
+  final AuditService? service;
+
+  const AuditScreen({Key? key, this.service}) : super(key: key);
 
   @override
   State<AuditScreen> createState() => _AuditScreenState();
 }
 
 class _AuditScreenState extends State<AuditScreen> {
-  final List<Map<String, String>> logs = [
-    {'action': 'CREATE', 'resource': 'Video', 'date': '2026-09-27'},
-    {'action': 'UPDATE', 'resource': 'Content', 'date': '2026-09-26'},
-    {'action': 'DELETE', 'resource': 'Draft', 'date': '2026-09-25'},
-  ];
+  late final AuditService _service = widget.service ?? AuditService(createAuthenticatedDio());
+  late Future<List<AuditEntry>> _entries = _service.fetchEntries();
+
+  void _reload() {
+    setState(() {
+      _entries = _service.fetchEntries();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Audit Logs')),
-      body: ListView.builder(
-        itemCount: logs.length,
-        itemBuilder: (context, index) {
-          final log = logs[index];
-          return Card(
-            margin: const EdgeInsets.all(8),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.blue[100],
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(log['action']!, style: const TextStyle(fontSize: 12)),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(log['resource']!, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  Text(log['date']!, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                ],
+      body: FutureBuilder<List<AuditEntry>>(
+        future: _entries,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(messageFromError(snapshot.error!), textAlign: TextAlign.center),
+                    const SizedBox(height: 12),
+                    OutlinedButton(onPressed: _reload, child: const Text('Try again')),
+                  ],
+                ),
               ),
-            ),
+            );
+          }
+          final entries = snapshot.data!;
+          if (entries.isEmpty) {
+            return const Center(child: Text('No audit entries yet.'));
+          }
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: entries.length,
+            itemBuilder: (context, index) {
+              final entry = entries[index];
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ListTile(
+                  title: Text('${entry.action} · ${entry.resourceType}'),
+                  subtitle: Text('Admin #${entry.adminId} · ${entry.timestamp.toLocal()}'),
+                ),
+              );
+            },
           );
         },
       ),

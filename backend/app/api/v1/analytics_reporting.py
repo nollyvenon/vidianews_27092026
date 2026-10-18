@@ -615,17 +615,19 @@ async def get_audit_logs(
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     admin_id: Optional[int] = None,
-    service: AdminService = Depends(_service(AdminService))
-, current_user: User = Depends(get_current_user)):
-    """Get audit logs"""
+    service: AdminService = Depends(_service(AdminService)),
+    _admin: User = Depends(require_admin("audit")),
+):
+    """Get audit logs (administrators only)"""
     return await service.get_audit_logs(limit, offset, admin_id)
 
 @admin_router.get("/audit-logs/{log_id}", response_model=AuditLogResponse)
 async def get_audit_log(
     log_id: int,
-    service: AdminService = Depends(_service(AdminService))
-, current_user: User = Depends(get_current_user)):
-    """Get specific audit log"""
+    service: AdminService = Depends(_service(AdminService)),
+    _admin: User = Depends(require_admin("audit")),
+):
+    """Get specific audit log (administrators only)"""
     log = await service.get_audit_log(log_id)
     if not log:
         raise HTTPException(status_code=404, detail="Audit log not found")
