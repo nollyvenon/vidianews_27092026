@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import '../../services/authenticated_dio.dart';
+import '../../services/ecommerce_service.dart';
+import 'wishlists_screen.dart';
+import 'addresses_screen.dart';
+import 'order_tracking_screen.dart';
 
 class Product {
   final int id;
@@ -38,13 +41,16 @@ class Product {
 }
 
 class ProductsScreen extends StatefulWidget {
-  const ProductsScreen({Key? key}) : super(key: key);
+  final EcommerceService? service;
+
+  const ProductsScreen({Key? key, this.service}) : super(key: key);
 
   @override
   State<ProductsScreen> createState() => _ProductsScreenState();
 }
 
 class _ProductsScreenState extends State<ProductsScreen> {
+  late final EcommerceService _service = widget.service ?? EcommerceService(createAuthenticatedDio());
   late Future<List<Product>> futureProducts;
   String selectedCategory = '';
   String searchQuery = '';
@@ -55,30 +61,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
     futureProducts = fetchProducts();
   }
 
-  Future<List<Product>> fetchProducts() async {
-    final response = await http.get(
-      Uri.parse('http://localhost:8000/api/v1/products'),
-    );
-
-    if (response.statusCode == 200) {
-      List jsonResponse = json.decode(response.body);
-      return jsonResponse.map((product) => Product.fromJson(product)).toList();
-    } else {
-      throw Exception('Failed to load products');
-    }
-  }
-
-  Future<List<Product>> searchProducts(String query) async {
-    final response = await http.get(
-      Uri.parse('http://localhost:8000/api/v1/products/search?q=$query'),
-    );
-
-    if (response.statusCode == 200) {
-      List jsonResponse = json.decode(response.body);
-      return jsonResponse.map((product) => Product.fromJson(product)).toList();
-    } else {
-      throw Exception('Failed to search products');
-    }
+  Future<List<Product>> fetchProducts({String query = ''}) async {
+    final rows = await _service.fetchProducts(query: query);
+    return rows.map(Product.fromJson).toList();
   }
 
   @override
@@ -87,6 +72,29 @@ class _ProductsScreenState extends State<ProductsScreen> {
       appBar: AppBar(
         title: const Text('Products'),
         backgroundColor: Colors.blue,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.favorite_border),
+            tooltip: 'Wishlists',
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => WishlistsScreen(service: _service),
+            )),
+          ),
+          IconButton(
+            icon: const Icon(Icons.location_on_outlined),
+            tooltip: 'Shipping addresses',
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => AddressesScreen(service: _service),
+            )),
+          ),
+          IconButton(
+            icon: const Icon(Icons.local_shipping_outlined),
+            tooltip: 'Order tracking',
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => OrderTrackingScreen(service: _service),
+            )),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -99,7 +107,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                     setState(() {
                       searchQuery = value;
                       if (value.isNotEmpty) {
-                        futureProducts = searchProducts(value);
+                        futureProducts = fetchProducts(query: value);
                       } else {
                         futureProducts = fetchProducts();
                       }
