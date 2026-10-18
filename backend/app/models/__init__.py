@@ -1,6 +1,7 @@
 """Database models"""
 
 from .social_auth import SocialLoginProvider
+from .outbound_webhooks import OutboundWebhook, OutboundWebhookDelivery
 from .activity_logs import ActivityLog, AuditLog, ActivityFeed, RetentionPolicy, ActionType, EntityType
 from .advanced_platform import BackgroundJob, DataPipeline, CacheEntry, JobStatus, CacheStrategy
 from .ai_advanced import Memory, ConversationMemory, AITemplate, Chat, ChatMessage, Document, ResearchQuery, UsageMetric, CostAlert, SafetyCheck, ComplianceLog, MemoryType, ChatStatus, DocumentType, MonitoringMetric, SafetyLevel

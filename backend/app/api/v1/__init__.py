@@ -3,7 +3,7 @@
 from fastapi import APIRouter
 
 # Import endpoints
-from app.api.v1 import auth, health, tenants, organizations, profiles, settings, notifications, activity, content, ai_providers, ai_core, ai_advanced, integrations, advanced_features, monetization, security_performance, api_monitoring, logging_analytics, social_messaging, streaming_premium, community_compliance, content_quality, publishing_distribution, user_management, enterprise_features, analytics_reporting, platform_completion, advanced_platform, ecommerce, ecommerce_extended, marketing, memberships, courses, analytics_admin, social_auth, billing_admin
+from app.api.v1 import auth, health, tenants, organizations, profiles, settings, notifications, activity, content, ai_providers, ai_core, ai_advanced, integrations, advanced_features, monetization, security_performance, api_monitoring, logging_analytics, social_messaging, streaming_premium, community_compliance, content_quality, publishing_distribution, user_management, enterprise_features, analytics_reporting, platform_completion, advanced_platform, ecommerce, ecommerce_extended, marketing, memberships, courses, analytics_admin, social_auth, billing_admin, outbound_webhooks
 
 api_router = APIRouter()
 
@@ -70,3 +70,4 @@ __all__ = ["api_router"]
 api_router.include_router(social_auth.router, tags=["social-auth"])
 api_router.include_router(social_auth.admin_router, tags=["social-auth-admin"])
 api_router.include_router(billing_admin.router, tags=["billing-admin"])
+api_router.include_router(outbound_webhooks.router, tags=["outbound-webhooks"])
