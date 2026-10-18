@@ -1,20 +1,43 @@
-from sqlalchemy import func, select, and_, or_
-from sqlalchemy.orm import Session
-from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
-import hashlib
+"""Security, moderation, rate limiting, notification and reporting services (async).
+
+Timestamps are naive UTC to match the naive ``DateTime`` columns in ``app.models.enterprise_features``.
+Objects returned from creates are refreshed so server-default columns (``created_at`` and similar) are loaded
+before the response is serialized.
+"""
+
 import re
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, TypeVar
+
+from sqlalchemy import and_, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.enterprise_features import (
     SecurityAuditLog, AccessControl, RoleBasedAccess, ModerationQueue,
     ComplianceRule, RateLimitConfig, ThrottleLog, NotificationPreference,
     RealTimeNotification, AlertConfiguration, AdvancedReport, ReportTemplate,
-    ReportSchedule, ExportJob, AccessLevel, PermissionType, ModerationStatus,
+    ReportSchedule, ExportJob, AccessLevel, ModerationStatus,
     NotificationType, ReportFormat
 )
 
+T = TypeVar("T")
+
+
+def _utcnow() -> datetime:
+    """Naive UTC, matching the naive DateTime columns"""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+async def _persist(db: AsyncSession, obj: T) -> T:
+    """Add, commit and reload so server-default columns are populated."""
+    db.add(obj)
+    await db.commit()
+    await db.refresh(obj)
+    return obj
+
 
 class SecurityService:
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
     async def log_audit_event(
@@ -29,7 +52,7 @@ class SecurityService:
         severity: str = "info",
         changes: Optional[Dict] = None,
     ) -> SecurityAuditLog:
-        log = SecurityAuditLog(
+        return await _persist(self.db, SecurityAuditLog(
             user_id=user_id,
             action=action,
             resource_type=resource_type,
@@ -39,10 +62,7 @@ class SecurityService:
             user_agent=user_agent,
             severity=severity,
             changes=changes or {},
-        )
-        self.db.add(log)
-        self.db.commit()
-        return log
+        ))
 
     async def get_audit_logs(
         self,
@@ -52,18 +72,25 @@ class SecurityService:
         days: int = 30,
         limit: int = 100,
     ) -> List[SecurityAuditLog]:
-        query = self.db.query(SecurityAuditLog)
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
-        query = query.filter(SecurityAuditLog.created_at >= cutoff_date)
+        cutoff_date = _utcnow() - timedelta(days=days)
+        stmt = select(SecurityAuditLog).where(SecurityAuditLog.created_at >= cutoff_date)
 
         if user_id:
-            query = query.filter(SecurityAuditLog.user_id == user_id)
+            stmt = stmt.where(SecurityAuditLog.user_id == user_id)
         if action:
-            query = query.filter(SecurityAuditLog.action == action)
+            stmt = stmt.where(SecurityAuditLog.action == action)
         if severity:
-            query = query.filter(SecurityAuditLog.severity == severity)
+            stmt = stmt.where(SecurityAuditLog.severity == severity)
 
-        return query.order_by(SecurityAuditLog.created_at.desc()).limit(limit).all()
+        result = await self.db.execute(stmt.order_by(SecurityAuditLog.created_at.desc()).limit(limit))
+        return list(result.scalars().all())
+
+    async def _access(self, user_id: int, resource_type: str, resource_id: int) -> Optional[AccessControl]:
+        return (await self.db.execute(select(AccessControl).where(and_(
+            AccessControl.user_id == user_id,
+            AccessControl.resource_type == resource_type,
+            AccessControl.resource_id == resource_id,
+        )))).scalars().first()
 
     async def grant_access(
         self,
@@ -75,7 +102,7 @@ class SecurityService:
         granted_by: int,
         expires_at: Optional[datetime] = None,
     ) -> AccessControl:
-        access = AccessControl(
+        return await _persist(self.db, AccessControl(
             user_id=user_id,
             resource_type=resource_type,
             resource_id=resource_id,
@@ -83,10 +110,7 @@ class SecurityService:
             permissions=permissions,
             granted_by=granted_by,
             expires_at=expires_at,
-        )
-        self.db.add(access)
-        self.db.commit()
-        return access
+        ))
 
     async def revoke_access(
         self,
@@ -94,16 +118,10 @@ class SecurityService:
         resource_type: str,
         resource_id: int,
     ) -> bool:
-        access = self.db.query(AccessControl).filter(
-            and_(
-                AccessControl.user_id == user_id,
-                AccessControl.resource_type == resource_type,
-                AccessControl.resource_id == resource_id,
-            )
-        ).first()
+        access = await self._access(user_id, resource_type, resource_id)
         if access:
-            self.db.delete(access)
-            self.db.commit()
+            await self.db.delete(access)
+            await self.db.commit()
             return True
         return False
 
@@ -114,20 +132,14 @@ class SecurityService:
         resource_id: int,
         permission: str,
     ) -> bool:
-        access = self.db.query(AccessControl).filter(
-            and_(
-                AccessControl.user_id == user_id,
-                AccessControl.resource_type == resource_type,
-                AccessControl.resource_id == resource_id,
-            )
-        ).first()
+        access = await self._access(user_id, resource_type, resource_id)
 
         if not access:
             return False
 
-        if access.expires_at and access.expires_at < datetime.utcnow():
-            self.db.delete(access)
-            self.db.commit()
+        if access.expires_at and access.expires_at < _utcnow():
+            await self.db.delete(access)
+            await self.db.commit()
             return False
 
         return permission in access.permissions
@@ -143,7 +155,7 @@ class SecurityService:
         can_access_analytics: bool = False,
         can_access_admin: bool = False,
     ) -> RoleBasedAccess:
-        role_access = RoleBasedAccess(
+        return await _persist(self.db, RoleBasedAccess(
             user_id=user_id,
             role=role,
             permissions=permissions,
@@ -152,19 +164,16 @@ class SecurityService:
             can_manage_users=can_manage_users,
             can_access_analytics=can_access_analytics,
             can_access_admin=can_access_admin,
-        )
-        self.db.add(role_access)
-        self.db.commit()
-        return role_access
+        ))
 
     async def get_user_role(self, user_id: int) -> Optional[RoleBasedAccess]:
-        return self.db.query(RoleBasedAccess).filter(
-            RoleBasedAccess.user_id == user_id
-        ).first()
+        return (await self.db.execute(
+            select(RoleBasedAccess).where(RoleBasedAccess.user_id == user_id)
+        )).scalars().first()
 
 
 class ModerationService:
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
     async def submit_for_moderation(
@@ -174,32 +183,29 @@ class ModerationService:
         reason: str,
         flags: Optional[List[str]] = None,
     ) -> ModerationQueue:
-        queue_item = ModerationQueue(
+        return await _persist(self.db, ModerationQueue(
             content_id=content_id,
             content_type=content_type,
             reason=reason,
             flags=flags or [],
-        )
-        self.db.add(queue_item)
-        self.db.commit()
-        return queue_item
+        ))
 
     async def get_pending_items(self, limit: int = 50) -> List[ModerationQueue]:
-        return self.db.query(ModerationQueue).filter(
-            ModerationQueue.status == ModerationStatus.PENDING
-        ).order_by(ModerationQueue.created_at).limit(limit).all()
+        result = await self.db.execute(
+            select(ModerationQueue).where(ModerationQueue.status == ModerationStatus.PENDING)
+            .order_by(ModerationQueue.created_at).limit(limit)
+        )
+        return list(result.scalars().all())
 
     async def assign_moderator(
         self,
         item_id: int,
         moderator_id: int,
     ) -> Optional[ModerationQueue]:
-        item = self.db.query(ModerationQueue).filter(
-            ModerationQueue.id == item_id
-        ).first()
+        item = await self.db.get(ModerationQueue, item_id)
         if item:
             item.assigned_to = moderator_id
-            self.db.commit()
+            await self.db.commit()
         return item
 
     async def review_content(
@@ -209,15 +215,13 @@ class ModerationService:
         status: ModerationStatus,
         decision: str,
     ) -> Optional[ModerationQueue]:
-        item = self.db.query(ModerationQueue).filter(
-            ModerationQueue.id == item_id
-        ).first()
+        item = await self.db.get(ModerationQueue, item_id)
         if item:
             item.status = status
             item.reviewed_by = reviewer_id
-            item.reviewed_at = datetime.utcnow()
+            item.reviewed_at = _utcnow()
             item.decision = decision
-            self.db.commit()
+            await self.db.commit()
         return item
 
     async def add_compliance_rule(
@@ -230,7 +234,7 @@ class ModerationService:
         severity: str = "medium",
         auto_action: Optional[str] = None,
     ) -> ComplianceRule:
-        rule = ComplianceRule(
+        return await _persist(self.db, ComplianceRule(
             name=name,
             rule_type=rule_type,
             description=description,
@@ -238,15 +242,12 @@ class ModerationService:
             patterns=patterns or [],
             severity=severity,
             auto_action=auto_action,
-        )
-        self.db.add(rule)
-        self.db.commit()
-        return rule
+        ))
 
     async def check_compliance(self, text: str) -> Dict[str, Any]:
-        rules = self.db.query(ComplianceRule).filter(
-            ComplianceRule.enabled == True
-        ).all()
+        rules = (await self.db.execute(
+            select(ComplianceRule).where(ComplianceRule.enabled == True)  # noqa: E712 - SQL comparison
+        )).scalars().all()
 
         violations = []
         for rule in rules:
@@ -269,7 +270,8 @@ class ModerationService:
                             "match_type": "pattern",
                         })
                 except re.error:
-                    pass
+                    # A pattern that is not a valid regular expression cannot match anything.
+                    continue
 
         return {
             "is_compliant": len(violations) == 0,
@@ -279,8 +281,28 @@ class ModerationService:
 
 
 class RateLimitService:
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
+
+    @staticmethod
+    def _caller_identity(user_id: Optional[int], ip_address: Optional[str], column_user, column_ip) -> List[Any]:
+        """Conditions that identify the caller. Only supplied identifiers count, so a missing IP never matches other callers' rows."""
+        identity = []
+        if user_id is not None:
+            identity.append(column_user == user_id)
+        if ip_address is not None:
+            identity.append(column_ip == ip_address)
+        return identity
+
+    async def _count_throttled_since(self, user_id: Optional[int], ip_address: Optional[str], endpoint: str, since: datetime) -> int:
+        identity = self._caller_identity(user_id, ip_address, ThrottleLog.user_id, ThrottleLog.ip_address)
+        if not identity:
+            return 0
+        return (await self.db.execute(select(func.count(ThrottleLog.id)).where(and_(
+            or_(*identity),
+            ThrottleLog.endpoint == endpoint,
+            ThrottleLog.throttled_at >= since,
+        )))).scalar_one()
 
     async def check_rate_limit(
         self,
@@ -288,63 +310,23 @@ class RateLimitService:
         ip_address: Optional[str] = None,
         endpoint: str = "*",
     ) -> Dict[str, Any]:
-        config = self.db.query(RateLimitConfig).filter(
-            and_(
-                RateLimitConfig.enabled == True,
-                or_(
-                    and_(
-                        RateLimitConfig.user_id == user_id,
-                        RateLimitConfig.endpoint == endpoint,
-                    ),
-                    and_(
-                        RateLimitConfig.ip_address == ip_address,
-                        RateLimitConfig.endpoint == endpoint,
-                    ),
-                ),
-            )
-        ).first()
+        identity = self._caller_identity(user_id, ip_address, RateLimitConfig.user_id, RateLimitConfig.ip_address)
+        config = None
+        if identity:
+            config = (await self.db.execute(select(RateLimitConfig).where(and_(
+                RateLimitConfig.enabled == True,  # noqa: E712 - SQL comparison
+                RateLimitConfig.endpoint == endpoint,
+                or_(*identity),
+            )))).scalars().first()
 
         if not config:
             # No limit applies to this caller, so there is nothing left to count down.
             return {"limited": False, "minute_remaining": None, "hour_remaining": None, "day_remaining": None}
 
-        now = datetime.utcnow()
-        minute_ago = now - timedelta(minutes=1)
-        hour_ago = now - timedelta(hours=1)
-        day_ago = now - timedelta(days=1)
-
-        minute_requests = self.db.query(func.count(ThrottleLog.id)).filter(
-            and_(
-                or_(
-                    ThrottleLog.user_id == user_id,
-                    ThrottleLog.ip_address == ip_address,
-                ),
-                ThrottleLog.endpoint == endpoint,
-                ThrottleLog.throttled_at >= minute_ago,
-            )
-        ).scalar()
-
-        hour_requests = self.db.query(func.count(ThrottleLog.id)).filter(
-            and_(
-                or_(
-                    ThrottleLog.user_id == user_id,
-                    ThrottleLog.ip_address == ip_address,
-                ),
-                ThrottleLog.endpoint == endpoint,
-                ThrottleLog.throttled_at >= hour_ago,
-            )
-        ).scalar()
-
-        day_requests = self.db.query(func.count(ThrottleLog.id)).filter(
-            and_(
-                or_(
-                    ThrottleLog.user_id == user_id,
-                    ThrottleLog.ip_address == ip_address,
-                ),
-                ThrottleLog.endpoint == endpoint,
-                ThrottleLog.throttled_at >= day_ago,
-            )
-        ).scalar()
+        now = _utcnow()
+        minute_requests = await self._count_throttled_since(user_id, ip_address, endpoint, now - timedelta(minutes=1))
+        hour_requests = await self._count_throttled_since(user_id, ip_address, endpoint, now - timedelta(hours=1))
+        day_requests = await self._count_throttled_since(user_id, ip_address, endpoint, now - timedelta(days=1))
 
         return {
             "limited": (
@@ -365,16 +347,13 @@ class RateLimitService:
         requests_count: int = 1,
         limit_type: str = "minute",
     ) -> ThrottleLog:
-        log = ThrottleLog(
+        return await _persist(self.db, ThrottleLog(
             user_id=user_id,
             ip_address=ip_address,
             endpoint=endpoint,
             requests_count=requests_count,
             limit_type=limit_type,
-        )
-        self.db.add(log)
-        self.db.commit()
-        return log
+        ))
 
     async def create_rate_limit_config(
         self,
@@ -386,7 +365,7 @@ class RateLimitService:
         user_id: Optional[int] = None,
         ip_address: Optional[str] = None,
     ) -> RateLimitConfig:
-        config = RateLimitConfig(
+        return await _persist(self.db, RateLimitConfig(
             user_id=user_id,
             ip_address=ip_address,
             endpoint=endpoint,
@@ -394,20 +373,17 @@ class RateLimitService:
             requests_per_hour=requests_per_hour,
             requests_per_day=requests_per_day,
             burst_limit=burst_limit,
-        )
-        self.db.add(config)
-        self.db.commit()
-        return config
+        ))
 
 
 class NotificationService:
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
     async def get_preferences(self, user_id: int) -> Optional[NotificationPreference]:
-        return self.db.query(NotificationPreference).filter(
-            NotificationPreference.user_id == user_id
-        ).first()
+        return (await self.db.execute(
+            select(NotificationPreference).where(NotificationPreference.user_id == user_id)
+        )).scalars().first()
 
     async def update_preferences(
         self,
@@ -440,7 +416,8 @@ class NotificationService:
         if do_not_disturb_end is not None:
             prefs.do_not_disturb_end = do_not_disturb_end
 
-        self.db.commit()
+        await self.db.commit()
+        await self.db.refresh(prefs)
         return prefs
 
     async def create_notification(
@@ -453,7 +430,7 @@ class NotificationService:
         action_url: Optional[str] = None,
         source: Optional[str] = None,
     ) -> RealTimeNotification:
-        notification = RealTimeNotification(
+        return await _persist(self.db, RealTimeNotification(
             user_id=user_id,
             notification_type=notification_type,
             title=title,
@@ -461,19 +438,17 @@ class NotificationService:
             data=data or {},
             action_url=action_url,
             source=source,
-        )
-        self.db.add(notification)
-        self.db.commit()
-        return notification
+        ))
+
+    async def get_notification(self, notification_id: int) -> Optional[RealTimeNotification]:
+        return await self.db.get(RealTimeNotification, notification_id)
 
     async def mark_as_read(self, notification_id: int) -> Optional[RealTimeNotification]:
-        notif = self.db.query(RealTimeNotification).filter(
-            RealTimeNotification.id == notification_id
-        ).first()
+        notif = await self.db.get(RealTimeNotification, notification_id)
         if notif:
             notif.read = True
-            notif.read_at = datetime.utcnow()
-            self.db.commit()
+            notif.read_at = _utcnow()
+            await self.db.commit()
         return notif
 
     async def get_user_notifications(
@@ -482,12 +457,11 @@ class NotificationService:
         unread_only: bool = False,
         limit: int = 50,
     ) -> List[RealTimeNotification]:
-        query = self.db.query(RealTimeNotification).filter(
-            RealTimeNotification.user_id == user_id
-        )
+        stmt = select(RealTimeNotification).where(RealTimeNotification.user_id == user_id)
         if unread_only:
-            query = query.filter(RealTimeNotification.read == False)
-        return query.order_by(RealTimeNotification.created_at.desc()).limit(limit).all()
+            stmt = stmt.where(RealTimeNotification.read == False)  # noqa: E712 - SQL comparison
+        result = await self.db.execute(stmt.order_by(RealTimeNotification.created_at.desc()).limit(limit))
+        return list(result.scalars().all())
 
     async def create_alert_config(
         self,
@@ -497,20 +471,17 @@ class NotificationService:
         threshold: Optional[float] = None,
         notification_channels: Optional[List[str]] = None,
     ) -> AlertConfiguration:
-        config = AlertConfiguration(
+        return await _persist(self.db, AlertConfiguration(
             user_id=user_id,
             alert_type=alert_type,
             condition=condition,
             threshold=threshold,
             notification_channels=notification_channels or [],
-        )
-        self.db.add(config)
-        self.db.commit()
-        return config
+        ))
 
 
 class ReportingService:
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
     async def create_report(
@@ -522,7 +493,7 @@ class ReportingService:
         query: Optional[Dict] = None,
         filters: Optional[Dict] = None,
     ) -> AdvancedReport:
-        report = AdvancedReport(
+        return await _persist(self.db, AdvancedReport(
             user_id=user_id,
             name=name,
             report_type=report_type,
@@ -530,10 +501,7 @@ class ReportingService:
             query=query or {},
             filters=filters or {},
             status="pending",
-        )
-        self.db.add(report)
-        self.db.commit()
-        return report
+        ))
 
     async def update_report_status(
         self,
@@ -542,9 +510,7 @@ class ReportingService:
         data: Optional[Dict] = None,
         file_path: Optional[str] = None,
     ) -> Optional[AdvancedReport]:
-        report = self.db.query(AdvancedReport).filter(
-            AdvancedReport.id == report_id
-        ).first()
+        report = await self.db.get(AdvancedReport, report_id)
         if report:
             report.status = status
             if data is not None:
@@ -552,9 +518,10 @@ class ReportingService:
             if file_path is not None:
                 report.file_path = file_path
             if status == "completed":
-                report.generated_at = datetime.utcnow()
-                report.expires_at = datetime.utcnow() + timedelta(days=30)
-            self.db.commit()
+                now = _utcnow()
+                report.generated_at = now
+                report.expires_at = now + timedelta(days=30)
+            await self.db.commit()
         return report
 
     async def get_user_reports(
@@ -562,9 +529,11 @@ class ReportingService:
         user_id: int,
         limit: int = 50,
     ) -> List[AdvancedReport]:
-        return self.db.query(AdvancedReport).filter(
-            AdvancedReport.user_id == user_id
-        ).order_by(AdvancedReport.created_at.desc()).limit(limit).all()
+        result = await self.db.execute(
+            select(AdvancedReport).where(AdvancedReport.user_id == user_id)
+            .order_by(AdvancedReport.created_at.desc()).limit(limit)
+        )
+        return list(result.scalars().all())
 
     async def create_template(
         self,
@@ -575,17 +544,14 @@ class ReportingService:
         description: Optional[str] = None,
         schedule: Optional[str] = None,
     ) -> ReportTemplate:
-        template = ReportTemplate(
+        return await _persist(self.db, ReportTemplate(
             name=name,
             report_type=report_type,
             sections=sections,
             format=format,
             description=description,
             schedule=schedule,
-        )
-        self.db.add(template)
-        self.db.commit()
-        return template
+        ))
 
     async def create_scheduled_report(
         self,
@@ -595,16 +561,13 @@ class ReportingService:
         cron_expression: str,
         recipient_emails: List[str],
     ) -> ReportSchedule:
-        schedule = ReportSchedule(
+        return await _persist(self.db, ReportSchedule(
             user_id=user_id,
             template_id=template_id,
             name=name,
             cron_expression=cron_expression,
             recipient_emails=recipient_emails,
-        )
-        self.db.add(schedule)
-        self.db.commit()
-        return schedule
+        ))
 
     async def create_export_job(
         self,
@@ -613,16 +576,13 @@ class ReportingService:
         format: ReportFormat,
         filters: Optional[Dict] = None,
     ) -> ExportJob:
-        job = ExportJob(
+        return await _persist(self.db, ExportJob(
             user_id=user_id,
             export_type=export_type,
             format=format,
             filters=filters or {},
             status="pending",
-        )
-        self.db.add(job)
-        self.db.commit()
-        return job
+        ))
 
     async def update_export_progress(
         self,
@@ -630,19 +590,15 @@ class ReportingService:
         progress: int,
         record_count: int = 0,
     ) -> Optional[ExportJob]:
-        job = self.db.query(ExportJob).filter(
-            ExportJob.id == job_id
-        ).first()
+        job = await self.db.get(ExportJob, job_id)
         if job:
             job.progress = min(progress, 100)
             job.record_count = record_count
             if progress >= 100:
                 job.status = "completed"
-                job.completed_at = datetime.utcnow()
-            self.db.commit()
+                job.completed_at = _utcnow()
+            await self.db.commit()
         return job
 
     async def get_export_job(self, job_id: int) -> Optional[ExportJob]:
-        return self.db.query(ExportJob).filter(
-            ExportJob.id == job_id
-        ).first()
+        return await self.db.get(ExportJob, job_id)

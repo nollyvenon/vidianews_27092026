@@ -1,25 +1,49 @@
-from app.core.security import get_current_user
-from app.core.admin_access import admin_status, require_admin
-from app.models.user import User
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from typing import Optional, List
-from datetime import datetime
-from pydantic import BaseModel, Field
+"""Enterprise endpoints: security, moderation, rate limiting, notifications and reporting (async).
 
-from app.database import get_db
-from app.services.enterprise_features_service import (
-    SecurityService, ModerationService, RateLimitService,
-    NotificationService, ReportingService
-)
+Access rules:
+- Granting access, assigning roles, writing audit entries and creating notifications for other users are
+  administrator operations. Granting a role is privilege management, so it is never open to the user it affects.
+- Preferences, alert configurations, reports and export jobs belong to their user; administrators may act for any user.
+- Moderation decisions, moderator assignment, compliance rules, report templates and export progress are for
+  administrators with the matching resource access.
+- Reading or marking a notification is limited to its owner, and administrators.
+"""
+
+from datetime import datetime
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, ConfigDict
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.admin_access import admin_status, require_admin
+from app.core.security import get_current_user
+from app.db.session import get_db
 from app.models.enterprise_features import (
-    AccessLevel, PermissionType, ModerationStatus,
-    NotificationType, ReportFormat, RateLimitConfig
+    AccessLevel, ModerationStatus,
+    NotificationType, RateLimitConfig, ReportFormat,
 )
+from app.models.user import User
+from app.services.enterprise_features_service import (
+    ModerationService, NotificationService, RateLimitService,
+    ReportingService, SecurityService,
+)
+
+require_security_admin = require_admin("security")
+require_moderation_admin = require_admin("moderation")
+require_notification_admin = require_admin("notifications")
+require_report_admin = require_admin("reports")
+
+
+def _forbidden(detail: str) -> HTTPException:
+    return HTTPException(status_code=403, detail=detail)
 
 
 # Pydantic Schemas
 class SecurityAuditLogResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     user_id: int
     action: str
@@ -29,9 +53,6 @@ class SecurityAuditLogResponse(BaseModel):
     ip_address: Optional[str]
     severity: str
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class AuditLogsRequest(BaseModel):
@@ -52,6 +73,8 @@ class AccessControlRequest(BaseModel):
 
 
 class AccessControlResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     user_id: int
     resource_type: str
@@ -59,9 +82,6 @@ class AccessControlResponse(BaseModel):
     access_level: str
     permissions: List[str]
     granted_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class RoleAssignmentRequest(BaseModel):
@@ -75,6 +95,8 @@ class RoleAssignmentRequest(BaseModel):
 
 
 class RoleResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     user_id: int
     role: str
@@ -85,9 +107,6 @@ class RoleResponse(BaseModel):
     can_access_analytics: bool
     can_access_admin: bool
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class ModerationQueueRequest(BaseModel):
@@ -103,6 +122,8 @@ class ModerationReviewRequest(BaseModel):
 
 
 class ModerationQueueResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     content_id: int
     content_type: str
@@ -113,9 +134,6 @@ class ModerationQueueResponse(BaseModel):
     reviewed_by: Optional[int]
     reviewed_at: Optional[datetime]
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class ComplianceRuleRequest(BaseModel):
@@ -164,6 +182,8 @@ class NotificationPreferenceRequest(BaseModel):
 
 
 class NotificationPreferenceResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     user_id: int
     email_enabled: bool
@@ -172,9 +192,6 @@ class NotificationPreferenceResponse(BaseModel):
     in_app_enabled: bool
     frequency: str
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class NotificationRequest(BaseModel):
@@ -187,6 +204,8 @@ class NotificationRequest(BaseModel):
 
 
 class NotificationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     user_id: int
     notification_type: str
@@ -195,9 +214,6 @@ class NotificationResponse(BaseModel):
     read: bool
     read_at: Optional[datetime]
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class AlertConfigRequest(BaseModel):
@@ -208,6 +224,8 @@ class AlertConfigRequest(BaseModel):
 
 
 class AlertConfigResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     user_id: int
     alert_type: str
@@ -215,9 +233,6 @@ class AlertConfigResponse(BaseModel):
     threshold: Optional[float]
     enabled: bool
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class ReportRequest(BaseModel):
@@ -229,6 +244,8 @@ class ReportRequest(BaseModel):
 
 
 class ReportResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     user_id: int
     name: str
@@ -237,9 +254,6 @@ class ReportResponse(BaseModel):
     status: str
     generated_at: Optional[datetime]
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class ReportTemplateRequest(BaseModel):
@@ -252,15 +266,14 @@ class ReportTemplateRequest(BaseModel):
 
 
 class ReportTemplateResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
     report_type: str
     sections: List[str]
     format: str
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class ScheduledReportRequest(BaseModel):
@@ -271,6 +284,8 @@ class ScheduledReportRequest(BaseModel):
 
 
 class ScheduledReportResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     user_id: int
     name: str
@@ -280,9 +295,6 @@ class ScheduledReportResponse(BaseModel):
     next_run: Optional[datetime]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-
 
 class ExportJobRequest(BaseModel):
     export_type: str
@@ -291,6 +303,8 @@ class ExportJobRequest(BaseModel):
 
 
 class ExportJobResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     user_id: int
     export_type: str
@@ -299,9 +313,6 @@ class ExportJobResponse(BaseModel):
     progress: int
     record_count: int
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 # Routers
@@ -318,47 +329,46 @@ async def get_audit_logs(
     user_id: Optional[int] = Query(None),
     action: Optional[str] = Query(None),
     severity: Optional[str] = Query(None),
-    days: int = Query(30),
-    limit: int = Query(100),
-    db: Session = Depends(get_db),
+    days: int = Query(30, ge=1, le=3650),
+    limit: int = Query(100, ge=1, le=1000),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     caller_is_admin: bool = Depends(admin_status("security")),
 ):
     """Audit entries. Administrators see every user's entries; everyone else sees only their own."""
     if not caller_is_admin:
         if user_id is not None and user_id != current_user.id:
-            raise HTTPException(status_code=403, detail="You can only view your own audit log")
+            raise _forbidden("You can only view your own audit log")
         user_id = current_user.id
-    service = SecurityService(db)
-    return await service.get_audit_logs(user_id, action, severity, days, limit)
+    return await SecurityService(db).get_audit_logs(user_id, action, severity, days, limit)
 
 
-@security_router.post("/audit-logs")
+@security_router.post("/audit-logs", status_code=201)
 async def log_audit_event(
     user_id: int,
     action: str,
     resource_type: Optional[str] = None,
     resource_id: Optional[int] = None,
     severity: str = "info",
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _admin: User = Depends(require_security_admin),
+    db: AsyncSession = Depends(get_db),
 ):
-    service = SecurityService(db)
-    log = await service.log_audit_event(
+    """Record an audit entry (administrators only, so entries cannot be forged by users)"""
+    log = await SecurityService(db).log_audit_event(
         user_id, action, resource_type, resource_id, severity=severity
     )
     return {"id": log.id, "created_at": log.created_at}
 
 
-@security_router.post("/access-control/{user_id}", response_model=AccessControlResponse)
+@security_router.post("/access-control/{user_id}", response_model=AccessControlResponse, status_code=201)
 async def grant_access(
     user_id: int,
     req: AccessControlRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _admin: User = Depends(require_security_admin),
+    db: AsyncSession = Depends(get_db),
 ):
-    service = SecurityService(db)
-    access = await service.grant_access(
+    """Grant a user access to a resource (administrators only)"""
+    return await SecurityService(db).grant_access(
         user_id,
         req.resource_type,
         req.resource_id,
@@ -367,7 +377,6 @@ async def grant_access(
         req.granted_by,
         req.expires_at,
     )
-    return access
 
 
 @security_router.delete("/access-control/{user_id}/{resource_type}/{resource_id}")
@@ -375,12 +384,11 @@ async def revoke_access(
     user_id: int,
     resource_type: str,
     resource_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _admin: User = Depends(require_security_admin),
+    db: AsyncSession = Depends(get_db),
 ):
-    service = SecurityService(db)
-    success = await service.revoke_access(user_id, resource_type, resource_id)
-    if not success:
+    """Revoke a user's access to a resource (administrators only)"""
+    if not await SecurityService(db).revoke_access(user_id, resource_type, resource_id):
         raise HTTPException(status_code=404, detail="Access control not found")
     return {"revoked": True}
 
@@ -391,25 +399,28 @@ async def check_permission(
     resource_type: str,
     resource_id: int,
     permission: str,
-    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    caller_is_admin: bool = Depends(admin_status("security")),
+    db: AsyncSession = Depends(get_db),
 ):
-    service = SecurityService(db)
-    has_permission = await service.check_permission(
+    """Whether a user holds a permission. Users may check only themselves."""
+    if user_id != current_user.id and not caller_is_admin:
+        raise _forbidden("You can only check your own permissions")
+    has_permission = await SecurityService(db).check_permission(
         user_id, resource_type, resource_id, permission
     )
     return {"has_permission": has_permission}
 
 
-@security_router.post("/roles/{user_id}", response_model=RoleResponse)
+@security_router.post("/roles/{user_id}", response_model=RoleResponse, status_code=201)
 async def assign_role(
     user_id: int,
     req: RoleAssignmentRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _admin: User = Depends(require_security_admin),
+    db: AsyncSession = Depends(get_db),
 ):
-    service = SecurityService(db)
-    role = await service.assign_role(
+    """Assign a role and its permissions to a user (administrators only)"""
+    return await SecurityService(db).assign_role(
         user_id,
         req.role,
         req.permissions,
@@ -419,53 +430,56 @@ async def assign_role(
         req.can_access_analytics,
         req.can_access_admin,
     )
-    return role
 
 
 @security_router.get("/roles/{user_id}", response_model=RoleResponse)
 async def get_user_role(
     user_id: int,
-    db: Session = Depends(get_db),
- current_user: User = Depends(get_current_user),):
-    service = SecurityService(db)
-    role = await service.get_user_role(user_id)
+    current_user: User = Depends(get_current_user),
+    caller_is_admin: bool = Depends(admin_status("security")),
+    db: AsyncSession = Depends(get_db),
+):
+    """A user's role. Users may read only their own."""
+    if user_id != current_user.id and not caller_is_admin:
+        raise _forbidden("You can only view your own role")
+    role = await SecurityService(db).get_user_role(user_id)
     if not role:
         raise HTTPException(status_code=404, detail="Role not found")
     return role
 
 
 # Moderation Endpoints
-@moderation_router.post("/queue", response_model=ModerationQueueResponse)
+@moderation_router.post("/queue", response_model=ModerationQueueResponse, status_code=201)
 async def submit_for_moderation(
     req: ModerationQueueRequest,
-    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    service = ModerationService(db)
-    item = await service.submit_for_moderation(
+    """Flag content for review by a moderator"""
+    return await ModerationService(db).submit_for_moderation(
         req.content_id, req.content_type, req.reason, req.flags
     )
-    return item
 
 
 @moderation_router.get("/queue/pending", response_model=List[ModerationQueueResponse])
 async def get_pending_items(
-    limit: int = Query(50),
-    db: Session = Depends(get_db),
-    moderator: User = Depends(require_admin("moderation")),):
-    service = ModerationService(db)
-    return await service.get_pending_items(limit)
+    limit: int = Query(50, ge=1, le=200),
+    _moderator: User = Depends(require_moderation_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Items awaiting a decision (moderators only)"""
+    return await ModerationService(db).get_pending_items(limit)
 
 
 @moderation_router.post("/queue/{item_id}/assign/{moderator_id}")
 async def assign_moderator(
     item_id: int,
     moderator_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _moderator: User = Depends(require_moderation_admin),
+    db: AsyncSession = Depends(get_db),
 ):
-    service = ModerationService(db)
-    item = await service.assign_moderator(item_id, moderator_id)
+    """Assign a moderation item to a moderator (moderators only)"""
+    item = await ModerationService(db).assign_moderator(item_id, moderator_id)
     if not item:
         raise HTTPException(status_code=404, detail="Moderation item not found")
     return {"assigned": True, "moderator_id": moderator_id}
@@ -475,25 +489,24 @@ async def assign_moderator(
 async def review_content(
     item_id: int,
     req: ModerationReviewRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    moderator: User = Depends(require_moderation_admin),
+    db: AsyncSession = Depends(get_db),
 ):
-    service = ModerationService(db)
-    # The reviewer is the authenticated caller, never a client-supplied id.
-    item = await service.review_content(item_id, current_user.id, req.status, req.decision)
+    """Record a moderation decision (moderators only). The reviewer is the authenticated caller."""
+    item = await ModerationService(db).review_content(item_id, moderator.id, req.status, req.decision)
     if not item:
         raise HTTPException(status_code=404, detail="Moderation item not found")
     return {"reviewed": True, "status": req.status.value}
 
 
-@moderation_router.post("/rules", response_model=dict)
+@moderation_router.post("/rules", response_model=dict, status_code=201)
 async def create_compliance_rule(
     req: ComplianceRuleRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _moderator: User = Depends(require_moderation_admin),
+    db: AsyncSession = Depends(get_db),
 ):
-    service = ModerationService(db)
-    rule = await service.add_compliance_rule(
+    """Add a compliance rule (moderators only)"""
+    rule = await ModerationService(db).add_compliance_rule(
         req.name,
         req.rule_type,
         req.description,
@@ -508,11 +521,11 @@ async def create_compliance_rule(
 @moderation_router.post("/check-compliance", response_model=ComplianceCheckResponse)
 async def check_compliance(
     req: ComplianceCheckRequest,
-    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    service = ModerationService(db)
-    return await service.check_compliance(req.text)
+    """Check text against the enabled compliance rules"""
+    return await ModerationService(db).check_compliance(req.text)
 
 
 # Rate Limiting Endpoints
@@ -521,20 +534,22 @@ async def check_rate_limit(
     user_id: Optional[int] = None,
     ip_address: Optional[str] = None,
     endpoint: str = "*",
-    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    service = RateLimitService(db)
-    return await service.check_rate_limit(user_id, ip_address, endpoint)
+    """Remaining allowance for a caller on an endpoint"""
+    return await RateLimitService(db).check_rate_limit(user_id, ip_address, endpoint)
 
 
 @rate_limit_router.get("/configs")
-def list_rate_limit_configs(
-    db: Session = Depends(get_db),
-    admin: User = Depends(require_admin("rate_limits")),
+async def list_rate_limit_configs(
+    _admin: User = Depends(require_admin("rate_limits")),
+    db: AsyncSession = Depends(get_db),
 ):
     """Every configured rate limit (administrators only)"""
-    rows = db.query(RateLimitConfig).order_by(RateLimitConfig.endpoint, RateLimitConfig.id).all()
+    rows = (await db.execute(
+        select(RateLimitConfig).order_by(RateLimitConfig.endpoint, RateLimitConfig.id)
+    )).scalars().all()
     return [
         {
             "id": row.id,
@@ -550,16 +565,16 @@ def list_rate_limit_configs(
     ]
 
 
-@rate_limit_router.post("/config", response_model=dict)
+@rate_limit_router.post("/config", response_model=dict, status_code=201)
 async def create_rate_limit_config(
     req: RateLimitConfigRequest,
     user_id: Optional[int] = None,
     ip_address: Optional[str] = None,
-    db: Session = Depends(get_db),
-    admin: User = Depends(require_admin("rate_limits")),
+    _admin: User = Depends(require_admin("rate_limits")),
+    db: AsyncSession = Depends(get_db),
 ):
-    service = RateLimitService(db)
-    config = await service.create_rate_limit_config(
+    """Create a rate limit (administrators only)"""
+    config = await RateLimitService(db).create_rate_limit_config(
         req.endpoint,
         req.requests_per_minute,
         req.requests_per_hour,
@@ -575,10 +590,14 @@ async def create_rate_limit_config(
 @notification_router.get("/preferences/{user_id}", response_model=NotificationPreferenceResponse)
 async def get_preferences(
     user_id: int,
-    db: Session = Depends(get_db),
- current_user: User = Depends(get_current_user),):
-    service = NotificationService(db)
-    prefs = await service.get_preferences(user_id)
+    current_user: User = Depends(get_current_user),
+    caller_is_admin: bool = Depends(admin_status("notifications")),
+    db: AsyncSession = Depends(get_db),
+):
+    """A user's notification preferences. Users may read only their own."""
+    if user_id != current_user.id and not caller_is_admin:
+        raise _forbidden("You can only view your own notification preferences")
+    prefs = await NotificationService(db).get_preferences(user_id)
     if not prefs:
         raise HTTPException(status_code=404, detail="Preferences not found")
     return prefs
@@ -588,11 +607,14 @@ async def get_preferences(
 async def update_preferences(
     user_id: int,
     req: NotificationPreferenceRequest,
-    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    caller_is_admin: bool = Depends(admin_status("notifications")),
+    db: AsyncSession = Depends(get_db),
 ):
-    service = NotificationService(db)
-    return await service.update_preferences(
+    """Update a user's notification preferences. Users may change only their own."""
+    if user_id != current_user.id and not caller_is_admin:
+        raise _forbidden("You can only change your own notification preferences")
+    return await NotificationService(db).update_preferences(
         user_id,
         req.email_enabled,
         req.push_enabled,
@@ -604,15 +626,15 @@ async def update_preferences(
     )
 
 
-@notification_router.post("/", response_model=NotificationResponse)
+@notification_router.post("/", response_model=NotificationResponse, status_code=201)
 async def create_notification(
     user_id: int,
     req: NotificationRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _admin: User = Depends(require_notification_admin),
+    db: AsyncSession = Depends(get_db),
 ):
-    service = NotificationService(db)
-    notification = await service.create_notification(
+    """Send a notification to a user (administrators only)"""
+    return await NotificationService(db).create_notification(
         user_id,
         req.notification_type,
         req.title,
@@ -621,135 +643,144 @@ async def create_notification(
         req.action_url,
         req.source,
     )
-    return notification
 
 
 @notification_router.get("/", response_model=List[NotificationResponse])
 async def get_notifications(
     user_id: Optional[int] = Query(None),
     unread_only: bool = Query(False),
-    limit: int = Query(50),
-    db: Session = Depends(get_db),
+    limit: int = Query(50, ge=1, le=200),
     current_user: User = Depends(get_current_user),
     caller_is_admin: bool = Depends(admin_status("notifications")),
+    db: AsyncSession = Depends(get_db),
 ):
     """The caller's own notifications. Reading another user's needs administrator access."""
     target = user_id if user_id is not None else current_user.id
     if target != current_user.id and not caller_is_admin:
-        raise HTTPException(status_code=403, detail="You can only view your own notifications")
-    service = NotificationService(db)
-    return await service.get_user_notifications(target, unread_only, limit)
+        raise _forbidden("You can only view your own notifications")
+    return await NotificationService(db).get_user_notifications(target, unread_only, limit)
 
 
 @notification_router.post("/{notification_id}/mark-read")
 async def mark_notification_read(
     notification_id: int,
-    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    caller_is_admin: bool = Depends(admin_status("notifications")),
+    db: AsyncSession = Depends(get_db),
 ):
+    """Mark one of the caller's notifications as read"""
     service = NotificationService(db)
-    notif = await service.mark_as_read(notification_id)
-    if not notif:
+    notification = await service.get_notification(notification_id)
+    if notification is None or (notification.user_id != current_user.id and not caller_is_admin):
         raise HTTPException(status_code=404, detail="Notification not found")
+    await service.mark_as_read(notification_id)
     return {"read": True}
 
 
-@notification_router.post("/alerts/config", response_model=AlertConfigResponse)
+@notification_router.post("/alerts/config", response_model=AlertConfigResponse, status_code=201)
 async def create_alert_config(
     user_id: int,
     req: AlertConfigRequest,
-    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    caller_is_admin: bool = Depends(admin_status("notifications")),
+    db: AsyncSession = Depends(get_db),
 ):
-    service = NotificationService(db)
-    config = await service.create_alert_config(
+    """Create an alert for a user. Users may configure only their own alerts."""
+    if user_id != current_user.id and not caller_is_admin:
+        raise _forbidden("You can only configure your own alerts")
+    return await NotificationService(db).create_alert_config(
         user_id,
         req.alert_type,
         req.condition,
         req.threshold,
         req.notification_channels,
     )
-    return config
 
 
 # Reporting Endpoints
-@reporting_router.post("/", response_model=ReportResponse)
+@reporting_router.post("/", response_model=ReportResponse, status_code=201)
 async def create_report(
     user_id: int,
     req: ReportRequest,
-    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    caller_is_admin: bool = Depends(admin_status("reports")),
+    db: AsyncSession = Depends(get_db),
 ):
-    service = ReportingService(db)
-    report = await service.create_report(
+    """Request a report for a user. Users may request reports only for themselves."""
+    if user_id != current_user.id and not caller_is_admin:
+        raise _forbidden("You can only request your own reports")
+    return await ReportingService(db).create_report(
         user_id, req.name, req.report_type, req.format, req.query, req.filters
     )
-    return report
 
 
 @reporting_router.get("/", response_model=List[ReportResponse])
 async def get_reports(
     user_id: Optional[int] = Query(None),
-    limit: int = Query(50),
-    db: Session = Depends(get_db),
+    limit: int = Query(50, ge=1, le=200),
     current_user: User = Depends(get_current_user),
     caller_is_admin: bool = Depends(admin_status("reports")),
+    db: AsyncSession = Depends(get_db),
 ):
     """The caller's own reports. Reading another user's needs administrator access."""
     target = user_id if user_id is not None else current_user.id
     if target != current_user.id and not caller_is_admin:
-        raise HTTPException(status_code=403, detail="You can only view your own reports")
-    service = ReportingService(db)
-    return await service.get_user_reports(target, limit)
+        raise _forbidden("You can only view your own reports")
+    return await ReportingService(db).get_user_reports(target, limit)
 
 
-@reporting_router.post("/templates", response_model=ReportTemplateResponse)
+@reporting_router.post("/templates", response_model=ReportTemplateResponse, status_code=201)
 async def create_report_template(
     req: ReportTemplateRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _admin: User = Depends(require_report_admin),
+    db: AsyncSession = Depends(get_db),
 ):
-    service = ReportingService(db)
-    template = await service.create_template(
+    """Create a report template shared by all users (administrators only)"""
+    return await ReportingService(db).create_template(
         req.name, req.report_type, req.sections, req.format, req.description, req.schedule
     )
-    return template
 
 
-@reporting_router.post("/scheduled", response_model=ScheduledReportResponse)
+@reporting_router.post("/scheduled", response_model=ScheduledReportResponse, status_code=201)
 async def create_scheduled_report(
     user_id: int,
     req: ScheduledReportRequest,
-    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    caller_is_admin: bool = Depends(admin_status("reports")),
+    db: AsyncSession = Depends(get_db),
 ):
-    service = ReportingService(db)
-    schedule = await service.create_scheduled_report(
+    """Schedule a report for a user. Users may schedule only their own."""
+    if user_id != current_user.id and not caller_is_admin:
+        raise _forbidden("You can only schedule your own reports")
+    return await ReportingService(db).create_scheduled_report(
         user_id, req.template_id, req.name, req.cron_expression, req.recipient_emails
     )
-    return schedule
 
 
-@reporting_router.post("/exports", response_model=ExportJobResponse)
+@reporting_router.post("/exports", response_model=ExportJobResponse, status_code=201)
 async def create_export_job(
     user_id: int,
     req: ExportJobRequest,
-    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    caller_is_admin: bool = Depends(admin_status("reports")),
+    db: AsyncSession = Depends(get_db),
 ):
-    service = ReportingService(db)
-    job = await service.create_export_job(user_id, req.export_type, req.format, req.filters)
-    return job
+    """Start an export for a user. Users may export only their own data."""
+    if user_id != current_user.id and not caller_is_admin:
+        raise _forbidden("You can only export your own data")
+    return await ReportingService(db).create_export_job(user_id, req.export_type, req.format, req.filters)
 
 
 @reporting_router.get("/exports/{job_id}", response_model=ExportJobResponse)
 async def get_export_job(
     job_id: int,
-    db: Session = Depends(get_db),
- current_user: User = Depends(get_current_user),):
-    service = ReportingService(db)
-    job = await service.get_export_job(job_id)
-    if not job:
+    current_user: User = Depends(get_current_user),
+    caller_is_admin: bool = Depends(admin_status("reports")),
+    db: AsyncSession = Depends(get_db),
+):
+    """An export job. Visible to the user who requested it, and to administrators."""
+    job = await ReportingService(db).get_export_job(job_id)
+    if job is None or (job.user_id != current_user.id and not caller_is_admin):
         raise HTTPException(status_code=404, detail="Export job not found")
     return job
 
@@ -757,13 +788,13 @@ async def get_export_job(
 @reporting_router.put("/exports/{job_id}/progress")
 async def update_export_progress(
     job_id: int,
-    progress: int,
-    record_count: int = 0,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    progress: int = Query(..., ge=0),
+    record_count: int = Query(0, ge=0),
+    _admin: User = Depends(require_report_admin),
+    db: AsyncSession = Depends(get_db),
 ):
-    service = ReportingService(db)
-    job = await service.update_export_progress(job_id, progress, record_count)
+    """Record export progress from the worker (administrators only)"""
+    job = await ReportingService(db).update_export_progress(job_id, progress, record_count)
     if not job:
         raise HTTPException(status_code=404, detail="Export job not found")
     return {"progress": job.progress, "status": job.status}
