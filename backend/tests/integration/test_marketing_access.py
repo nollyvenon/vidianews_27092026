@@ -1,9 +1,7 @@
 """Route tests for marketing: every record is scoped to the signed-in user's organization"""
 
 import pytest
-from sqlalchemy.orm import Session
-
-from app.models.marketing import EmailCampaign, LoyaltyMember, LoyaltyProgram, Segment
+from app.models.organizations import OrganizationMember
 from app.services.marketing_service import EmailCampaignService, LoyaltyService, SegmentationService
 
 CAMPAIGN = {
@@ -16,17 +14,15 @@ CAMPAIGN = {
 
 
 @pytest.fixture
-def other_org_records(second_organization, reset_test_database):
+async def other_org_records(second_organization, session):
     """A campaign, a segment, a loyalty program with a member, all owned by organization 2."""
-    with Session(reset_test_database) as session:
-        campaign = EmailCampaignService.create_campaign(session, 2, dict(CAMPAIGN, name="Other"))
-        segment = SegmentationService.create_segment(
-            session, 2, {"name": "Other segment", "segmentation_type": "custom"}
-        )
-        program = LoyaltyService.create_program(session, 2, {"name": "Other rewards", "points_per_dollar": 1.0})
-        member = LoyaltyService.enroll_member(session, program.id, 2)
-        ids = {"campaign": campaign.id, "segment": segment.id, "program": program.id, "member": member.id}
-    return ids
+    campaign = await EmailCampaignService(session).create_campaign(2, dict(CAMPAIGN, name="Other"))
+    segment = await SegmentationService(session).create_segment(
+        2, {"name": "Other segment", "segmentation_type": "custom"}
+    )
+    program = await LoyaltyService(session).create_program(2, {"name": "Other rewards", "points_per_dollar": 1.0})
+    member = await LoyaltyService(session).enroll_member(program.id, 2)
+    return {"campaign": campaign.id, "segment": segment.id, "program": program.id, "member": member.id}
 
 
 class TestMarketingAccess:
@@ -79,12 +75,12 @@ class TestMarketingAccess:
         assert created.status_code == 200
         assert fetched.status_code == 200
 
-    async def test_lead_scores_are_open_to_own_person_and_organization_members_only(self, async_client, org_member, reference_data, reset_test_database):
-        from app.models.organizations import OrganizationMember
+    async def test_lead_scores_are_open_to_own_person_and_organization_members_only(
+        self, async_client, org_member, reference_data, session,
+    ):
+        session.add(OrganizationMember(organization_id=1, user_id=2, role="member", status="active"))
+        await session.commit()
 
-        with Session(reset_test_database) as session:
-            session.add(OrganizationMember(organization_id=1, user_id=2, role="member", status="active"))
-            session.commit()
         own = await async_client.get("/api/v1/leads/1/score", headers=org_member)
         colleague = await async_client.get("/api/v1/leads/2/score", headers=org_member)
         colleague_update = await async_client.put("/api/v1/leads/2/score?engagement=5", headers=org_member)
@@ -141,14 +137,12 @@ class TestMarketingAccess:
         assert added.status_code == 404
         assert redeemed.status_code == 404
 
-    async def test_points_of_an_own_member_can_be_changed(self, async_client, org_member, reference_data, reset_test_database):
-        with Session(reset_test_database) as session:
-            program = LoyaltyService.create_program(session, 1, {"name": "Own rewards", "points_per_dollar": 1.0})
-            member = LoyaltyService.enroll_member(session, program.id, 1)
-            member_id = member.id
+    async def test_points_of_an_own_member_can_be_changed(self, async_client, org_member, reference_data, session):
+        program = await LoyaltyService(session).create_program(1, {"name": "Own rewards", "points_per_dollar": 1.0})
+        member = await LoyaltyService(session).enroll_member(program.id, 1)
 
         added = await async_client.post(
-            f"/api/v1/loyalty-members/{member_id}/add-points?points=5&reason=bonus", headers=org_member
+            f"/api/v1/loyalty-members/{member.id}/add-points?points=5&reason=bonus", headers=org_member
         )
 
         assert added.status_code == 200
