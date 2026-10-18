@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'services/authenticated_dio.dart';
@@ -8,7 +9,8 @@ import 'services/social_sign_in_flow.dart';
 import 'widgets/social_login_buttons.dart';
 
 void main() {
-  runApp(const AetherCMSApp());
+  // Riverpod providers used by the feature screens need a scope at the root of the app.
+  runApp(const ProviderScope(child: AetherCMSApp()));
 }
 
 class AetherCMSApp extends StatelessWidget {
