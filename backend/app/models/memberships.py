@@ -7,6 +7,11 @@ from enum import Enum
 from app.db.base import Base
 
 
+def utc_now_naive() -> datetime:
+    """Current UTC time as a naive value, matching these timezone-less DateTime columns."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 class MembershipTier(str, Enum):
     FREE = "free"
     BASIC = "basic"
@@ -41,8 +46,8 @@ class MembershipType(Base):
     max_students = Column(Integer, default=-1)
     features = Column(JSON, default={})
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utc_now_naive)
+    updated_at = Column(DateTime, default=utc_now_naive, onupdate=utc_now_naive)
 
     subscriptions = relationship("MembershipSubscription", back_populates="membership_type")
 
@@ -59,8 +64,8 @@ class MembershipSubscription(Base):
     renewal_date = Column(DateTime)
     stripe_subscription_id = Column(String(255), unique=True, index=True)
     auto_renew = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utc_now_naive)
+    updated_at = Column(DateTime, default=utc_now_naive, onupdate=utc_now_naive)
 
     user = relationship("User")
     membership_type = relationship("MembershipType", back_populates="subscriptions")
@@ -81,8 +86,8 @@ class MembershipInvoice(Base):
     due_date = Column(DateTime, nullable=False)
     paid_date = Column(DateTime)
     stripe_invoice_id = Column(String(255), unique=True, index=True)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utc_now_naive)
+    updated_at = Column(DateTime, default=utc_now_naive, onupdate=utc_now_naive)
 
     subscription = relationship("MembershipSubscription", back_populates="invoices")
 
@@ -96,7 +101,7 @@ class MembershipPaymentMethod(Base):
     card_last_four = Column(String(4))
     stripe_payment_method_id = Column(String(255), unique=True, index=True)
     is_default = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utc_now_naive)
+    updated_at = Column(DateTime, default=utc_now_naive, onupdate=utc_now_naive)
 
     subscription = relationship("MembershipSubscription", back_populates="payment_methods")
