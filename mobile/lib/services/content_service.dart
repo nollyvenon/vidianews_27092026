@@ -1,9 +1,10 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import './authenticated_http.dart';
+import './authenticated_dio.dart';
 
 class ContentService {
-  static const String baseUrl = 'https://api.vidianews.app/api/v1/content';
+  static const String baseUrl = '$kApiBaseUrl/content';
 
   Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -21,7 +22,7 @@ class ContentService {
   // Content CRUD
   Future<Map<String, dynamic>> createContent(Map<String, dynamic> data) async {
     final headers = await _getHeaders();
-    final response = await http.post(
+    final response = await authenticatedHttp.post(
       Uri.parse(baseUrl),
       headers: headers,
       body: jsonEncode(data),
@@ -34,7 +35,7 @@ class ContentService {
   }
 
   Future<Map<String, dynamic>> getContent(int id) async {
-    final response = await http.get(
+    final response = await authenticatedHttp.get(
       Uri.parse('$baseUrl/$id'),
       headers: await _getHeaders(),
     );
@@ -47,7 +48,7 @@ class ContentService {
 
   Future<Map<String, dynamic>> updateContent(int id, Map<String, dynamic> data) async {
     final headers = await _getHeaders();
-    final response = await http.put(
+    final response = await authenticatedHttp.put(
       Uri.parse('$baseUrl/$id'),
       headers: headers,
       body: jsonEncode(data),
@@ -61,7 +62,7 @@ class ContentService {
 
   Future<void> deleteContent(int id) async {
     final headers = await _getHeaders();
-    final response = await http.delete(
+    final response = await authenticatedHttp.delete(
       Uri.parse('$baseUrl/$id'),
       headers: headers,
     );
@@ -86,7 +87,7 @@ class ContentService {
     };
 
     final uri = Uri.parse(baseUrl).replace(queryParameters: params);
-    final response = await http.get(uri);
+    final response = await authenticatedHttp.get(uri);
 
     if (response.statusCode != 200) {
       throw Exception('Failed to fetch content list');
@@ -102,7 +103,7 @@ class ContentService {
     };
 
     final uri = Uri.parse('$baseUrl/search').replace(queryParameters: params);
-    final response = await http.get(uri);
+    final response = await authenticatedHttp.get(uri);
 
     if (response.statusCode != 200) {
       throw Exception('Failed to search content');
@@ -114,7 +115,7 @@ class ContentService {
   Future<List<dynamic>> getFeaturedContent({int limit = 10}) async {
     final params = {'limit': limit.toString()};
     final uri = Uri.parse('$baseUrl/featured').replace(queryParameters: params);
-    final response = await http.get(uri);
+    final response = await authenticatedHttp.get(uri);
 
     if (response.statusCode != 200) {
       throw Exception('Failed to fetch featured content');
@@ -129,7 +130,7 @@ class ContentService {
       'limit': limit.toString(),
     };
     final uri = Uri.parse('$baseUrl/trending').replace(queryParameters: params);
-    final response = await http.get(uri);
+    final response = await authenticatedHttp.get(uri);
 
     if (response.statusCode != 200) {
       throw Exception('Failed to fetch trending content');
@@ -140,7 +141,7 @@ class ContentService {
   // Publishing workflow
   Future<Map<String, dynamic>> publishContent(int id) async {
     final headers = await _getHeaders();
-    final response = await http.post(
+    final response = await authenticatedHttp.post(
       Uri.parse('$baseUrl/$id/publish'),
       headers: headers,
       body: jsonEncode({'access_level': 'public'}),
@@ -154,7 +155,7 @@ class ContentService {
 
   Future<Map<String, dynamic>> scheduleContent(int id, DateTime scheduledAt) async {
     final headers = await _getHeaders();
-    final response = await http.post(
+    final response = await authenticatedHttp.post(
       Uri.parse('$baseUrl/$id/schedule'),
       headers: headers,
       body: jsonEncode({'scheduled_at': scheduledAt.toIso8601String()}),
@@ -168,7 +169,7 @@ class ContentService {
 
   Future<Map<String, dynamic>> archiveContent(int id) async {
     final headers = await _getHeaders();
-    final response = await http.post(
+    final response = await authenticatedHttp.post(
       Uri.parse('$baseUrl/$id/archive'),
       headers: headers,
       body: jsonEncode({}),
@@ -182,7 +183,7 @@ class ContentService {
 
   // Engagement
   Future<void> recordEngagement(int contentId, String engagementType) async {
-    final response = await http.post(
+    final response = await authenticatedHttp.post(
       Uri.parse('$baseUrl/$contentId/engage'),
       headers: await _getHeaders(),
       body: jsonEncode({'engagement_type': engagementType}),
@@ -195,7 +196,7 @@ class ContentService {
 
   // Stats
   Future<Map<String, dynamic>> getContentStats(int id) async {
-    final response = await http.get(
+    final response = await authenticatedHttp.get(
       Uri.parse('$baseUrl/$id/stats'),
     );
 

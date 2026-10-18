@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import '../models/user_management_models.dart';
+import '../services/authenticated_dio.dart';
 
 final userManagementServiceProvider = Provider((ref) {
   final dio = Dio();
@@ -9,7 +10,7 @@ final userManagementServiceProvider = Provider((ref) {
 
 class UserManagementService {
   final Dio _dio;
-  final String _baseUrl = 'http://localhost:8000/api/v1';
+  final String _baseUrl = '$kApiBaseUrl';
 
   UserManagementService(this._dio);
 

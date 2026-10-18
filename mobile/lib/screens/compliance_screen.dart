@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../services/authenticated_http.dart';
+import '../services/authenticated_dio.dart';
 
 class ComplianceScreen extends StatefulWidget {
   const ComplianceScreen({Key? key}) : super(key: key);
@@ -23,8 +24,8 @@ class _ComplianceScreenState extends State<ComplianceScreen> {
   Future<void> fetchCompliance() async {
     setState(() => loading = true);
     try {
-      final res1 = await http.get(Uri.parse('http://localhost:8000/api/v1/compliance/status'));
-      final res2 = await http.get(Uri.parse('http://localhost:8000/api/v1/audit/logs'));
+      final res1 = await authenticatedHttp.get(Uri.parse('$kApiBaseUrl/compliance/status'));
+      final res2 = await authenticatedHttp.get(Uri.parse('$kApiBaseUrl/audit/logs'));
       if (res1.statusCode == 200 && res2.statusCode == 200) {
         setState(() {
           compliance = jsonDecode(res1.body);

@@ -1,5 +1,5 @@
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import './authenticated_http.dart';
 
 class TenantService {
   final String apiUrl;
@@ -12,7 +12,7 @@ class TenantService {
 
   Future<List<Tenant>> listTenants({int skip = 0, int limit = 20}) async {
     try {
-      final response = await http.get(
+      final response = await authenticatedHttp.get(
         Uri.parse('$apiUrl/api/v1/tenants?skip=$skip&limit=$limit'),
         headers: {
           'Authorization': 'Bearer $token',
@@ -34,7 +34,7 @@ class TenantService {
 
   Future<Tenant> getTenant(int id) async {
     try {
-      final response = await http.get(
+      final response = await authenticatedHttp.get(
         Uri.parse('$apiUrl/api/v1/tenants/$id'),
         headers: {
           'Authorization': 'Bearer $token',
@@ -58,7 +58,7 @@ class TenantService {
     String plan = 'free',
   }) async {
     try {
-      final response = await http.post(
+      final response = await authenticatedHttp.post(
         Uri.parse('$apiUrl/api/v1/tenants'),
         headers: {
           'Authorization': 'Bearer $token',
@@ -93,7 +93,7 @@ class TenantService {
       if (description != null) body['description'] = description;
       if (plan != null) body['plan'] = plan;
 
-      final response = await http.put(
+      final response = await authenticatedHttp.put(
         Uri.parse('$apiUrl/api/v1/tenants/$id'),
         headers: {
           'Authorization': 'Bearer $token',
@@ -112,7 +112,7 @@ class TenantService {
 
   Future<void> deleteTenant(int id) async {
     try {
-      final response = await http.delete(
+      final response = await authenticatedHttp.delete(
         Uri.parse('$apiUrl/api/v1/tenants/$id'),
         headers: {
           'Authorization': 'Bearer $token',
@@ -130,7 +130,7 @@ class TenantService {
 
   Future<List<TenantMember>> getTenantMembers(int tenantId) async {
     try {
-      final response = await http.get(
+      final response = await authenticatedHttp.get(
         Uri.parse('$apiUrl/api/v1/tenants/$tenantId/members'),
         headers: {
           'Authorization': 'Bearer $token',
@@ -155,7 +155,7 @@ class TenantService {
     String role = 'member',
   }) async {
     try {
-      final response = await http.post(
+      final response = await authenticatedHttp.post(
         Uri.parse('$apiUrl/api/v1/tenants/$tenantId/members'),
         headers: {
           'Authorization': 'Bearer $token',
@@ -177,7 +177,7 @@ class TenantService {
 
   Future<void> removeMember(int tenantId, int userId) async {
     try {
-      final response = await http.delete(
+      final response = await authenticatedHttp.delete(
         Uri.parse('$apiUrl/api/v1/tenants/$tenantId/members/$userId'),
         headers: {
           'Authorization': 'Bearer $token',
@@ -199,7 +199,7 @@ class TenantService {
     String role = 'member',
   }) async {
     try {
-      final response = await http.post(
+      final response = await authenticatedHttp.post(
         Uri.parse('$apiUrl/api/v1/tenants/$tenantId/invite'),
         headers: {
           'Authorization': 'Bearer $token',

@@ -1,14 +1,15 @@
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import './authenticated_http.dart';
+import './authenticated_dio.dart';
 
 class ChatService {
-  static const String baseUrl = 'http://localhost:8000/api/v1';
+  static const String baseUrl = '$kApiBaseUrl';
   static String? token;
 
   static void setToken(String? newToken) => token = newToken;
 
   Future<List<dynamic>> listChats(int userId) async {
-    final response = await http.get(
+    final response = await authenticatedHttp.get(
       Uri.parse('$baseUrl/ai/chats'),
       headers: {'Authorization': 'Bearer $token'},
     );
@@ -19,7 +20,7 @@ class ChatService {
   }
 
   Future<Map<String, dynamic>> getChat(int chatId) async {
-    final response = await http.get(
+    final response = await authenticatedHttp.get(
       Uri.parse('$baseUrl/ai/chats/$chatId'),
       headers: {'Authorization': 'Bearer $token'},
     );
@@ -30,7 +31,7 @@ class ChatService {
   }
 
   Future<Map<String, dynamic>> createChat(int userId, String title) async {
-    final response = await http.post(
+    final response = await authenticatedHttp.post(
       Uri.parse('$baseUrl/ai/chats'),
       headers: {
         'Authorization': 'Bearer $token',
@@ -50,7 +51,7 @@ class ChatService {
     String content,
     int tokens,
   ) async {
-    final response = await http.post(
+    final response = await authenticatedHttp.post(
       Uri.parse('$baseUrl/ai/chats/$chatId/messages'),
       headers: {
         'Authorization': 'Bearer $token',

@@ -39,7 +39,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _dio = Dio(BaseOptions(baseUrl: 'http://localhost:8000'));
+  final _dio = Dio(BaseOptions(baseUrl: kApiBaseUrl));
   late final SocialAuthService _socialService = SocialAuthService(createAuthenticatedDio());
   late final SocialSignInFlow _socialFlow = SocialSignInFlow(
     service: _socialService,
@@ -62,7 +62,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final response = await _dio.post(
-        '/api/v1/auth/login',
+        '/auth/login',
         data: {
           'email': _emailController.text,
           'password': _passwordController.text,

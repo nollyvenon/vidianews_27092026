@@ -1,14 +1,15 @@
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import './authenticated_http.dart';
+import './authenticated_dio.dart';
 
 class SettingsService {
-  final String baseUrl = 'http://localhost:8000/api/v1';
+  final String baseUrl = '$kApiBaseUrl';
   final String? token;
 
   SettingsService({this.token});
 
   Future<Map<String, dynamic>> getAllSettings() async {
-    final response = await http.get(
+    final response = await authenticatedHttp.get(
       Uri.parse('$baseUrl/settings/me'),
       headers: _getHeaders(),
     );
@@ -20,7 +21,7 @@ class SettingsService {
   }
 
   Future<Map<String, dynamic>> updateSettings(Map<String, dynamic> updates) async {
-    final response = await http.put(
+    final response = await authenticatedHttp.put(
       Uri.parse('$baseUrl/settings/me'),
       headers: _getHeaders(),
       body: jsonEncode(updates),
@@ -33,7 +34,7 @@ class SettingsService {
   }
 
   Future<Map<String, dynamic>> getNotificationSettings() async {
-    final response = await http.get(
+    final response = await authenticatedHttp.get(
       Uri.parse('$baseUrl/settings/me/notifications'),
       headers: _getHeaders(),
     );
@@ -47,7 +48,7 @@ class SettingsService {
   Future<Map<String, dynamic>> updateNotificationSettings(
     Map<String, dynamic> updates,
   ) async {
-    final response = await http.put(
+    final response = await authenticatedHttp.put(
       Uri.parse('$baseUrl/settings/me/notifications'),
       headers: _getHeaders(),
       body: jsonEncode(updates),
@@ -60,7 +61,7 @@ class SettingsService {
   }
 
   Future<Map<String, dynamic>> getPrivacySettings() async {
-    final response = await http.get(
+    final response = await authenticatedHttp.get(
       Uri.parse('$baseUrl/settings/me/privacy'),
       headers: _getHeaders(),
     );
@@ -74,7 +75,7 @@ class SettingsService {
   Future<Map<String, dynamic>> updatePrivacySettings(
     Map<String, dynamic> updates,
   ) async {
-    final response = await http.put(
+    final response = await authenticatedHttp.put(
       Uri.parse('$baseUrl/settings/me/privacy'),
       headers: _getHeaders(),
       body: jsonEncode(updates),
@@ -87,7 +88,7 @@ class SettingsService {
   }
 
   Future<Map<String, dynamic>> getDisplaySettings() async {
-    final response = await http.get(
+    final response = await authenticatedHttp.get(
       Uri.parse('$baseUrl/settings/me/display'),
       headers: _getHeaders(),
     );
@@ -101,7 +102,7 @@ class SettingsService {
   Future<Map<String, dynamic>> updateDisplaySettings(
     Map<String, dynamic> updates,
   ) async {
-    final response = await http.put(
+    final response = await authenticatedHttp.put(
       Uri.parse('$baseUrl/settings/me/display'),
       headers: _getHeaders(),
       body: jsonEncode(updates),

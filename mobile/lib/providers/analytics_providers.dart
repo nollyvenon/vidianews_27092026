@@ -1,10 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/analytics_models.dart';
+import '../services/authenticated_dio.dart';
 
 class AnalyticsService {
   final Dio dio;
-  final String baseUrl = 'https://api.vidianews.com/api/v1';
+  final String baseUrl = '$kApiBaseUrl';
 
   AnalyticsService({required this.dio});
 

@@ -1,14 +1,15 @@
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import './authenticated_http.dart';
+import './authenticated_dio.dart';
 
 class ActivityService {
-  final String baseUrl = 'http://localhost:8000/api/v1';
+  final String baseUrl = '$kApiBaseUrl';
   final String? token;
 
   ActivityService({this.token});
 
   Future<List<dynamic>> getActivities({int limit = 50, int offset = 0}) async {
-    final response = await http.get(
+    final response = await authenticatedHttp.get(
       Uri.parse('$baseUrl/activity/me?limit=$limit&offset=$offset'),
       headers: _getHeaders(),
     );
@@ -20,7 +21,7 @@ class ActivityService {
   }
 
   Future<Map<String, dynamic>> getActivityCount({int days = 7}) async {
-    final response = await http.get(
+    final response = await authenticatedHttp.get(
       Uri.parse('$baseUrl/activity/me/count?days=$days'),
       headers: _getHeaders(),
     );
@@ -32,7 +33,7 @@ class ActivityService {
   }
 
   Future<Map<String, dynamic>> getActivitySummary({int days = 7}) async {
-    final response = await http.get(
+    final response = await authenticatedHttp.get(
       Uri.parse('$baseUrl/activity/me/summary?days=$days'),
       headers: _getHeaders(),
     );
@@ -44,7 +45,7 @@ class ActivityService {
   }
 
   Future<List<dynamic>> getActivityFeed({int limit = 50, int offset = 0}) async {
-    final response = await http.get(
+    final response = await authenticatedHttp.get(
       Uri.parse('$baseUrl/activity/feed?limit=$limit&offset=$offset'),
       headers: _getHeaders(),
     );
@@ -56,7 +57,7 @@ class ActivityService {
   }
 
   Future<Map<String, dynamic>> getUnreadFeedCount() async {
-    final response = await http.get(
+    final response = await authenticatedHttp.get(
       Uri.parse('$baseUrl/activity/feed/unread-count'),
       headers: _getHeaders(),
     );
@@ -68,7 +69,7 @@ class ActivityService {
   }
 
   Future<void> markFeedRead(int feedId) async {
-    final response = await http.post(
+    final response = await authenticatedHttp.post(
       Uri.parse('$baseUrl/activity/feed/$feedId/read'),
       headers: _getHeaders(),
     );
@@ -79,7 +80,7 @@ class ActivityService {
   }
 
   Future<void> markAllFeedRead() async {
-    final response = await http.post(
+    final response = await authenticatedHttp.post(
       Uri.parse('$baseUrl/activity/feed/read-all'),
       headers: _getHeaders(),
     );

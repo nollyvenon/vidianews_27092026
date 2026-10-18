@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../../services/authenticated_http.dart';
+import '../../services/authenticated_dio.dart';
 
 class CoursesScreen extends StatefulWidget {
   @override
@@ -19,8 +20,8 @@ class _CoursesScreenState extends State<CoursesScreen> {
   }
 
   Future<List<Course>> fetchCourses() async {
-    final response = await http.get(
-      Uri.parse('http://localhost:8000/api/v1/courses'),
+    final response = await authenticatedHttp.get(
+      Uri.parse('$kApiBaseUrl/courses'),
       headers: {'Authorization': 'Bearer YOUR_TOKEN'},
     );
 
@@ -52,8 +53,8 @@ class _CoursesScreenState extends State<CoursesScreen> {
 
   Future<void> _enrollCourse(int courseId) async {
     try {
-      final response = await http.post(
-        Uri.parse('http://localhost:8000/api/v1/courses/$courseId/enroll'),
+      final response = await authenticatedHttp.post(
+        Uri.parse('$kApiBaseUrl/courses/$courseId/enroll'),
         headers: {'Authorization': 'Bearer YOUR_TOKEN'},
       );
 

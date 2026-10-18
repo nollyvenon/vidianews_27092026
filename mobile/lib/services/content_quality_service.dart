@@ -3,13 +3,14 @@
 import 'package:dio/dio.dart';
 import 'package:logger/logger.dart';
 import '../models/content_quality_models.dart';
+import './authenticated_dio.dart';
 
 class ContentQualityService {
   final Dio _dio;
   final Logger _logger = Logger();
   final String _baseUrl;
 
-  ContentQualityService(this._dio, {String baseUrl = 'http://localhost:8000/api/v1'})
+  ContentQualityService(this._dio, {String baseUrl = '$kApiBaseUrl'})
       : _baseUrl = baseUrl;
 
   // Module 61: Calendar Events

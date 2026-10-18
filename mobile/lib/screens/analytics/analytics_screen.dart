@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../../services/authenticated_http.dart';
+import '../../services/authenticated_dio.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   @override
@@ -18,8 +19,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   Future<Map<String, dynamic>> fetchAnalytics() async {
     try {
-      final response = await http.get(
-        Uri.parse('http://localhost:8000/api/v1/system/health'),
+      final response = await authenticatedHttp.get(
+        Uri.parse('$kApiBaseUrl/system/health'),
         headers: {'Authorization': 'Bearer YOUR_TOKEN'},
       );
 

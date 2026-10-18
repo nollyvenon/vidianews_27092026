@@ -1,23 +1,24 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 import '../models/advanced_platform_models.dart';
+import '../services/authenticated_http.dart';
+import '../services/authenticated_dio.dart';
 
-const String baseUrl = 'http://localhost:8000/api/v1';
+const String baseUrl = '$kApiBaseUrl';
 
 class AdvancedPlatformService {
   final String _baseUrl;
   late WebSocketChannel _webSocketChannel;
 
-  AdvancedPlatformService({String? baseUrl}) : _baseUrl = baseUrl ?? 'http://localhost:8000/api/v1';
+  AdvancedPlatformService({String? baseUrl}) : _baseUrl = baseUrl ?? '$kApiBaseUrl';
 
   // WebSocket Methods
   Future<void> connectWebSocket(int userId, String connectionId) async {
     try {
       _webSocketChannel = WebSocketChannel.connect(
-        Uri.parse('ws://localhost:8000/api/v1/websocket/ws/$userId/$connectionId'),
+        Uri.parse('$kApiWsBaseUrl/websocket/ws/$userId/$connectionId'),
       );
     } catch (e) {
       throw Exception('Failed to connect WebSocket: $e');
@@ -41,7 +42,7 @@ class AdvancedPlatformService {
     int? userId,
     int priority = 0,
   }) async {
-    final response = await http.post(
+    final response = await authenticatedHttp.post(
       Uri.parse('$_baseUrl/jobs/create'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
@@ -62,7 +63,7 @@ class AdvancedPlatformService {
     final uri = Uri.parse('$_baseUrl/jobs/pending').replace(
       queryParameters: {'limit': limit.toString()},
     );
-    final response = await http.get(uri);
+    final response = await authenticatedHttp.get(uri);
 
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
@@ -80,7 +81,7 @@ class AdvancedPlatformService {
     Map<String, dynamic>? transformationRules,
     String? schedule,
   }) async {
-    final response = await http.post(
+    final response = await authenticatedHttp.post(
       Uri.parse('$_baseUrl/pipelines/'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
@@ -100,7 +101,7 @@ class AdvancedPlatformService {
   }
 
   Future<PipelineExecution> executePipeline(int pipelineId) async {
-    final response = await http.post(
+    final response = await authenticatedHttp.post(
       Uri.parse('$_baseUrl/pipelines/$pipelineId/execute'),
     );
 
@@ -117,7 +118,7 @@ class AdvancedPlatformService {
     int? ttlSeconds,
     String strategy = 'ttl',
   }) async {
-    final response = await http.post(
+    final response = await authenticatedHttp.post(
       Uri.parse('$_baseUrl/cache/set'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
@@ -134,7 +135,7 @@ class AdvancedPlatformService {
   }
 
   Future<Map<String, dynamic>?> getCacheEntry(String cacheKey) async {
-    final response = await http.get(
+    final response = await authenticatedHttp.get(
       Uri.parse('$_baseUrl/cache/get/$cacheKey'),
     );
 
@@ -147,7 +148,7 @@ class AdvancedPlatformService {
   }
 
   Future<CacheMetrics> getCacheMetrics() async {
-    final response = await http.get(
+    final response = await authenticatedHttp.get(
       Uri.parse('$_baseUrl/cache/metrics'),
     );
 
@@ -165,7 +166,7 @@ class AdvancedPlatformService {
     String version = '1.0.0',
     String? description,
   }) async {
-    final response = await http.post(
+    final response = await authenticatedHttp.post(
       Uri.parse('$_baseUrl/api-docs/'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
@@ -193,7 +194,7 @@ class AdvancedPlatformService {
   }
 
   Future<List<APIEndpoint>> getDocumentationEndpoints(int docId) async {
-    final response = await http.get(
+    final response = await authenticatedHttp.get(
       Uri.parse('$_baseUrl/api-docs/$docId/endpoints'),
     );
 
@@ -205,7 +206,7 @@ class AdvancedPlatformService {
   }
 
   Future<List<APIUsageMetrics>> getAPIUsageMetrics(String endpoint) async {
-    final response = await http.get(
+    final response = await authenticatedHttp.get(
       Uri.parse('$_baseUrl/api-docs/usage/$endpoint'),
     );
 

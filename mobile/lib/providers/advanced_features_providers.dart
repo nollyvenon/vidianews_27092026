@@ -1,8 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import '../models/advanced_features_models.dart';
+import '../services/authenticated_dio.dart';
 
-final dioProvider = Provider((ref) => Dio(BaseOptions(baseUrl: 'http://localhost:8000')));
+final dioProvider = Provider((ref) => createAuthenticatedDio(baseUrl: kApiOrigin));
 
 class AdvancedFeaturesService {
   final Dio dio;

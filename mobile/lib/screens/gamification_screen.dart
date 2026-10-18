@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../services/authenticated_http.dart';
+import '../services/authenticated_dio.dart';
 
 class GamificationScreen extends StatefulWidget {
   const GamificationScreen({Key? key}) : super(key: key);
@@ -23,8 +24,8 @@ class _GamificationScreenState extends State<GamificationScreen> {
   Future<void> fetchData() async {
     setState(() => loading = true);
     try {
-      final res1 = await http.get(Uri.parse('http://localhost:8000/api/v1/leaderboard'));
-      final res2 = await http.get(Uri.parse('http://localhost:8000/api/v1/badges/user'));
+      final res1 = await authenticatedHttp.get(Uri.parse('$kApiBaseUrl/leaderboard'));
+      final res2 = await authenticatedHttp.get(Uri.parse('$kApiBaseUrl/badges/user'));
       if (res1.statusCode == 200 && res2.statusCode == 200) {
         setState(() {
           leaderboard = jsonDecode(res1.body);

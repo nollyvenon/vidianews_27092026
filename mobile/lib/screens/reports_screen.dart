@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../services/authenticated_http.dart';
+import '../services/authenticated_dio.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({Key? key}) : super(key: key);
@@ -23,7 +24,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Future<void> fetchReports() async {
     setState(() => loading = true);
     try {
-      final res = await http.get(Uri.parse('http://localhost:8000/api/v1/reports'));
+      final res = await authenticatedHttp.get(Uri.parse('$kApiBaseUrl/reports'));
       if (res.statusCode == 200) {
         setState(() => reports = jsonDecode(res.body));
       }
@@ -37,8 +38,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Future<void> generateReport() async {
     setState(() => loading = true);
     try {
-      final res = await http.post(
-        Uri.parse('http://localhost:8000/api/v1/reports'),
+      final res = await authenticatedHttp.post(
+        Uri.parse('$kApiBaseUrl/reports'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'report_type': reportType}),
       );

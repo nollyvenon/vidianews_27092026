@@ -1,5 +1,5 @@
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import './authenticated_http.dart';
 
 class ProfileService {
   final String apiUrl;
@@ -9,7 +9,7 @@ class ProfileService {
 
   Future<UserProfile> getMyProfile() async {
     try {
-      final response = await http.get(
+      final response = await authenticatedHttp.get(
         Uri.parse('$apiUrl/api/v1/profiles/me'),
         headers: {'Authorization': 'Bearer $token'},
       );
@@ -24,7 +24,7 @@ class ProfileService {
 
   Future<void> updateProfile(Map<String, dynamic> updates) async {
     try {
-      final response = await http.put(
+      final response = await authenticatedHttp.put(
         Uri.parse('$apiUrl/api/v1/profiles/me'),
         headers: {
           'Authorization': 'Bearer $token',
@@ -40,7 +40,7 @@ class ProfileService {
 
   Future<void> addSkill(String name, {String? category}) async {
     try {
-      final response = await http.post(
+      final response = await authenticatedHttp.post(
         Uri.parse('$apiUrl/api/v1/profiles/me/skills'),
         headers: {
           'Authorization': 'Bearer $token',

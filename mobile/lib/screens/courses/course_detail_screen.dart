@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../../services/authenticated_http.dart';
+import '../../services/authenticated_dio.dart';
 
 class CourseDetailScreen extends StatefulWidget {
   final int courseId;
@@ -29,8 +30,8 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   }
 
   Future<CourseDetail> fetchCourseDetail() async {
-    final response = await http.get(
-      Uri.parse('http://localhost:8000/api/v1/courses/${widget.courseId}'),
+    final response = await authenticatedHttp.get(
+      Uri.parse('$kApiBaseUrl/courses/${widget.courseId}'),
       headers: {'Authorization': 'Bearer YOUR_TOKEN'},
     );
 
@@ -43,8 +44,8 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
 
   Future<void> _loadSections() async {
     try {
-      final response = await http.get(
-        Uri.parse('http://localhost:8000/api/v1/courses/${widget.courseId}/sections'),
+      final response = await authenticatedHttp.get(
+        Uri.parse('$kApiBaseUrl/courses/${widget.courseId}/sections'),
         headers: {'Authorization': 'Bearer YOUR_TOKEN'},
       );
 
@@ -61,8 +62,8 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
 
   Future<void> _loadReviews() async {
     try {
-      final response = await http.get(
-        Uri.parse('http://localhost:8000/api/v1/courses/${widget.courseId}/reviews'),
+      final response = await authenticatedHttp.get(
+        Uri.parse('$kApiBaseUrl/courses/${widget.courseId}/reviews'),
         headers: {'Authorization': 'Bearer YOUR_TOKEN'},
       );
 
@@ -79,8 +80,8 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
 
   Future<void> _loadEnrollment() async {
     try {
-      final response = await http.get(
-        Uri.parse('http://localhost:8000/api/v1/enrollments/me'),
+      final response = await authenticatedHttp.get(
+        Uri.parse('$kApiBaseUrl/enrollments/me'),
         headers: {'Authorization': 'Bearer YOUR_TOKEN'},
       );
 
@@ -103,8 +104,8 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
 
   Future<void> _enrollCourse() async {
     try {
-      final response = await http.post(
-        Uri.parse('http://localhost:8000/api/v1/courses/${widget.courseId}/enroll'),
+      final response = await authenticatedHttp.post(
+        Uri.parse('$kApiBaseUrl/courses/${widget.courseId}/enroll'),
         headers: {'Authorization': 'Bearer YOUR_TOKEN'},
       );
 
@@ -127,8 +128,8 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
     if (enrollment == null) return;
 
     try {
-      await http.post(
-        Uri.parse('http://localhost:8000/api/v1/enrollments/${enrollment!.id}/lessons/$lessonId/complete'),
+      await authenticatedHttp.post(
+        Uri.parse('$kApiBaseUrl/enrollments/${enrollment!.id}/lessons/$lessonId/complete'),
         headers: {'Authorization': 'Bearer YOUR_TOKEN'},
       );
 
@@ -152,8 +153,8 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
     }
 
     try {
-      await http.post(
-        Uri.parse('http://localhost:8000/api/v1/courses/${widget.courseId}/reviews'),
+      await authenticatedHttp.post(
+        Uri.parse('$kApiBaseUrl/courses/${widget.courseId}/reviews'),
         headers: {
           'Authorization': 'Bearer YOUR_TOKEN',
           'Content-Type': 'application/json',

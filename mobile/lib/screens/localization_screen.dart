@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../services/authenticated_http.dart';
+import '../services/authenticated_dio.dart';
 
 class LocalizationScreen extends StatefulWidget {
   const LocalizationScreen({Key? key}) : super(key: key);
@@ -25,7 +26,7 @@ class _LocalizationScreenState extends State<LocalizationScreen> {
   Future<void> fetchLanguages() async {
     setState(() => loading = true);
     try {
-      final res = await http.get(Uri.parse('http://localhost:8000/api/v1/languages'));
+      final res = await authenticatedHttp.get(Uri.parse('$kApiBaseUrl/languages'));
       if (res.statusCode == 200) {
         setState(() => languages = jsonDecode(res.body));
       }
@@ -38,8 +39,8 @@ class _LocalizationScreenState extends State<LocalizationScreen> {
 
   Future<void> setLanguage(String code) async {
     try {
-      final res = await http.post(
-        Uri.parse('http://localhost:8000/api/v1/localization/language'),
+      final res = await authenticatedHttp.post(
+        Uri.parse('$kApiBaseUrl/localization/language'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'language_code': code}),
       );

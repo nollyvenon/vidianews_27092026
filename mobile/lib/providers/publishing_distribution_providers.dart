@@ -2,6 +2,7 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
+import '../services/authenticated_dio.dart';
 
 final publishingServiceProvider = Provider((ref) {
   final dio = Dio();
@@ -10,7 +11,7 @@ final publishingServiceProvider = Provider((ref) {
 
 class PublishingDistributionService {
   final Dio _dio;
-  final String _baseUrl = 'http://localhost:8000/api/v1';
+  final String _baseUrl = '$kApiBaseUrl';
 
   PublishingDistributionService(this._dio);
 

@@ -1,5 +1,5 @@
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import './authenticated_http.dart';
 
 class OrganizationService {
   final String apiUrl;
@@ -12,7 +12,7 @@ class OrganizationService {
 
   Future<List<Organization>> listOrganizations(int tenantId) async {
     try {
-      final response = await http.get(
+      final response = await authenticatedHttp.get(
         Uri.parse('$apiUrl/api/v1/organizations?tenant_id=$tenantId'),
         headers: {
           'Authorization': 'Bearer $token',
@@ -39,7 +39,7 @@ class OrganizationService {
     String orgType = 'department',
   }) async {
     try {
-      final response = await http.post(
+      final response = await authenticatedHttp.post(
         Uri.parse('$apiUrl/api/v1/organizations'),
         headers: {
           'Authorization': 'Bearer $token',
@@ -64,7 +64,7 @@ class OrganizationService {
 
   Future<List<OrganizationMember>> getMembers(int orgId) async {
     try {
-      final response = await http.get(
+      final response = await authenticatedHttp.get(
         Uri.parse('$apiUrl/api/v1/organizations/$orgId/members'),
         headers: {
           'Authorization': 'Bearer $token',
@@ -85,7 +85,7 @@ class OrganizationService {
 
   Future<void> addMember(int orgId, int userId, String role) async {
     try {
-      final response = await http.post(
+      final response = await authenticatedHttp.post(
         Uri.parse('$apiUrl/api/v1/organizations/$orgId/members?user_id=$userId&role=$role'),
         headers: {
           'Authorization': 'Bearer $token',

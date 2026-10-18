@@ -4,8 +4,15 @@
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-const String kApiBaseUrl = 'http://localhost:8000/api/v1';
+/// API base URL. Build for another environment with --dart-define=API_BASE_URL=https://...
+const String kApiBaseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://localhost:8000/api/v1');
 const String kAuthTokenKey = 'auth_token';
+
+/// Scheme and host of the API, for callers whose paths already include /api/v1.
+final String kApiOrigin = kApiBaseUrl.replaceFirst('/api/v1', '');
+
+/// The API's WebSocket base, derived from [kApiBaseUrl].
+final String kApiWsBaseUrl = kApiBaseUrl.replaceFirst(RegExp(r'^http'), 'ws');
 
 Dio createAuthenticatedDio({String baseUrl = kApiBaseUrl, Dio? dio}) {
   final client = dio ??

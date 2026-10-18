@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../../services/authenticated_http.dart';
+import '../../services/authenticated_dio.dart';
 
 class AdminScreen extends StatefulWidget {
   @override
@@ -20,8 +21,8 @@ class _AdminScreenState extends State<AdminScreen> {
 
   Future<List<dynamic>> fetchAlerts() async {
     try {
-      final response = await http.get(
-        Uri.parse('http://localhost:8000/api/v1/system/alerts'),
+      final response = await authenticatedHttp.get(
+        Uri.parse('$kApiBaseUrl/system/alerts'),
         headers: {'Authorization': 'Bearer YOUR_TOKEN'},
       );
 
@@ -36,8 +37,8 @@ class _AdminScreenState extends State<AdminScreen> {
 
   Future<List<dynamic>> fetchLogs() async {
     try {
-      final response = await http.get(
-        Uri.parse('http://localhost:8000/api/v1/admin/logs'),
+      final response = await authenticatedHttp.get(
+        Uri.parse('$kApiBaseUrl/admin/logs'),
         headers: {'Authorization': 'Bearer YOUR_TOKEN'},
       );
 

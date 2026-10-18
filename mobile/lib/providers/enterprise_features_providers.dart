@@ -1,15 +1,16 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 import '../models/enterprise_features_models.dart';
+import '../services/authenticated_http.dart';
+import '../services/authenticated_dio.dart';
 
-const String baseUrl = 'http://localhost:8000/api/v1';
+const String baseUrl = '$kApiBaseUrl';
 
 class EnterpriseService {
   final String _baseUrl;
 
-  EnterpriseService({String? baseUrl}) : _baseUrl = baseUrl ?? 'http://localhost:8000/api/v1';
+  EnterpriseService({String? baseUrl}) : _baseUrl = baseUrl ?? '$kApiBaseUrl';
 
   // Security endpoints
   Future<List<AuditLog>> getAuditLogs({
@@ -28,7 +29,7 @@ class EnterpriseService {
     if (severity != null) params['severity'] = severity;
 
     final uri = Uri.parse('$_baseUrl/security/audit-logs').replace(queryParameters: params);
-    final response = await http.get(uri);
+    final response = await authenticatedHttp.get(uri);
 
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
@@ -46,7 +47,7 @@ class EnterpriseService {
     required int grantedBy,
     DateTime? expiresAt,
   }) async {
-    final response = await http.post(
+    final response = await authenticatedHttp.post(
       Uri.parse('$_baseUrl/security/access-control/$userId'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
@@ -75,7 +76,7 @@ class EnterpriseService {
     bool canAccessAnalytics = false,
     bool canAccessAdmin = false,
   }) async {
-    final response = await http.post(
+    final response = await authenticatedHttp.post(
       Uri.parse('$_baseUrl/security/roles/$userId'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
@@ -96,7 +97,7 @@ class EnterpriseService {
   }
 
   Future<RoleAssignment> getUserRole(int userId) async {
-    final response = await http.get(
+    final response = await authenticatedHttp.get(
       Uri.parse('$_baseUrl/security/roles/$userId'),
     );
 
@@ -113,7 +114,7 @@ class EnterpriseService {
     required String reason,
     List<String>? flags,
   }) async {
-    final response = await http.post(
+    final response = await authenticatedHttp.post(
       Uri.parse('$_baseUrl/moderation/queue'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
@@ -134,7 +135,7 @@ class EnterpriseService {
     final uri = Uri.parse('$_baseUrl/moderation/queue/pending').replace(
       queryParameters: {'limit': limit.toString()},
     );
-    final response = await http.get(uri);
+    final response = await authenticatedHttp.get(uri);
 
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
@@ -144,7 +145,7 @@ class EnterpriseService {
   }
 
   Future<ComplianceCheckResult> checkCompliance(String text) async {
-    final response = await http.post(
+    final response = await authenticatedHttp.post(
       Uri.parse('$_baseUrl/moderation/check-compliance'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'text': text}),
@@ -169,7 +170,7 @@ class EnterpriseService {
     if (ipAddress != null) params['ip_address'] = ipAddress;
 
     final uri = Uri.parse('$_baseUrl/rate-limits/check').replace(queryParameters: params);
-    final response = await http.post(uri);
+    final response = await authenticatedHttp.post(uri);
 
     if (response.statusCode == 200) {
       return RateLimitStatus.fromJson(jsonDecode(response.body));
@@ -179,7 +180,7 @@ class EnterpriseService {
 
   // Notification endpoints
   Future<NotificationPreference> getNotificationPreferences(int userId) async {
-    final response = await http.get(
+    final response = await authenticatedHttp.get(
       Uri.parse('$_baseUrl/notifications/preferences/$userId'),
     );
 
@@ -197,7 +198,7 @@ class EnterpriseService {
     bool? inAppEnabled,
     String? frequency,
   }) async {
-    final response = await http.put(
+    final response = await authenticatedHttp.put(
       Uri.parse('$_baseUrl/notifications/preferences/$userId'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
@@ -225,7 +226,7 @@ class EnterpriseService {
       'unread_only': unreadOnly.toString(),
       'limit': limit.toString(),
     });
-    final response = await http.get(uri);
+    final response = await authenticatedHttp.get(uri);
 
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
@@ -235,7 +236,7 @@ class EnterpriseService {
   }
 
   Future<void> markNotificationAsRead(int notificationId) async {
-    final response = await http.post(
+    final response = await authenticatedHttp.post(
       Uri.parse('$_baseUrl/notifications/$notificationId/mark-read'),
     );
 
@@ -253,7 +254,7 @@ class EnterpriseService {
     Map<String, dynamic>? query,
     Map<String, dynamic>? filters,
   }) async {
-    final response = await http.post(
+    final response = await authenticatedHttp.post(
       Uri.parse('$_baseUrl/reports/'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
@@ -280,7 +281,7 @@ class EnterpriseService {
       'user_id': userId.toString(),
       'limit': limit.toString(),
     });
-    final response = await http.get(uri);
+    final response = await authenticatedHttp.get(uri);
 
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
@@ -295,7 +296,7 @@ class EnterpriseService {
     required String format,
     Map<String, dynamic>? filters,
   }) async {
-    final response = await http.post(
+    final response = await authenticatedHttp.post(
       Uri.parse('$_baseUrl/reports/exports'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
@@ -313,7 +314,7 @@ class EnterpriseService {
   }
 
   Future<ExportJob> getExportJob(int jobId) async {
-    final response = await http.get(
+    final response = await authenticatedHttp.get(
       Uri.parse('$_baseUrl/reports/exports/$jobId'),
     );
 

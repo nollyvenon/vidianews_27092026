@@ -1,14 +1,15 @@
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import './authenticated_http.dart';
+import './authenticated_dio.dart';
 
 class NotificationService {
-  final String baseUrl = 'http://localhost:8000/api/v1';
+  final String baseUrl = '$kApiBaseUrl';
   final String? token;
 
   NotificationService({this.token});
 
   Future<List<dynamic>> getMyNotifications({int limit = 50, int offset = 0}) async {
-    final response = await http.get(
+    final response = await authenticatedHttp.get(
       Uri.parse('$baseUrl/notifications/me?limit=$limit&offset=$offset'),
       headers: _getHeaders(),
     );
@@ -20,7 +21,7 @@ class NotificationService {
   }
 
   Future<Map<String, dynamic>> getUnreadCount() async {
-    final response = await http.get(
+    final response = await authenticatedHttp.get(
       Uri.parse('$baseUrl/notifications/me/unread-count'),
       headers: _getHeaders(),
     );
@@ -32,7 +33,7 @@ class NotificationService {
   }
 
   Future<void> markAsRead(int notificationId) async {
-    final response = await http.post(
+    final response = await authenticatedHttp.post(
       Uri.parse('$baseUrl/notifications/me/$notificationId/read'),
       headers: _getHeaders(),
     );
@@ -43,7 +44,7 @@ class NotificationService {
   }
 
   Future<void> markAllAsRead() async {
-    final response = await http.post(
+    final response = await authenticatedHttp.post(
       Uri.parse('$baseUrl/notifications/me/read-all'),
       headers: _getHeaders(),
     );
@@ -54,7 +55,7 @@ class NotificationService {
   }
 
   Future<void> archiveNotification(int notificationId) async {
-    final response = await http.post(
+    final response = await authenticatedHttp.post(
       Uri.parse('$baseUrl/notifications/me/$notificationId/archive'),
       headers: _getHeaders(),
     );
@@ -65,7 +66,7 @@ class NotificationService {
   }
 
   Future<void> deleteNotification(int notificationId) async {
-    final response = await http.delete(
+    final response = await authenticatedHttp.delete(
       Uri.parse('$baseUrl/notifications/me/$notificationId'),
       headers: _getHeaders(),
     );
@@ -76,7 +77,7 @@ class NotificationService {
   }
 
   Future<Map<String, dynamic>> getNotificationLogs({int limit = 100, int offset = 0}) async {
-    final response = await http.get(
+    final response = await authenticatedHttp.get(
       Uri.parse('$baseUrl/notifications/me/logs?limit=$limit&offset=$offset'),
       headers: _getHeaders(),
     );

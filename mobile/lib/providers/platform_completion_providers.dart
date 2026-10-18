@@ -1,13 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:dio/dio.dart';
 import '../models/platform_completion_models.dart';
+import '../services/authenticated_dio.dart';
 
 
-final dioProvider = Provider((ref) => Dio(BaseOptions(
-  baseUrl: 'http://localhost:8000',
-  connectTimeout: const Duration(seconds: 10),
-  receiveTimeout: const Duration(seconds: 10),
-)));
+final dioProvider = Provider((ref) => createAuthenticatedDio(baseUrl: kApiOrigin));
 
 
 // Social Service Providers

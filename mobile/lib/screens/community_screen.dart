@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../services/authenticated_http.dart';
+import '../services/authenticated_dio.dart';
 
 class CommunityScreen extends StatefulWidget {
   const CommunityScreen({Key? key}) : super(key: key);
@@ -22,7 +23,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
   Future<void> fetchThreads() async {
     setState(() => loading = true);
     try {
-      final res = await http.get(Uri.parse('http://localhost:8000/api/v1/forum/threads'));
+      final res = await authenticatedHttp.get(Uri.parse('$kApiBaseUrl/forum/threads'));
       if (res.statusCode == 200) {
         setState(() => threads = jsonDecode(res.body));
       }

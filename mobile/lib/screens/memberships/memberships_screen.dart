@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../../services/authenticated_http.dart';
+import '../../services/authenticated_dio.dart';
 
 class MembershipsScreen extends StatefulWidget {
   @override
@@ -19,8 +20,8 @@ class _MembershipsScreenState extends State<MembershipsScreen> {
   }
 
   Future<List<MembershipPlan>> fetchMembershipPlans() async {
-    final response = await http.get(
-      Uri.parse('http://localhost:8000/api/v1/membership-types'),
+    final response = await authenticatedHttp.get(
+      Uri.parse('$kApiBaseUrl/membership-types'),
       headers: {'Authorization': 'Bearer YOUR_TOKEN'},
     );
 
@@ -34,8 +35,8 @@ class _MembershipsScreenState extends State<MembershipsScreen> {
 
   Future<void> _loadActiveSubscription() async {
     try {
-      final response = await http.get(
-        Uri.parse('http://localhost:8000/api/v1/subscriptions/me/active'),
+      final response = await authenticatedHttp.get(
+        Uri.parse('$kApiBaseUrl/subscriptions/me/active'),
         headers: {'Authorization': 'Bearer YOUR_TOKEN'},
       );
 
@@ -51,8 +52,8 @@ class _MembershipsScreenState extends State<MembershipsScreen> {
 
   Future<void> _subscribe(int planId) async {
     try {
-      final response = await http.post(
-        Uri.parse('http://localhost:8000/api/v1/subscriptions'),
+      final response = await authenticatedHttp.post(
+        Uri.parse('$kApiBaseUrl/subscriptions'),
         headers: {
           'Authorization': 'Bearer YOUR_TOKEN',
           'Content-Type': 'application/json',
@@ -79,8 +80,8 @@ class _MembershipsScreenState extends State<MembershipsScreen> {
     if (activeSubscription == null) return;
 
     try {
-      await http.post(
-        Uri.parse('http://localhost:8000/api/v1/subscriptions/${activeSubscription!.id}/cancel'),
+      await authenticatedHttp.post(
+        Uri.parse('$kApiBaseUrl/subscriptions/${activeSubscription!.id}/cancel'),
         headers: {'Authorization': 'Bearer YOUR_TOKEN'},
       );
 
