@@ -1,13 +1,13 @@
 // Content Quality Providers using Riverpod (Modules 61-65)
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:dio/dio.dart';
+import '../services/authenticated_dio.dart';
 import '../services/content_quality_service.dart';
 import '../models/content_quality_models.dart';
 
 // Service Provider
 final contentQualityServiceProvider = Provider((ref) {
-  final dio = Dio();
+  final dio = createAuthenticatedDio();
   return ContentQualityService(dio);
 });
 

@@ -28,6 +28,7 @@ import 'package:aether_cms/screens/billing_screen.dart';
 import 'package:aether_cms/screens/cache_screen.dart';
 import 'package:aether_cms/screens/community_screen.dart';
 import 'package:aether_cms/screens/compliance_screen.dart';
+import 'package:aether_cms/screens/comments_screen.dart';
 import 'package:aether_cms/screens/content/content_list_screen.dart';
 import 'package:aether_cms/screens/content_quality/brand_voice_screen.dart';
 import 'package:aether_cms/screens/content_quality/calendar_screen.dart';
@@ -125,6 +126,7 @@ final List<_Section> _sections = [
   ]),
   _Section('Content & AI', [
     _Feature('Content', 'Videos and articles', (_) => ContentListScreen()),
+    _Feature('Comments', 'Discussion on a piece of content', (_) => CommentsLookupScreen()),
     _Feature('Creator', 'Your creator profile', (_) => CreatorScreen()),
     _Feature('Discover', 'Trending and recommended', (_) => DiscoverScreen()),
     _Feature('Recommendations', 'Suggested content', (_) => discover_recommendations.RecommendationsScreen()),

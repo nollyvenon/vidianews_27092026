@@ -155,3 +155,43 @@ class BrandVoiceResult with _$BrandVoiceResult {
   factory BrandVoiceResult.fromJson(Map<String, dynamic> json) =>
       _$BrandVoiceResultFromJson(json);
 }
+
+/// Checks run and their average results, per quality tool, for the caller's organization.
+class ContentQualityOverview {
+  final int proofreadingChecks;
+  final double? averageProofreadingScore;
+  final int readabilityChecks;
+  final double? averageReadabilityGrade;
+  final int brandVoiceChecks;
+  final double? averageBrandVoiceCompliance;
+  final int plagiarismChecks;
+  final double? averagePlagiarismSimilarity;
+
+  const ContentQualityOverview({
+    required this.proofreadingChecks,
+    this.averageProofreadingScore,
+    required this.readabilityChecks,
+    this.averageReadabilityGrade,
+    required this.brandVoiceChecks,
+    this.averageBrandVoiceCompliance,
+    required this.plagiarismChecks,
+    this.averagePlagiarismSimilarity,
+  });
+
+  factory ContentQualityOverview.fromJson(Map<String, dynamic> json) {
+    final proofreading = json['proofreading'] as Map<String, dynamic>;
+    final readability = json['readability'] as Map<String, dynamic>;
+    final brandVoice = json['brand_voice'] as Map<String, dynamic>;
+    final plagiarism = json['plagiarism'] as Map<String, dynamic>;
+    return ContentQualityOverview(
+      proofreadingChecks: proofreading['checks'] as int,
+      averageProofreadingScore: (proofreading['average_score'] as num?)?.toDouble(),
+      readabilityChecks: readability['checks'] as int,
+      averageReadabilityGrade: (readability['average_grade'] as num?)?.toDouble(),
+      brandVoiceChecks: brandVoice['checks'] as int,
+      averageBrandVoiceCompliance: (brandVoice['average_compliance'] as num?)?.toDouble(),
+      plagiarismChecks: plagiarism['checks'] as int,
+      averagePlagiarismSimilarity: (plagiarism['average_similarity'] as num?)?.toDouble(),
+    );
+  }
+}

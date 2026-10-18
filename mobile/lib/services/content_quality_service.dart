@@ -13,6 +13,12 @@ class ContentQualityService {
   ContentQualityService(this._dio, {String baseUrl = '$kApiBaseUrl'})
       : _baseUrl = baseUrl;
 
+  /// Average results of the quality checks run in the caller's organization.
+  Future<ContentQualityOverview> fetchOverview() async {
+    final response = await _dio.get<dynamic>('$_baseUrl/content-quality/overview');
+    return ContentQualityOverview.fromJson(response.data as Map<String, dynamic>);
+  }
+
   // Module 61: Calendar Events
   Future<CalendarResponse> getCalendarEvents({
     required DateTime startDate,

@@ -1,56 +1,143 @@
-import 'package:flutter/material.dart';
+// Outbound webhooks: the endpoints that receive platform events, creating one, and a test delivery.
 
-class WebhooksScreen extends StatelessWidget {
-  const WebhooksScreen({Key? key}) : super(key: key);
+import 'package:flutter/material.dart';
+import '../models/community_models.dart';
+import '../services/authenticated_dio.dart';
+import '../services/community_service.dart';
+import '../widgets/async_view.dart';
+
+class _WebhookData {
+  final List<OutboundWebhook> webhooks;
+  final List<WebhookEventType> events;
+
+  const _WebhookData({required this.webhooks, required this.events});
+}
+
+class WebhooksScreen extends StatefulWidget {
+  final CommunityService? service;
+
+  const WebhooksScreen({Key? key, this.service}) : super(key: key);
+
+  @override
+  State<WebhooksScreen> createState() => _WebhooksScreenState();
+}
+
+class _WebhooksScreenState extends State<WebhooksScreen> {
+  late final CommunityService _service = widget.service ?? CommunityService(createAuthenticatedDio());
+  final _urlController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final Set<String> _selectedEvents = {};
+  late Future<_WebhookData> _data = _load();
+
+  @override
+  void dispose() {
+    _urlController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  Future<_WebhookData> _load() async {
+    final webhooks = await _service.fetchWebhooks();
+    final events = await _service.fetchWebhookEvents();
+    return _WebhookData(webhooks: webhooks, events: events);
+  }
+
+  void _reload() {
+    setState(() {
+      _data = _load();
+    });
+  }
+
+  void _notify(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _create() async {
+    final url = _urlController.text.trim();
+    if (url.isEmpty) {
+      _notify('Enter the URL that should receive events.');
+      return;
+    }
+    if (_selectedEvents.isEmpty) {
+      _notify('Choose at least one event.');
+      return;
+    }
+    try {
+      await _service.createWebhook(
+        url: url,
+        events: _selectedEvents.toList(),
+        description: _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
+      );
+      _urlController.clear();
+      _descriptionController.clear();
+      setState(_selectedEvents.clear);
+      _notify('Webhook created.');
+      _reload();
+    } catch (error) {
+      _notify(messageFromError(error));
+    }
+  }
+
+  Future<void> _test(OutboundWebhook webhook) async {
+    try {
+      final result = await _service.testWebhook(webhook.id);
+      _notify('Test delivery: ${result['status'] ?? 'sent'}');
+    } catch (error) {
+      _notify(messageFromError(error));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final webhooks = [
-      {'url': 'example.com/hook', 'event': 'user.created', 'status': 'active'},
-      {'url': 'api.service.com/events', 'event': 'content.uploaded', 'status': 'active'},
-      {'url': 'old-service.com/hook', 'event': 'payment.received', 'status': 'failed'}
-    ];
-
     return Scaffold(
       appBar: AppBar(title: const Text('Webhooks')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      body: AsyncView<_WebhookData>(
+        future: _data,
+        onRetry: _reload,
+        builder: (context, data) => ListView(
+          padding: const EdgeInsets.all(16),
           children: [
-            const Text('Active Webhooks', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: webhooks.length,
-              itemBuilder: (context, index) {
-                final w = webhooks[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(w['url']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                        const SizedBox(height: 4),
-                        Text(w['event']!, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                        const SizedBox(height: 8),
-                        Text(
-                          w['status']!.toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: w['status'] == 'active' ? Colors.green : Colors.red,
-                            fontWeight: FontWeight.bold
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
+            TextField(
+              key: const Key('webhook-url-field'),
+              controller: _urlController,
+              keyboardType: TextInputType.url,
+              decoration: const InputDecoration(labelText: 'Endpoint URL'),
             ),
+            TextField(
+              key: const Key('webhook-description-field'),
+              controller: _descriptionController,
+              decoration: const InputDecoration(labelText: 'Description (optional)'),
+            ),
+            const SizedBox(height: 8),
+            const Text('Events', style: TextStyle(fontWeight: FontWeight.bold)),
+            for (final event in data.events)
+              CheckboxListTile(
+                key: Key('event-${event.event}'),
+                contentPadding: EdgeInsets.zero,
+                title: Text(event.event),
+                subtitle: Text(event.description),
+                value: _selectedEvents.contains(event.event),
+                onChanged: (checked) => setState(() {
+                  if (checked ?? false) {
+                    _selectedEvents.add(event.event);
+                  } else {
+                    _selectedEvents.remove(event.event);
+                  }
+                }),
+              ),
+            ElevatedButton(key: const Key('create-webhook'), onPressed: _create, child: const Text('Create webhook')),
+            const Divider(height: 32),
+            if (data.webhooks.isEmpty) const Text('No webhooks yet.'),
+            for (final webhook in data.webhooks)
+              Card(
+                child: ListTile(
+                  key: Key('webhook-${webhook.id}'),
+                  title: Text(webhook.url),
+                  subtitle: Text('${webhook.events.join(', ')}${webhook.isActive ? '' : ' · paused'}'),
+                  trailing: TextButton(onPressed: () => _test(webhook), child: const Text('Test')),
+                ),
+              ),
           ],
         ),
       ),
