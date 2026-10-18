@@ -1,51 +1,66 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+// Data pipelines and their latest runs. Creating, activating and running pipelines is an administrator task on the web.
 
-class PipelinesScreen extends ConsumerWidget {
-  const PipelinesScreen({Key? key}) : super(key: key);
+import 'package:flutter/material.dart';
+import '../../models/platform_ops_models.dart';
+import '../../services/authenticated_dio.dart';
+import '../../services/platform_ops_service.dart';
+import '../../widgets/async_view.dart';
+
+class PipelinesScreen extends StatefulWidget {
+  final PlatformOpsService? service;
+
+  const PipelinesScreen({Key? key, this.service}) : super(key: key);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final pipelines = [
-      {'name': 'User Sync', 'status': 'active', 'source': 'database', 'dest': 'warehouse'},
-      {'name': 'Event Pipeline', 'status': 'active', 'source': 'events', 'dest': 'analytics'},
-      {'name': 'ETL Process', 'status': 'inactive', 'source': 'api', 'dest': 'storage'},
-    ];
+  State<PipelinesScreen> createState() => _PipelinesScreenState();
+}
 
+class _PipelinesScreenState extends State<PipelinesScreen> {
+  late final PlatformOpsService _service = widget.service ?? PlatformOpsService(createAuthenticatedDio());
+  late Future<List<Pipeline>> _pipelines = _service.fetchPipelines();
+
+  void _reload() {
+    setState(() {
+      _pipelines = _service.fetchPipelines();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Data Pipelines'),
-        elevation: 0,
-      ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(8),
-        itemCount: pipelines.length,
-        itemBuilder: (context, index) {
-          final pipeline = pipelines[index];
-          return Card(
-            margin: const EdgeInsets.all(8),
-            child: ListTile(
-              title: Text(pipeline['name'] as String),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('${pipeline['source']} → ${pipeline['dest']}'),
-                  Text('Status: ${pipeline['status']}'),
-                ],
-              ),
-              trailing: Chip(
-                label: Text(pipeline['status'] as String),
-                backgroundColor: pipeline['status'] == 'active'
-                    ? Colors.green.shade200
-                    : Colors.grey.shade200,
-              ),
-            ),
+      appBar: AppBar(title: const Text('Data Pipelines'), elevation: 0),
+      body: AsyncView<List<Pipeline>>(
+        future: _pipelines,
+        onRetry: _reload,
+        builder: (context, pipelines) {
+          if (pipelines.isEmpty) {
+            return const Center(child: Text('No data pipelines are configured.'));
+          }
+          return ListView.builder(
+            padding: const EdgeInsets.all(8),
+            itemCount: pipelines.length,
+            itemBuilder: (context, index) {
+              final pipeline = pipelines[index];
+              return Card(
+                margin: const EdgeInsets.all(8),
+                child: ListTile(
+                  key: Key('pipeline-${pipeline.id}'),
+                  title: Text(pipeline.name),
+                  subtitle: Text(
+                    '${pipeline.sourceType} → ${pipeline.destinationType}'
+                    '${pipeline.lastRun != null ? '\nLast run: ${pipeline.lastRun!.toLocal()}' : ''}'
+                    '${pipeline.failureCount > 0 ? '\nFailures: ${pipeline.failureCount}' : ''}',
+                  ),
+                  isThreeLine: pipeline.lastRun != null,
+                  trailing: Chip(
+                    label: Text(pipeline.isActive ? 'active' : pipeline.status),
+                    backgroundColor: pipeline.isActive ? Colors.green.shade200 : Colors.grey.shade200,
+                  ),
+                ),
+              );
+            },
           );
         },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        child: const Icon(Icons.add),
       ),
     );
   }

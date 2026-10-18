@@ -1,52 +1,82 @@
-import 'package:flutter/material.dart';
+// Registered API endpoint versions, their deprecation state, and the migrations between versions.
 
-class APIVersionsScreen extends StatelessWidget {
-  const APIVersionsScreen({Key? key}) : super(key: key);
+import 'package:flutter/material.dart';
+import '../services/api_versions_service.dart';
+import '../services/authenticated_dio.dart';
+import '../widgets/async_view.dart';
+
+class APIVersionsScreen extends StatefulWidget {
+  final ApiVersionsService? service;
+
+  const APIVersionsScreen({Key? key, this.service}) : super(key: key);
+
+  @override
+  State<APIVersionsScreen> createState() => _APIVersionsScreenState();
+}
+
+class _APIVersionsScreenState extends State<APIVersionsScreen> {
+  late final ApiVersionsService _service = widget.service ?? ApiVersionsService(createAuthenticatedDio());
+  late Future<_VersionData> _data = _load();
+
+  Future<_VersionData> _load() async {
+    final versions = await _service.fetchVersions();
+    final migrations = await _service.fetchMigrations();
+    return _VersionData(versions: versions, migrations: migrations);
+  }
+
+  void _reload() {
+    setState(() {
+      _data = _load();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final versions = [
-      {'endpoint': '/api/users', 'version': 'v3', 'usage': '8.5K'},
-      {'endpoint': '/api/posts', 'version': 'v2', 'usage': '3.2K'},
-      {'endpoint': '/api/content', 'version': 'v1 (deprecated)', 'usage': '120'}
-    ];
-
     return Scaffold(
       appBar: AppBar(title: const Text('API Versions')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      body: AsyncView<_VersionData>(
+        future: _data,
+        onRetry: _reload,
+        builder: (context, data) => ListView(
+          padding: const EdgeInsets.all(16),
           children: [
-            const Text('Active Versions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text('Endpoint versions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: versions.length,
-              itemBuilder: (context, index) {
-                final v = versions[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(v['endpoint']!, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 4),
-                        Text(v['version']!, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                        const SizedBox(height: 4),
-                        Text('Usage: ${v['usage']} calls/day', style: const TextStyle(fontSize: 11)),
-                      ],
-                    ),
+            if (data.versions.isEmpty) const Text('No endpoint versions are registered.'),
+            for (final version in data.versions)
+              Card(
+                child: ListTile(
+                  key: Key('version-${version.id}'),
+                  title: Text(version.endpoint),
+                  subtitle: Text(
+                    version.deprecated
+                        ? '${version.version} · deprecated'
+                            '${version.sunsetDate != null ? ', sunsets ${version.sunsetDate!.toLocal().toString().split(' ').first}' : ''}'
+                        : version.version,
                   ),
-                );
-              },
-            ),
+                ),
+              ),
+            const SizedBox(height: 24),
+            const Text('Migrations', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            if (data.migrations.isEmpty) const Text('No migrations between versions.'),
+            for (final migration in data.migrations)
+              ListTile(
+                key: Key('migration-${migration.id}'),
+                contentPadding: EdgeInsets.zero,
+                title: Text('${migration.oldVersion} → ${migration.newVersion}'),
+                subtitle: Text(migration.status),
+              ),
           ],
         ),
       ),
     );
   }
+}
+
+class _VersionData {
+  final List<EndpointVersion> versions;
+  final List<VersionMigration> migrations;
+
+  const _VersionData({required this.versions, required this.migrations});
 }

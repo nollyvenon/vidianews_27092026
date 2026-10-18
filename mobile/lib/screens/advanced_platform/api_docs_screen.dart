@@ -1,108 +1,59 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+// API usage: how often each endpoint is called, how often it fails and how long it takes.
 
-class APIDocsScreen extends ConsumerWidget {
-  const APIDocsScreen({Key? key}) : super(key: key);
+import 'package:flutter/material.dart';
+import '../../models/platform_ops_models.dart';
+import '../../services/authenticated_dio.dart';
+import '../../services/platform_ops_service.dart';
+import '../../widgets/async_view.dart';
+
+class APIDocsScreen extends StatefulWidget {
+  final PlatformOpsService? service;
+
+  const APIDocsScreen({Key? key, this.service}) : super(key: key);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final endpoints = [
-      {'path': '/users', 'method': 'GET', 'calls': 1234},
-      {'path': '/users/{id}', 'method': 'GET', 'calls': 567},
-      {'path': '/users', 'method': 'POST', 'calls': 89},
-      {'path': '/content', 'method': 'GET', 'calls': 4567},
-      {'path': '/recommendations', 'method': 'GET', 'calls': 2345},
-    ];
+  State<APIDocsScreen> createState() => _APIDocsScreenState();
+}
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('API Documentation'),
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'API Endpoints',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Version 1.0.0',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              itemCount: endpoints.length,
-              itemBuilder: (context, index) {
-                final endpoint = endpoints[index];
-                return _buildEndpointCard(
-                  endpoint['path'] as String,
-                  endpoint['method'] as String,
-                  endpoint['calls'] as int,
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
+class _APIDocsScreenState extends State<APIDocsScreen> {
+  late final PlatformOpsService _service = widget.service ?? PlatformOpsService(createAuthenticatedDio());
+  late Future<List<ApiUsage>> _usage = _service.fetchApiUsage();
+
+  void _reload() {
+    setState(() {
+      _usage = _service.fetchApiUsage();
+    });
   }
 
-  Widget _buildEndpointCard(String path, String method, int calls) {
-    Color methodColor;
-    switch (method) {
-      case 'GET':
-        methodColor = Colors.blue;
-        break;
-      case 'POST':
-        methodColor = Colors.green;
-        break;
-      case 'PUT':
-        methodColor = Colors.orange;
-        break;
-      case 'DELETE':
-        methodColor = Colors.red;
-        break;
-      default:
-        methodColor = Colors.grey;
-    }
-
-    return Card(
-      margin: const EdgeInsets.all(8),
-      child: ListTile(
-        leading: Container(
-          width: 50,
-          height: 50,
-          decoration: BoxDecoration(
-            color: methodColor.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Center(
-            child: Text(
-              method,
-              style: TextStyle(
-                color: methodColor,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              ),
-            ),
-          ),
-        ),
-        title: Text(path),
-        subtitle: Text('$calls calls'),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('API Usage')),
+      body: AsyncView<List<ApiUsage>>(
+        future: _usage,
+        onRetry: _reload,
+        builder: (context, rows) {
+          if (rows.isEmpty) {
+            return const Center(child: Text('No API calls have been measured yet.'));
+          }
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: rows.length,
+            itemBuilder: (context, index) {
+              final row = rows[index];
+              return Card(
+                child: ListTile(
+                  key: Key('usage-${row.id}'),
+                  title: Text('${row.method} ${row.endpoint}'),
+                  subtitle: Text(
+                    '${row.callCount} calls · ${(row.errorRate * 100).toStringAsFixed(1)}% errors · '
+                    '${row.averageResponseTimeMs.toStringAsFixed(0)} ms average',
+                  ),
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }
