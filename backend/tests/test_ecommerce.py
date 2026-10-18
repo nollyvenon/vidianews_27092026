@@ -1,279 +1,64 @@
-"""Tests for ecommerce services"""
+"""Tests for ecommerce services (async)."""
+
+from decimal import Decimal
 
 import pytest
-from sqlalchemy.orm import Session, sessionmaker
-from decimal import Decimal
+
 from app.models.ecommerce import (
-    Product, ProductReview, Cart, CartItem, CheckoutSession, PaymentDetail,
-    Refund, Order, OrderItem, ProductStatus, CartItemStatus, CheckoutStatus,
-    PaymentStatus, OrderStatus, ShippingStatus, PaymentMethod
+    CheckoutSession,
+    Order,
+    OrderStatus,
+    PaymentDetail,
+    PaymentMethod,
+    Product,
+    ProductStatus,
 )
 from app.models.user import User
 from app.services.ecommerce_service import (
-    ProductService, CartService, CheckoutService, PaymentService, OrderService
+    CartService,
+    CheckoutService,
+    OrderService,
+    PaymentService,
+    ProductService,
 )
 
-
-class TestProductService:
-    """Product service tests"""
-
-    def test_create_product(self, db: Session):
-        """Test creating a product"""
-        product_data = {
-            "sku": "TEST-001",
-            "name": "Test Product",
-            "price": Decimal("99.99"),
-            "category": "electronics",
-            "status": "published"
-        }
-        product = ProductService.create_product(db, product_data)
-
-        assert product.id is not None
-        assert product.sku == "TEST-001"
-        assert product.name == "Test Product"
-        assert product.price == Decimal("99.99")
-
-    def test_get_product(self, db: Session, sample_product: Product):
-        """Test getting a product"""
-        product = ProductService.get_product(db, sample_product.id)
-
-        assert product is not None
-        assert product.id == sample_product.id
-        assert product.sku == sample_product.sku
-
-    def test_get_products(self, db: Session, sample_product: Product):
-        """Test getting products list"""
-        products = ProductService.get_products(db)
-
-        assert len(products) > 0
-        assert any(p.id == sample_product.id for p in products)
-
-    def test_search_products(self, db: Session, sample_product: Product):
-        """Test searching products"""
-        results = ProductService.search_products(db, sample_product.name)
-
-        assert len(results) > 0
-        assert any(p.id == sample_product.id for p in results)
-
-    def test_get_featured_products(self, db: Session):
-        """Test getting featured products"""
-        featured_products = ProductService.get_featured_products(db)
-
-        assert isinstance(featured_products, list)
-
-    def test_add_product_review(self, db: Session, sample_product: Product, sample_user: User):
-        """Test adding product review"""
-        review_data = {
-            "rating": 5,
-            "title": "Great product",
-            "review_text": "This is a great product"
-        }
-        review = ProductService.add_product_review(
-            db, sample_product.id, sample_user.id, review_data
-        )
-
-        assert review.id is not None
-        assert review.rating == 5
-        assert review.product_id == sample_product.id
-
-
-class TestCartService:
-    """Shopping cart service tests"""
-
-    def test_get_or_create_cart(self, db: Session, sample_user: User):
-        """Test getting or creating cart"""
-        cart = CartService.get_or_create_cart(db, sample_user.id)
-
-        assert cart.id is not None
-        assert cart.user_id == sample_user.id
-
-    def test_add_to_cart(self, db: Session, sample_user: User, sample_product: Product):
-        """Test adding item to cart"""
-        cart = CartService.get_or_create_cart(db, sample_user.id)
-        cart_item = CartService.add_to_cart(db, cart.id, sample_product.id, 2)
-
-        assert cart_item.quantity == 2
-        assert cart_item.product_id == sample_product.id
-        assert cart_item.line_total == 2 * sample_product.price
-
-    def test_remove_from_cart(self, db: Session, sample_user: User, sample_product: Product):
-        """Test removing item from cart"""
-        cart = CartService.get_or_create_cart(db, sample_user.id)
-        cart_item = CartService.add_to_cart(db, cart.id, sample_product.id, 1)
-
-        CartService.remove_from_cart(db, cart_item.id)
-
-        db.refresh(cart)
-        assert cart.item_count == 0
-
-    def test_clear_cart(self, db: Session, sample_user: User, sample_product: Product):
-        """Test clearing cart"""
-        cart = CartService.get_or_create_cart(db, sample_user.id)
-        CartService.add_to_cart(db, cart.id, sample_product.id, 2)
-
-        CartService.clear_cart(db, cart.id)
-
-        db.refresh(cart)
-        assert cart.item_count == 0
-        assert cart.total == Decimal("0.00")
-
-
-class TestCheckoutService:
-    """Checkout service tests"""
-
-    def test_create_checkout_session(self, db: Session, sample_user: User, sample_product: Product):
-        """Test creating checkout session"""
-        cart = CartService.get_or_create_cart(db, sample_user.id)
-        CartService.add_to_cart(db, cart.id, sample_product.id, 1)
-
-        checkout_data = {
-            "shipping_method": "standard",
-            "billing_address": {
-                "street": "123 Main St",
-                "city": "New York",
-                "state": "NY",
-                "zip": "10001"
-            },
-            "shipping_address": {
-                "street": "123 Main St",
-                "city": "New York",
-                "state": "NY",
-                "zip": "10001"
-            },
-            "email": "test@example.com",
-            "phone": "555-1234"
-        }
-
-        checkout = CheckoutService.create_checkout_session(
-            db, sample_user.id, cart.id, checkout_data
-        )
-
-        assert checkout.id is not None
-        assert checkout.checkout_token is not None
-        assert checkout.user_id == sample_user.id
-
-    def test_get_checkout_session(self, db: Session, sample_checkout: CheckoutSession):
-        """Test getting checkout session"""
-        checkout = CheckoutService.get_checkout_session(db, sample_checkout.id)
-
-        assert checkout is not None
-        assert checkout.id == sample_checkout.id
-
-    def test_apply_coupon(self, db: Session, sample_checkout: CheckoutSession):
-        """Test applying coupon"""
-        CheckoutService.apply_coupon(db, sample_checkout.id, "DISCOUNT10")
-
-        db.refresh(sample_checkout)
-        assert sample_checkout.coupon_code == "DISCOUNT10"
-        assert sample_checkout.discount > Decimal("0.00")
-
-
-class TestPaymentService:
-    """Payment service tests"""
-
-    def test_create_payment(self, db: Session, sample_checkout: CheckoutSession):
-        """Test creating payment"""
-        payment_data = {
-            "payment_method": "stripe",
-            "amount": sample_checkout.total,
-            "currency": "USD"
-        }
-
-        payment = PaymentService.create_payment(db, sample_checkout.id, payment_data)
-
-        assert payment.id is not None
-        assert payment.checkout_id == sample_checkout.id
-        assert payment.amount == sample_checkout.total
-
-
-class TestOrderService:
-    """Order service tests"""
-
-    def test_create_order(
-        self, db: Session, sample_user: User, sample_checkout: CheckoutSession,
-        sample_payment: PaymentDetail
-    ):
-        """Test creating order"""
-        order = OrderService.create_order(db, sample_user.id, sample_checkout, sample_payment)
-
-        assert order.id is not None
-        assert order.order_number is not None
-        assert order.user_id == sample_user.id
-        assert order.total == sample_checkout.total
-
-    def test_get_order(self, db: Session, sample_order: Order):
-        """Test getting order"""
-        order = OrderService.get_order(db, sample_order.id)
-
-        assert order is not None
-        assert order.id == sample_order.id
-
-    def test_get_user_orders(self, db: Session, sample_user: User, sample_order: Order):
-        """Test getting user orders"""
-        orders = OrderService.get_user_orders(db, sample_user.id)
-
-        assert len(orders) > 0
-        assert any(o.id == sample_order.id for o in orders)
-
-    def test_update_order_status(self, db: Session, sample_order: Order):
-        """Test updating order status"""
-        OrderService.update_order_status(db, sample_order.id, OrderStatus.SHIPPED)
-
-        db.refresh(sample_order)
-        assert sample_order.order_status == OrderStatus.SHIPPED
-
-    def test_cancel_order(self, db: Session, sample_order: Order):
-        """Test cancelling order"""
-        OrderService.cancel_order(db, sample_order.id)
-
-        db.refresh(sample_order)
-        assert sample_order.order_status == OrderStatus.CANCELLED
-
-
-# Fixtures
-
-@pytest.fixture
-def db(reset_test_database) -> Session:
-    """Blocking session on the per-test database (ecommerce services are synchronous)"""
-    db_session = sessionmaker(bind=reset_test_database, expire_on_commit=False)()
-    yield db_session
-    db_session.close()
+SHIPPING = {
+    "shipping_method": "standard",
+    "billing_address": {"street": "123 Main St", "city": "New York", "state": "NY", "zip": "10001"},
+    "shipping_address": {"street": "123 Main St", "city": "New York", "state": "NY", "zip": "10001"},
+    "email": "test@example.com",
+    "phone": "555-1234",
+}
 
 
 @pytest.fixture
-def sample_product(db: Session) -> Product:
-    """Create sample product"""
+async def sample_product(session) -> Product:
     product = Product(
         sku="TEST-PRODUCT-001",
         name="Sample Product",
         price=Decimal("99.99"),
         category="electronics",
         status=ProductStatus.PUBLISHED,
-        stock_quantity=100
+        stock_quantity=100,
     )
-    db.add(product)
-    db.commit()
-    db.refresh(product)
+    session.add(product)
+    await session.commit()
+    await session.refresh(product)
     return product
 
 
 @pytest.fixture
-def sample_user(db: Session) -> User:
-    """Create sample user"""
-    user = User(
-        email="test@example.com",
-        password_hash="password_hash"
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
+async def sample_user(session) -> User:
+    user = User(email="test@example.com", password_hash="password_hash")
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
     return user
 
 
 @pytest.fixture
-def sample_checkout(db: Session, sample_user: User) -> CheckoutSession:
-    """Create sample checkout session"""
-    cart = CartService.get_or_create_cart(db, sample_user.id)
+async def sample_checkout(session, sample_user) -> CheckoutSession:
+    cart = await CartService(session).get_or_create_cart(sample_user.id)
     checkout = CheckoutSession(
         checkout_token="test-token-123",
         user_id=sample_user.id,
@@ -282,31 +67,29 @@ def sample_checkout(db: Session, sample_user: User) -> CheckoutSession:
         shipping_address={"street": "123 Main", "city": "NY"},
         email="test@example.com",
         subtotal=Decimal("99.99"),
-        total=Decimal("107.99")
+        total=Decimal("107.99"),
     )
-    db.add(checkout)
-    db.commit()
-    db.refresh(checkout)
+    session.add(checkout)
+    await session.commit()
+    await session.refresh(checkout)
     return checkout
 
 
 @pytest.fixture
-def sample_payment(db: Session, sample_checkout: CheckoutSession) -> PaymentDetail:
-    """Create sample payment"""
+async def sample_payment(session, sample_checkout) -> PaymentDetail:
     payment = PaymentDetail(
         checkout_id=sample_checkout.id,
         payment_method=PaymentMethod.STRIPE,
-        amount=sample_checkout.total
+        amount=sample_checkout.total,
     )
-    db.add(payment)
-    db.commit()
-    db.refresh(payment)
+    session.add(payment)
+    await session.commit()
+    await session.refresh(payment)
     return payment
 
 
 @pytest.fixture
-def sample_order(db: Session, sample_user: User, sample_checkout: CheckoutSession, sample_payment: PaymentDetail) -> Order:
-    """Create sample order"""
+async def sample_order(session, sample_user) -> Order:
     order = Order(
         order_number="ORD-001",
         user_id=sample_user.id,
@@ -317,9 +100,176 @@ def sample_order(db: Session, sample_user: User, sample_checkout: CheckoutSessio
         tax=Decimal("8.00"),
         total=Decimal("107.99"),
         payment_method=PaymentMethod.STRIPE,
-        payment_id="txn_123"
+        payment_id="txn_123",
     )
-    db.add(order)
-    db.commit()
-    db.refresh(order)
+    session.add(order)
+    await session.commit()
+    await session.refresh(order)
     return order
+
+
+class TestProductService:
+    async def test_create_product(self, session):
+        product = await ProductService(session).create_product({
+            "sku": "TEST-001",
+            "name": "Test Product",
+            "price": Decimal("99.99"),
+            "category": "electronics",
+            "status": "published",
+        })
+        assert product.id is not None
+        assert product.price == Decimal("99.99")
+
+    async def test_get_products_and_get_product(self, session, sample_product):
+        service = ProductService(session)
+        assert (await service.get_product(sample_product.id)).sku == sample_product.sku
+        assert any(p.id == sample_product.id for p in await service.get_products())
+
+    async def test_drafts_are_not_listed_as_published(self, session, sample_product):
+        sample_product.status = ProductStatus.DRAFT
+        await session.commit()
+        assert await ProductService(session).get_products() == []
+
+    async def test_search_products(self, session, sample_product):
+        results = await ProductService(session).search_products(sample_product.name)
+        assert any(p.id == sample_product.id for p in results)
+
+    async def test_get_featured_products(self, session):
+        assert isinstance(await ProductService(session).get_featured_products(), list)
+
+    async def test_add_product_review_updates_the_product(self, session, sample_product, sample_user):
+        service = ProductService(session)
+        review = await service.add_product_review(sample_product.id, sample_user.id, {
+            "rating": 5, "title": "Great product", "review_text": "This is a great product",
+        })
+        assert review.rating == 5
+        await session.refresh(sample_product)
+        assert sample_product.review_count == 1
+        assert sample_product.average_rating == 5
+
+    async def test_review_of_a_missing_product_is_not_found(self, session, sample_user):
+        from app.utils.exceptions import NotFoundError
+
+        with pytest.raises(NotFoundError):
+            await ProductService(session).add_product_review(999999, sample_user.id, {"rating": 3})
+
+
+class TestCartService:
+    async def test_get_or_create_cart(self, session, sample_user):
+        cart = await CartService(session).get_or_create_cart(sample_user.id)
+        assert cart.user_id == sample_user.id
+        assert (await CartService(session).get_or_create_cart(sample_user.id)).id == cart.id
+
+    async def test_add_to_cart_prices_the_line(self, session, sample_user, sample_product):
+        service = CartService(session)
+        cart = await service.get_or_create_cart(sample_user.id)
+        item = await service.add_to_cart(cart.id, sample_product.id, 2)
+        assert item.quantity == 2
+        assert item.line_total == 2 * sample_product.price
+        await session.refresh(cart)
+        assert cart.item_count == 2
+
+    async def test_adding_the_same_product_adds_to_the_quantity(self, session, sample_user, sample_product):
+        service = CartService(session)
+        cart = await service.get_or_create_cart(sample_user.id)
+        await service.add_to_cart(cart.id, sample_product.id, 1)
+        item = await service.add_to_cart(cart.id, sample_product.id, 2)
+        assert item.quantity == 3
+
+    async def test_remove_from_cart(self, session, sample_user, sample_product):
+        service = CartService(session)
+        cart = await service.get_or_create_cart(sample_user.id)
+        item = await service.add_to_cart(cart.id, sample_product.id, 1)
+        await service.remove_from_cart(item.id)
+        await session.refresh(cart)
+        assert cart.item_count == 0
+
+    async def test_clear_cart(self, session, sample_user, sample_product):
+        service = CartService(session)
+        cart = await service.get_or_create_cart(sample_user.id)
+        await service.add_to_cart(cart.id, sample_product.id, 2)
+        await service.clear_cart(cart.id)
+        await session.refresh(cart)
+        assert cart.item_count == 0
+        assert cart.total == Decimal("0.00")
+
+    async def test_unknown_cart_item_is_not_found(self, session):
+        from app.utils.exceptions import NotFoundError
+
+        with pytest.raises(NotFoundError):
+            await CartService(session).remove_from_cart(999999)
+
+
+class TestCheckoutService:
+    async def test_create_checkout_session_from_the_cart(self, session, sample_user, sample_product):
+        cart = await CartService(session).get_or_create_cart(sample_user.id)
+        await CartService(session).add_to_cart(cart.id, sample_product.id, 1)
+        checkout = await CheckoutService(session).create_checkout_session(sample_user.id, cart.id, dict(SHIPPING))
+        assert checkout.checkout_token is not None
+        assert checkout.user_id == sample_user.id
+        assert checkout.total > checkout.subtotal
+
+    async def test_empty_cart_cannot_check_out(self, session, sample_user):
+        cart = await CartService(session).get_or_create_cart(sample_user.id)
+        with pytest.raises(ValueError, match="empty"):
+            await CheckoutService(session).create_checkout_session(sample_user.id, cart.id, dict(SHIPPING))
+
+    async def test_get_checkout_session(self, session, sample_checkout):
+        assert (await CheckoutService(session).get_checkout_session(sample_checkout.id)).id == sample_checkout.id
+
+    async def test_apply_coupon(self, session, sample_checkout):
+        await CheckoutService(session).apply_coupon(sample_checkout.id, "DISCOUNT10")
+        await session.refresh(sample_checkout)
+        assert sample_checkout.coupon_code == "DISCOUNT10"
+        assert sample_checkout.discount > Decimal("0.00")
+
+
+class TestPaymentService:
+    async def test_create_payment(self, session, sample_checkout):
+        payment = await PaymentService(session).create_payment(sample_checkout.id, {
+            "payment_method": "stripe", "amount": sample_checkout.total, "currency": "USD",
+        })
+        assert payment.checkout_id == sample_checkout.id
+        assert payment.amount == sample_checkout.total
+
+    async def test_only_a_completed_payment_counts_as_paid(self, session, sample_checkout):
+        service = PaymentService(session)
+        failed = await service.create_payment(sample_checkout.id, {"payment_method": "stripe", "amount": Decimal("1")})
+        failed.status = "failed"
+        await session.commit()
+        assert await service.completed_payment_for(sample_checkout.id) is None
+
+
+class TestOrderService:
+    async def test_create_order_copies_the_checkout_and_clears_the_cart(
+        self, session, sample_user, sample_checkout, sample_payment,
+    ):
+        order = await OrderService(session).create_order(sample_user.id, sample_checkout, sample_payment)
+        assert order.order_number.startswith("ORD-")
+        assert order.total == sample_checkout.total
+
+    async def test_get_order_includes_its_items(self, session, sample_order):
+        order = await OrderService(session).get_order(sample_order.id)
+        assert order.id == sample_order.id
+        assert order.items == []
+
+    async def test_get_user_orders(self, session, sample_user, sample_order):
+        orders = await OrderService(session).get_user_orders(sample_user.id)
+        assert any(o.id == sample_order.id for o in orders)
+
+    async def test_update_order_status(self, session, sample_order):
+        service = OrderService(session)
+        await service.update_order_status(sample_order.id, OrderStatus.SHIPPED)
+        await session.refresh(sample_order)
+        assert sample_order.order_status == OrderStatus.SHIPPED
+
+    async def test_cancel_order(self, session, sample_order):
+        await OrderService(session).cancel_order(sample_order.id)
+        await session.refresh(sample_order)
+        assert sample_order.order_status == OrderStatus.CANCELLED
+
+    async def test_missing_order_is_not_found(self, session):
+        from app.utils.exceptions import NotFoundError
+
+        with pytest.raises(NotFoundError):
+            await OrderService(session).cancel_order(999999)

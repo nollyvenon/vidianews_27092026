@@ -1,34 +1,48 @@
-"""Ecommerce API endpoints"""
+"""Ecommerce API endpoints.
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from app.database import get_db
-from app.core.security import get_current_user
-from app.services.ecommerce_service import (
-    ProductService, CartService, CheckoutService, PaymentService, OrderService
-)
-from app.models.user import User
-from app.models.ecommerce import PaymentDetail
-from app.core.config import settings
-import stripe
-from pydantic import BaseModel
-from typing import List, Optional
-from decimal import Decimal
+Access rules:
+- The catalog is public for published products. Drafts are visible to administrators only;
+  creating and changing products requires the ecommerce administrator role.
+- Carts, checkouts, orders and cart items belong to the signed-in user. Anything of another
+  user's is answered with 404.
+- A card charge is made only for a checkout that has no completed payment yet, so a declined
+  card can be retried.
+"""
+
 from datetime import datetime
+from decimal import Decimal
+from typing import List, Optional
+
+import stripe
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.admin_access import is_admin, require_admin
+from app.core.config import settings
+from app.core.security import get_current_user, get_optional_current_user
+from app.db.session import get_db
+from app.models.ecommerce import CartItem, ProductStatus
+from app.models.user import User
+from app.services.ecommerce_service import (
+    CartService,
+    CheckoutService,
+    OrderService,
+    PaymentService,
+    ProductService,
+)
 
 router = APIRouter()
 
+require_ecommerce_admin = require_admin("ecommerce")
 
-# ============================================================================
-# SCHEMAS
-# ============================================================================
 
 class ProductBase(BaseModel):
-    sku: str
-    name: str
+    sku: str = Field(..., min_length=1, max_length=100)
+    name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
-    price: Decimal
-    category: str
+    price: Decimal = Field(..., ge=0)
+    category: str = Field(..., min_length=1, max_length=100)
     status: str = "draft"
 
 
@@ -40,14 +54,14 @@ class ProductResponse(ProductBase):
 
 
 class ProductReviewRequest(BaseModel):
-    rating: int
+    rating: int = Field(..., ge=1, le=5)
     title: Optional[str] = None
     review_text: Optional[str] = None
 
 
 class CartItemRequest(BaseModel):
-    product_id: int
-    quantity: int
+    product_id: int = Field(..., ge=1)
+    quantity: int = Field(..., ge=1, le=1000)
     selected_attributes: Optional[dict] = None
 
 
@@ -105,87 +119,111 @@ class OrderResponse(BaseModel):
         from_attributes = True
 
 
+async def _is_ecommerce_admin(session: AsyncSession, user: Optional[User]) -> bool:
+    return user is not None and await is_admin(session, user.id, "ecommerce")
+
+
+async def _own_cart_item(session: AsyncSession, user: User, item_id: int) -> CartItem:
+    item = await CartService(session).get_cart_item(item_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Cart item not found")
+    cart = await CartService(session).get_cart(item.cart_id)
+    if cart is None or cart.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Cart item not found")
+    return item
+
+
 # ============================================================================
 # PRODUCTS
 # ============================================================================
 
 @router.get("/products", response_model=List[ProductResponse])
-def get_products(
+async def get_products(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     category: Optional[str] = None,
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Get all products"""
-    return ProductService.get_products(db, skip=skip, limit=limit, category=category)
+    """Published products"""
+    return await ProductService(session).get_products(skip=skip, limit=limit, category=category)
 
 
 @router.get("/products/search", response_model=List[ProductResponse])
-def search_products(
+async def search_products(
     q: str = Query(..., min_length=1),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Search products"""
-    return ProductService.search_products(db, q, skip=skip, limit=limit)
+    """Published products matching the text"""
+    return await ProductService(session).search_products(q, skip=skip, limit=limit)
 
 
 @router.get("/products/featured", response_model=List[ProductResponse])
-def get_featured_products(db: Session = Depends(get_db)):
-    """Get featured products"""
-    return ProductService.get_featured_products(db)
+async def get_featured_products(session: AsyncSession = Depends(get_db)):
+    return await ProductService(session).get_featured_products()
 
 
 @router.get("/products/{product_id}", response_model=ProductResponse)
-def get_product(product_id: int, db: Session = Depends(get_db)):
-    """Get product by ID"""
-    product = ProductService.get_product(db, product_id)
-    if not product:
+async def get_product(
+    product_id: int,
+    current_user: Optional[User] = Depends(get_optional_current_user),
+    session: AsyncSession = Depends(get_db),
+):
+    """A published product; drafts are visible to ecommerce administrators only"""
+    product = await ProductService(session).get_product(product_id)
+    if product is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    if product.status != ProductStatus.PUBLISHED and not await _is_ecommerce_admin(session, current_user):
         raise HTTPException(status_code=404, detail="Product not found")
     return product
 
 
-@router.post("/products", response_model=ProductResponse)
-def create_product(
+@router.post("/products", response_model=ProductResponse, status_code=201)
+async def create_product(
     product: ProductBase,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    _admin: User = Depends(require_ecommerce_admin),
+    session: AsyncSession = Depends(get_db),
 ):
-    """Create new product (admin only)"""
-    return ProductService.create_product(db, product.dict())
+    """Create a product (ecommerce administrators)"""
+    return await ProductService(session).create_product(product.model_dump())
 
 
 @router.put("/products/{product_id}", response_model=ProductResponse)
-def update_product(
+async def update_product(
     product_id: int,
     product: ProductBase,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    _admin: User = Depends(require_ecommerce_admin),
+    session: AsyncSession = Depends(get_db),
 ):
-    """Update product (admin only)"""
-    return ProductService.update_product(db, product_id, product.dict())
+    """Update a product (ecommerce administrators)"""
+    return await ProductService(session).update_product(product_id, product.model_dump())
 
-@router.post("/products/{product_id}/reviews")
-def add_product_review(
+
+@router.post("/products/{product_id}/reviews", status_code=201)
+async def add_product_review(
     product_id: int,
     review: ProductReviewRequest,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Add product review"""
-    return ProductService.add_product_review(db, product_id, current_user.id, review.dict())
+    product = await ProductService(session).get_product(product_id)
+    if product is None or product.status != ProductStatus.PUBLISHED:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return await ProductService(session).add_product_review(product_id, current_user.id, review.model_dump())
 
 
 @router.get("/products/{product_id}/reviews")
-def get_product_reviews(
+async def get_product_reviews(
     product_id: int,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Get product reviews"""
-    return ProductService.get_product_reviews(db, product_id, skip=skip, limit=limit)
+    product = await ProductService(session).get_product(product_id)
+    if product is None or product.status != ProductStatus.PUBLISHED:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return await ProductService(session).get_product_reviews(product_id, skip=skip, limit=limit)
 
 
 # ============================================================================
@@ -193,59 +231,53 @@ def get_product_reviews(
 # ============================================================================
 
 @router.get("/cart", response_model=CartResponse)
-def get_cart(
+async def get_cart(
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Get user's cart"""
-    cart = CartService.get_or_create_cart(db, current_user.id)
-    return cart
+    return await CartService(session).get_or_create_cart(current_user.id)
 
 
-@router.post("/cart/items")
-def add_to_cart(
+@router.post("/cart/items", status_code=201)
+async def add_to_cart(
     item: CartItemRequest,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Add item to cart"""
-    cart = CartService.get_or_create_cart(db, current_user.id)
-    return CartService.add_to_cart(
-        db, cart.id, item.product_id, item.quantity, item.selected_attributes
-    )
+    cart = await CartService(session).get_or_create_cart(current_user.id)
+    return await CartService(session).add_to_cart(cart.id, item.product_id, item.quantity, item.selected_attributes)
 
 
 @router.put("/cart/items/{item_id}")
-def update_cart_item(
+async def update_cart_item(
     item_id: int,
-    quantity: int,
+    quantity: int = Query(..., ge=1, le=1000),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Update cart item quantity"""
-    CartService.update_cart_item(db, item_id, quantity)
+    await _own_cart_item(session, current_user, item_id)
+    await CartService(session).update_cart_item(item_id, quantity)
     return {"status": "success"}
 
 
 @router.delete("/cart/items/{item_id}")
-def remove_from_cart(
+async def remove_from_cart(
     item_id: int,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Remove item from cart"""
-    CartService.remove_from_cart(db, item_id)
+    await _own_cart_item(session, current_user, item_id)
+    await CartService(session).remove_from_cart(item_id)
     return {"status": "success"}
 
 
 @router.delete("/cart")
-def clear_cart(
+async def clear_cart(
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Clear cart"""
-    cart = CartService.get_or_create_cart(db, current_user.id)
-    CartService.clear_cart(db, cart.id)
+    cart = await CartService(session).get_or_create_cart(current_user.id)
+    await CartService(session).clear_cart(cart.id)
     return {"status": "success"}
 
 
@@ -253,45 +285,42 @@ def clear_cart(
 # CHECKOUT
 # ============================================================================
 
-@router.post("/checkout")
-def create_checkout(
+@router.post("/checkout", status_code=201)
+async def create_checkout(
     checkout: CheckoutRequest,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Create checkout session"""
-    cart = CartService.get_or_create_cart(db, current_user.id)
+    cart = await CartService(session).get_or_create_cart(current_user.id)
     try:
-        return CheckoutService.create_checkout_session(db, current_user.id, cart.id, checkout.dict())
+        return await CheckoutService(session).create_checkout_session(current_user.id, cart.id, checkout.model_dump())
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
 
 @router.get("/checkout/{checkout_id}")
-def get_checkout(
+async def get_checkout(
     checkout_id: int,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Get checkout session"""
-    checkout = CheckoutService.get_checkout_session(db, checkout_id)
-    if not checkout or checkout.user_id != current_user.id:
+    checkout = await CheckoutService(session).get_checkout_session(checkout_id)
+    if checkout is None or checkout.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Checkout not found")
     return checkout
 
 
 @router.post("/checkout/{checkout_id}/coupon")
-def apply_coupon(
+async def apply_coupon(
     checkout_id: int,
     coupon_code: str,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Apply coupon code"""
-    checkout = CheckoutService.get_checkout_session(db, checkout_id)
-    if not checkout or checkout.user_id != current_user.id:
+    checkout = await CheckoutService(session).get_checkout_session(checkout_id)
+    if checkout is None or checkout.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Checkout not found")
-    CheckoutService.apply_coupon(db, checkout_id, coupon_code)
+    await CheckoutService(session).apply_coupon(checkout_id, coupon_code)
     return {"status": "success"}
 
 
@@ -300,19 +329,19 @@ def apply_coupon(
 # ============================================================================
 
 @router.post("/checkout/{checkout_id}/payment")
-def process_payment(
+async def process_payment(
     checkout_id: int,
     payment: PaymentRequest,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
     """Charge the checkout total by card and create the order once the charge succeeds.
 
     The amount is always the checkout total; the client's amount is ignored. Only card
     payments through Stripe are supported.
     """
-    checkout = CheckoutService.get_checkout_session(db, checkout_id)
-    if not checkout or checkout.user_id != current_user.id:
+    checkout = await CheckoutService(session).get_checkout_session(checkout_id)
+    if checkout is None or checkout.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Checkout not found")
     if payment.payment_method != "stripe":
         raise HTTPException(status_code=422, detail="Only card payments are supported")
@@ -320,23 +349,24 @@ def process_payment(
         raise HTTPException(status_code=503, detail="Card payments are not configured on this server")
     if not payment.card_token:
         raise HTTPException(status_code=422, detail="A card payment method is required")
-    if db.query(PaymentDetail).filter(PaymentDetail.checkout_id == checkout_id).first():
+
+    payments = PaymentService(session)
+    if await payments.completed_payment_for(checkout_id) is not None:
         raise HTTPException(status_code=409, detail="This checkout has already been paid")
 
-    payment_detail = PaymentService.create_payment(
-        db,
+    payment_detail = await payments.create_payment(
         checkout_id,
         {"payment_method": payment.payment_method, "amount": checkout.total, "currency": "USD"},
     )
     try:
-        PaymentService.process_stripe_payment(db, payment_detail.id, payment.card_token)
+        await payments.process_stripe_payment(payment_detail.id, payment.card_token)
     except stripe.error.CardError as exc:
         raise HTTPException(status_code=402, detail=exc.user_message or "Your card was declined")
-    except stripe.error.StripeError as exc:
+    except stripe.error.StripeError:
         raise HTTPException(status_code=502, detail="The payment provider could not complete the charge")
 
-    db.refresh(payment_detail)
-    order = OrderService.create_order(db, current_user.id, checkout, payment_detail)
+    await session.refresh(payment_detail)
+    order = await OrderService(session).create_order(current_user.id, checkout, payment_detail)
     return {
         "payment_id": payment_detail.id,
         "status": payment_detail.status.value,
@@ -352,38 +382,35 @@ def process_payment(
 # ============================================================================
 
 @router.get("/orders", response_model=List[OrderResponse])
-def get_user_orders(
+async def get_user_orders(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Get user's orders"""
-    return OrderService.get_user_orders(db, current_user.id, skip=skip, limit=limit)
+    return await OrderService(session).get_user_orders(current_user.id, skip=skip, limit=limit)
 
 
 @router.get("/orders/{order_id}", response_model=OrderResponse)
-def get_order(
+async def get_order(
     order_id: int,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Get order details"""
-    order = OrderService.get_order(db, order_id)
-    if not order or order.user_id != current_user.id:
+    order = await OrderService(session).get_order(order_id)
+    if order is None or order.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Order not found")
     return order
 
 
 @router.post("/orders/{order_id}/cancel")
-def cancel_order(
+async def cancel_order(
     order_id: int,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
-    """Cancel order"""
-    order = OrderService.get_order(db, order_id)
-    if not order or order.user_id != current_user.id:
+    order = await OrderService(session).get_order(order_id)
+    if order is None or order.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Order not found")
-    OrderService.cancel_order(db, order_id)
+    await OrderService(session).cancel_order(order_id)
     return {"status": "success"}
