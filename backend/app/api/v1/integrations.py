@@ -12,7 +12,7 @@ from app.services.integrations_service import (
     AnalyticsService, WebhookService, NotificationService,
     AuditService, SearchService
 )
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from app.models.integrations import IntegrationType
 
 router = APIRouter(prefix="/system", tags=["system"])
@@ -238,9 +238,19 @@ async def get_compliance_reports(current_user: User = Depends(get_current_user),
 
 # ==================== MODULE 25: SEARCH & DISCOVERY ====================
 
-@router.get("/search")
+class SearchResultResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    resource_type: str
+    resource_id: int
+    title: str
+    content: Optional[str] = None
+
+
+@router.get("/search", response_model=List[SearchResultResponse])
 async def search(q: str, current_user: User = Depends(get_current_user), session: AsyncSession = Depends(get_db)):
-    """Search resources"""
+    """Search the resources indexed for the caller's organization by title"""
     service = SearchService(session)
     return await service.search(current_user.organization_id, q)
 
