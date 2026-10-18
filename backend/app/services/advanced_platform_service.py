@@ -1,24 +1,42 @@
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
-from typing import Optional, List, Dict, Any, Set
-from datetime import datetime, timedelta
+"""Realtime, background job, data pipeline, cache and API documentation services (async).
+
+Timestamps are naive UTC to match the naive ``DateTime`` columns in ``app.models.advanced_platform``.
+Missing records raise NotFoundError from the operations that create child rows, so the API answers 404
+instead of failing on a foreign key.
+"""
+
 import json
 import time
-import asyncio
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Set
+
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.advanced_platform import (
     WebSocketConnection, RealtimeEvent, BackgroundJob, JobSchedule,
     DataPipeline, PipelineExecution, PipelineStage, CacheEntry, CacheMetrics,
     APIDocumentation, APIEndpoint, APIUsageMetrics,
-    WebSocketConnectionStatus, JobStatus, PipelineStageStatus,
+    WebSocketConnectionStatus, JobStatus,
     CacheStrategy, DocumentationFormat
 )
+from app.utils.exceptions import NotFoundError
+
+
+def _utcnow() -> datetime:
+    """Naive UTC, matching the naive DateTime columns"""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class WebSocketService:
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
         self.active_connections: Dict[str, Set[str]] = {}
+
+    async def _connection(self, connection_id: str) -> Optional[WebSocketConnection]:
+        return (await self.db.execute(
+            select(WebSocketConnection).where(WebSocketConnection.connection_id == connection_id)
+        )).scalar_one_or_none()
 
     async def register_connection(
         self,
@@ -36,7 +54,7 @@ class WebSocketService:
             user_agent=user_agent,
         )
         self.db.add(connection)
-        self.db.commit()
+        await self.db.commit()
 
         if user_id not in self.active_connections:
             self.active_connections[user_id] = set()
@@ -45,14 +63,12 @@ class WebSocketService:
         return connection
 
     async def unregister_connection(self, connection_id: str) -> bool:
-        connection = self.db.query(WebSocketConnection).filter(
-            WebSocketConnection.connection_id == connection_id
-        ).first()
+        connection = await self._connection(connection_id)
 
         if connection:
             connection.status = WebSocketConnectionStatus.DISCONNECTED
-            connection.disconnected_at = datetime.utcnow()
-            self.db.commit()
+            connection.disconnected_at = _utcnow()
+            await self.db.commit()
 
             if connection.user_id in self.active_connections:
                 self.active_connections[connection.user_id].discard(connection_id)
@@ -61,22 +77,21 @@ class WebSocketService:
         return False
 
     async def heartbeat(self, connection_id: str) -> bool:
-        connection = self.db.query(WebSocketConnection).filter(
-            WebSocketConnection.connection_id == connection_id
-        ).first()
+        connection = await self._connection(connection_id)
 
         if connection:
-            connection.last_heartbeat = datetime.utcnow()
+            connection.last_heartbeat = _utcnow()
             connection.status = WebSocketConnectionStatus.CONNECTED
-            self.db.commit()
+            await self.db.commit()
             return True
         return False
 
     async def get_connections_for_user(self, user_id: int) -> List[WebSocketConnection]:
-        return self.db.query(WebSocketConnection).filter(
+        result = await self.db.execute(select(WebSocketConnection).where(
             WebSocketConnection.user_id == user_id,
             WebSocketConnection.status == WebSocketConnectionStatus.CONNECTED,
-        ).all()
+        ))
+        return list(result.scalars().all())
 
     async def broadcast_event(
         self,
@@ -94,39 +109,44 @@ class WebSocketService:
             priority=priority,
         )
         self.db.add(event)
-        self.db.commit()
+        await self.db.commit()
+        await self.db.refresh(event)
         return event
 
-    def list_recent_events(self, limit: int = 50) -> List[RealtimeEvent]:
+    async def list_recent_events(self, limit: int = 50) -> List[RealtimeEvent]:
         """Most recent realtime events first"""
-        return self.db.query(RealtimeEvent).order_by(RealtimeEvent.id.desc()).limit(limit).all()
-
-    def presence(self, now: datetime, idle_after: timedelta) -> Dict[str, int]:
-        """Connected sockets, and how many of them have not sent a heartbeat within `idle_after`"""
-        connected = self.db.query(WebSocketConnection).filter(
-            WebSocketConnection.status == WebSocketConnectionStatus.CONNECTED
+        result = await self.db.execute(
+            select(RealtimeEvent).order_by(RealtimeEvent.id.desc()).limit(limit)
         )
-        return {
-            "online": connected.count(),
-            "idle": connected.filter(WebSocketConnection.last_heartbeat < now - idle_after).count(),
-        }
+        return list(result.scalars().all())
+
+    async def presence(self, now: datetime, idle_after: timedelta) -> Dict[str, int]:
+        """Connected sockets, and how many of them have not sent a heartbeat within `idle_after`"""
+        online, idle = (await self.db.execute(
+            select(
+                func.count(WebSocketConnection.id),
+                func.count(WebSocketConnection.id).filter(WebSocketConnection.last_heartbeat < now - idle_after),
+            ).where(WebSocketConnection.status == WebSocketConnectionStatus.CONNECTED)
+        )).one()
+        return {"online": int(online), "idle": int(idle)}
 
     async def publish_event(self, event_id: int) -> Optional[RealtimeEvent]:
-        event = self.db.query(RealtimeEvent).filter(
-            RealtimeEvent.id == event_id
-        ).first()
+        event = await self.db.get(RealtimeEvent, event_id)
 
         if event:
             event.status = "published"
-            event.published_at = datetime.utcnow()
-            self.db.commit()
+            event.published_at = _utcnow()
+            await self.db.commit()
 
         return event
 
 
 class BackgroundJobService:
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
+
+    async def _job(self, job_id: int) -> Optional[BackgroundJob]:
+        return await self.db.get(BackgroundJob, job_id)
 
     async def create_job(
         self,
@@ -144,26 +164,30 @@ class BackgroundJobService:
             scheduled_at=scheduled_at,
         )
         self.db.add(job)
-        self.db.commit()
+        await self.db.commit()
+        await self.db.refresh(job)
         return job
 
-    async def get_pending_jobs(self, limit: int = 50) -> List[BackgroundJob]:
-        now = datetime.utcnow()
-        return self.db.query(BackgroundJob).filter(
+    async def get_pending_jobs(self, limit: int = 50, user_id: Optional[int] = None) -> List[BackgroundJob]:
+        """Jobs ready to run now, highest priority first. `user_id` limits the list to one user's jobs."""
+        now = _utcnow()
+        stmt = select(BackgroundJob).where(
             BackgroundJob.status == JobStatus.PENDING,
             (BackgroundJob.scheduled_at.is_(None)) |
             (BackgroundJob.scheduled_at <= now),
-        ).order_by(BackgroundJob.priority.desc()).limit(limit).all()
+        )
+        if user_id is not None:
+            stmt = stmt.where(BackgroundJob.user_id == user_id)
+        result = await self.db.execute(stmt.order_by(BackgroundJob.priority.desc(), BackgroundJob.id).limit(limit))
+        return list(result.scalars().all())
 
     async def start_job(self, job_id: int) -> Optional[BackgroundJob]:
-        job = self.db.query(BackgroundJob).filter(
-            BackgroundJob.id == job_id
-        ).first()
+        job = await self._job(job_id)
 
         if job:
             job.status = JobStatus.RUNNING
-            job.started_at = datetime.utcnow()
-            self.db.commit()
+            job.started_at = _utcnow()
+            await self.db.commit()
 
         return job
 
@@ -172,15 +196,13 @@ class BackgroundJobService:
         job_id: int,
         result: Optional[Dict[str, Any]] = None,
     ) -> Optional[BackgroundJob]:
-        job = self.db.query(BackgroundJob).filter(
-            BackgroundJob.id == job_id
-        ).first()
+        job = await self._job(job_id)
 
         if job:
             job.status = JobStatus.COMPLETED
-            job.completed_at = datetime.utcnow()
+            job.completed_at = _utcnow()
             job.result = result
-            self.db.commit()
+            await self.db.commit()
 
         return job
 
@@ -189,21 +211,19 @@ class BackgroundJobService:
         job_id: int,
         error_message: str,
     ) -> Optional[BackgroundJob]:
-        job = self.db.query(BackgroundJob).filter(
-            BackgroundJob.id == job_id
-        ).first()
+        job = await self._job(job_id)
 
         if job:
             job.retry_count += 1
             if job.retry_count >= job.max_retries:
                 job.status = JobStatus.FAILED
-                job.completed_at = datetime.utcnow()
+                job.completed_at = _utcnow()
             else:
                 job.status = JobStatus.PENDING
-                job.scheduled_at = datetime.utcnow() + timedelta(minutes=5 * job.retry_count)
+                job.scheduled_at = _utcnow() + timedelta(minutes=5 * job.retry_count)
 
             job.error_message = error_message
-            self.db.commit()
+            await self.db.commit()
 
         return job
 
@@ -221,17 +241,23 @@ class BackgroundJobService:
             description=description,
         )
         self.db.add(schedule)
-        self.db.commit()
+        await self.db.commit()
         return schedule
 
 
 class DataPipelineService:
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
-    def list_pipelines(self) -> List[DataPipeline]:
+    async def _pipeline(self, pipeline_id: int) -> Optional[DataPipeline]:
+        return await self.db.get(DataPipeline, pipeline_id)
+
+    async def list_pipelines(self) -> List[DataPipeline]:
         """Every pipeline, most recently run first"""
-        return self.db.query(DataPipeline).order_by(DataPipeline.last_run.desc().nulls_last(), DataPipeline.id).all()
+        result = await self.db.execute(
+            select(DataPipeline).order_by(DataPipeline.last_run.desc().nulls_last(), DataPipeline.id)
+        )
+        return list(result.scalars().all())
 
     async def create_pipeline(
         self,
@@ -253,32 +279,33 @@ class DataPipelineService:
             description=description,
         )
         self.db.add(pipeline)
-        self.db.commit()
+        await self.db.commit()
+        await self.db.refresh(pipeline)
         return pipeline
 
     async def activate_pipeline(self, pipeline_id: int) -> Optional[DataPipeline]:
-        pipeline = self.db.query(DataPipeline).filter(
-            DataPipeline.id == pipeline_id
-        ).first()
+        pipeline = await self._pipeline(pipeline_id)
 
         if pipeline:
             pipeline.is_active = True
             pipeline.status = "active"
-            self.db.commit()
+            await self.db.commit()
 
         return pipeline
 
     async def execute_pipeline(self, pipeline_id: int) -> PipelineExecution:
-        pipeline = self.db.query(DataPipeline).filter(
-            DataPipeline.id == pipeline_id
-        ).first()
+        pipeline = await self._pipeline(pipeline_id)
+        if pipeline is None:
+            raise NotFoundError("Pipeline")
 
         execution = PipelineExecution(
             pipeline_id=pipeline_id,
             status="running",
         )
         self.db.add(execution)
-        self.db.commit()
+        pipeline.last_run = _utcnow()
+        await self.db.commit()
+        await self.db.refresh(execution)
 
         return execution
 
@@ -289,17 +316,19 @@ class DataPipelineService:
         records_failed: int = 0,
         execution_time_ms: int = 0,
     ) -> Optional[PipelineExecution]:
-        execution = self.db.query(PipelineExecution).filter(
-            PipelineExecution.id == execution_id
-        ).first()
+        execution = await self.db.get(PipelineExecution, execution_id)
 
         if execution:
+            now = _utcnow()
             execution.status = "success"
-            execution.completed_at = datetime.utcnow()
+            execution.completed_at = now
             execution.records_processed = records_processed
             execution.records_failed = records_failed
             execution.execution_time_ms = execution_time_ms
-            self.db.commit()
+            pipeline = await self._pipeline(execution.pipeline_id)
+            if pipeline is not None:
+                pipeline.last_success = now
+            await self.db.commit()
 
         return execution
 
@@ -311,6 +340,8 @@ class DataPipelineService:
         stage_type: str,
         config: Dict[str, Any],
     ) -> PipelineStage:
+        if await self._pipeline(pipeline_id) is None:
+            raise NotFoundError("Pipeline")
         stage = PipelineStage(
             pipeline_id=pipeline_id,
             stage_name=stage_name,
@@ -319,19 +350,25 @@ class DataPipelineService:
             config=config,
         )
         self.db.add(stage)
-        self.db.commit()
+        await self.db.commit()
         return stage
 
     async def get_pipeline_stages(self, pipeline_id: int) -> List[PipelineStage]:
-        return self.db.query(PipelineStage).filter(
-            PipelineStage.pipeline_id == pipeline_id
-        ).order_by(PipelineStage.stage_order).all()
+        result = await self.db.execute(
+            select(PipelineStage).where(PipelineStage.pipeline_id == pipeline_id).order_by(PipelineStage.stage_order)
+        )
+        return list(result.scalars().all())
 
 
 class CacheService:
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
         self.local_cache: Dict[str, Any] = {}
+
+    async def _entry(self, cache_key: str) -> Optional[CacheEntry]:
+        return (await self.db.execute(
+            select(CacheEntry).where(CacheEntry.cache_key == cache_key)
+        )).scalar_one_or_none()
 
     async def set_cache(
         self,
@@ -342,7 +379,7 @@ class CacheService:
     ) -> CacheEntry:
         expires_at = None
         if ttl_seconds:
-            expires_at = datetime.utcnow() + timedelta(seconds=ttl_seconds)
+            expires_at = _utcnow() + timedelta(seconds=ttl_seconds)
 
         entry = CacheEntry(
             cache_key=cache_key,
@@ -353,7 +390,8 @@ class CacheService:
             size_bytes=len(json.dumps(cache_value).encode()),
         )
         self.db.add(entry)
-        self.db.commit()
+        await self.db.commit()
+        await self.db.refresh(entry)
 
         self.local_cache[cache_key] = cache_value
 
@@ -361,27 +399,27 @@ class CacheService:
 
     async def get_cache(self, cache_key: str) -> Optional[Dict[str, Any]]:
         started = time.perf_counter()
-        entry = self.db.query(CacheEntry).filter(
-            CacheEntry.cache_key == cache_key
-        ).first()
+        entry = await self._entry(cache_key)
 
         value: Optional[Dict[str, Any]] = None
-        if entry is not None and entry.expires_at and entry.expires_at < datetime.utcnow():
-            self.db.delete(entry)
-            self.db.commit()
+        if entry is not None and entry.expires_at and entry.expires_at < _utcnow():
+            await self.db.delete(entry)
+            await self.db.commit()
             entry = None
         if entry is not None:
             entry.hit_count += 1
             value = entry.cache_value
             self.local_cache[cache_key] = value
-        self.db.commit()
+        await self.db.commit()
 
-        self._record_access(hit=value is not None, elapsed_ms=(time.perf_counter() - started) * 1000)
+        await self._record_access(hit=value is not None, elapsed_ms=(time.perf_counter() - started) * 1000)
         return value
 
-    def _running_metrics(self) -> CacheMetrics:
+    async def _running_metrics(self) -> CacheMetrics:
         """The single running row that accumulates every recorded cache access."""
-        row = self.db.query(CacheMetrics).order_by(CacheMetrics.id.desc()).first()
+        row = (await self.db.execute(
+            select(CacheMetrics).order_by(CacheMetrics.id.desc()).limit(1)
+        )).scalar_one_or_none()
         if row is None:
             row = CacheMetrics(
                 total_requests=0,
@@ -394,8 +432,8 @@ class CacheService:
             self.db.add(row)
         return row
 
-    def _record_access(self, hit: bool, elapsed_ms: float) -> None:
-        row = self._running_metrics()
+    async def _record_access(self, hit: bool, elapsed_ms: float) -> None:
+        row = await self._running_metrics()
         prior = row.total_requests or 0
         row.average_response_time_ms = ((row.average_response_time_ms or 0.0) * prior + elapsed_ms) / (prior + 1)
         row.total_requests = prior + 1
@@ -403,28 +441,28 @@ class CacheService:
             row.total_hits = (row.total_hits or 0) + 1
         else:
             row.total_misses = (row.total_misses or 0) + 1
-        row.measured_at = datetime.utcnow()
-        self.db.commit()
+        row.measured_at = _utcnow()
+        await self.db.commit()
 
     async def invalidate_cache(self, cache_key: str) -> bool:
         self.local_cache.pop(cache_key, None)
-        entry = self.db.query(CacheEntry).filter(
-            CacheEntry.cache_key == cache_key
-        ).first()
+        entry = await self._entry(cache_key)
 
         if entry:
-            self.db.delete(entry)
-            self.db.commit()
+            await self.db.delete(entry)
+            await self.db.commit()
             return True
 
         return False
 
     async def get_cache_metrics(self) -> Dict[str, Any]:
         """Recorded cache accesses (hits, misses, latency) with the memory the live entries occupy."""
-        row = self._running_metrics()
-        total_size = sum(size or 0 for (size,) in self.db.query(CacheEntry.size_bytes).all())
-        row.memory_usage_mb = total_size / (1024 * 1024)
-        self.db.commit()
+        row = await self._running_metrics()
+        total_size = (await self.db.execute(
+            select(func.coalesce(func.sum(CacheEntry.size_bytes), 0))
+        )).scalar_one()
+        row.memory_usage_mb = int(total_size) / (1024 * 1024)
+        await self.db.commit()
         return {
             "total_requests": int(row.total_requests or 0),
             "total_hits": int(row.total_hits or 0),
@@ -433,9 +471,22 @@ class CacheService:
             "memory_usage_mb": round(float(row.memory_usage_mb or 0.0), 6),
         }
 
+    async def cache_summary(self) -> Dict[str, Any]:
+        """Entry count, hits served and memory occupied by the live cache entries."""
+        entries, hits, size_bytes = (await self.db.execute(select(
+            func.count(CacheEntry.id),
+            func.coalesce(func.sum(CacheEntry.hit_count), 0),
+            func.coalesce(func.sum(CacheEntry.size_bytes), 0),
+        ))).one()
+        return {
+            "entries": int(entries),
+            "total_hits": int(hits),
+            "memory_usage_mb": round(int(size_bytes) / (1024 * 1024), 3),
+        }
+
 
 class APIDocumentationService:
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
     async def create_documentation(
@@ -458,7 +509,7 @@ class APIDocumentationService:
             servers=servers or [],
         )
         self.db.add(doc)
-        self.db.commit()
+        await self.db.commit()
         return doc
 
     async def add_endpoint(
@@ -473,6 +524,8 @@ class APIDocumentationService:
         response_schema: Optional[Dict] = None,
         status_codes: Optional[Dict] = None,
     ) -> APIEndpoint:
+        if await self.db.get(APIDocumentation, doc_id) is None:
+            raise NotFoundError("Documentation")
         endpoint = APIEndpoint(
             doc_id=doc_id,
             path=path,
@@ -485,18 +538,26 @@ class APIDocumentationService:
             status_codes=status_codes or {},
         )
         self.db.add(endpoint)
-        self.db.commit()
+        await self.db.commit()
         return endpoint
 
     async def get_documentation(self, doc_id: int) -> Optional[APIDocumentation]:
-        return self.db.query(APIDocumentation).filter(
-            APIDocumentation.id == doc_id
-        ).first()
+        return await self.db.get(APIDocumentation, doc_id)
 
     async def get_endpoints(self, doc_id: int) -> List[APIEndpoint]:
-        return self.db.query(APIEndpoint).filter(
-            APIEndpoint.doc_id == doc_id
-        ).all()
+        result = await self.db.execute(select(APIEndpoint).where(APIEndpoint.doc_id == doc_id).order_by(APIEndpoint.id))
+        return list(result.scalars().all())
+
+    async def list_usage(self) -> List[APIUsageMetrics]:
+        """Every measured endpoint, most called first"""
+        result = await self.db.execute(
+            select(APIUsageMetrics).order_by(APIUsageMetrics.call_count.desc(), APIUsageMetrics.id)
+        )
+        return list(result.scalars().all())
+
+    async def get_usage(self, endpoint: str) -> List[APIUsageMetrics]:
+        result = await self.db.execute(select(APIUsageMetrics).where(APIUsageMetrics.endpoint == endpoint))
+        return list(result.scalars().all())
 
     async def record_usage(
         self,
@@ -505,15 +566,18 @@ class APIDocumentationService:
         response_time_ms: float,
         is_error: bool = False,
     ) -> APIUsageMetrics:
-        metrics = self.db.query(APIUsageMetrics).filter(
+        metrics = (await self.db.execute(select(APIUsageMetrics).where(
             APIUsageMetrics.endpoint == endpoint,
             APIUsageMetrics.method == method,
-        ).first()
+        ))).scalar_one_or_none()
 
         if not metrics:
             metrics = APIUsageMetrics(
                 endpoint=endpoint,
                 method=method,
+                call_count=0,
+                error_count=0,
+                average_response_time_ms=0.0,
             )
             self.db.add(metrics)
 
@@ -532,5 +596,5 @@ class APIDocumentationService:
         if response_time_ms < (metrics.min_response_time_ms or float('inf')):
             metrics.min_response_time_ms = response_time_ms
 
-        self.db.commit()
+        await self.db.commit()
         return metrics
