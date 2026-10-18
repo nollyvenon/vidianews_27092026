@@ -79,3 +79,8 @@ from .enterprise_features import SecurityLevel, ModerationAction, SecurityPolicy
 from .analytics_reporting import VisualizationType, TrackingPixel, ConversionFunnel, CustomReport, DataVisualization
 from .platform_completion import SocialFeature, NotificationStatus
 from .advanced_platform import WebSocketSession
+
+# Registered for their tables only: their class names overlap with exports above
+# (for example NotificationPreference), so the modules are imported instead.
+from . import auth  # noqa: F401
+from . import settings  # noqa: F401
