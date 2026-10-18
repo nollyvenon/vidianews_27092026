@@ -1,38 +1,55 @@
+// Content recommended for the signed-in user, most relevant first.
+
 import 'package:flutter/material.dart';
+import '../models/discovery_models.dart';
+import '../services/authenticated_dio.dart';
+import '../services/discovery_service.dart';
+import '../widgets/async_view.dart';
 
 class RecommendationsScreen extends StatefulWidget {
-  const RecommendationsScreen({Key? key}) : super(key: key);
+  final DiscoveryService? service;
+
+  const RecommendationsScreen({Key? key, this.service}) : super(key: key);
 
   @override
   State<RecommendationsScreen> createState() => _RecommendationsScreenState();
 }
 
 class _RecommendationsScreenState extends State<RecommendationsScreen> {
-  final List<Map<String, String>> recommendations = [
-    {'title': 'Advanced Flutter Tips', 'reason': 'Based on your interests', 'score': '0.95'},
-    {'title': 'React Performance Guide', 'reason': 'Similar to watched videos', 'score': '0.88'},
-    {'title': 'Web Security Basics', 'reason': 'Trending in your category', 'score': '0.85'},
-  ];
+  late final DiscoveryService _service = widget.service ?? DiscoveryService(createAuthenticatedDio());
+  late Future<List<Recommendation>> _items = _service.fetchRecommendations(limit: 20);
+
+  void _reload() {
+    setState(() {
+      _items = _service.fetchRecommendations(limit: 20);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Recommendations')),
-      body: ListView.builder(
-        itemCount: recommendations.length,
-        itemBuilder: (context, index) {
-          final rec = recommendations[index];
-          return Card(
-            margin: const EdgeInsets.all(8),
-            child: ListTile(
-              leading: CircleAvatar(
-                child: Text(rec['score']!),
-              ),
-              title: Text(rec['title']!),
-              subtitle: Text(rec['reason']!),
-              trailing: const Icon(Icons.arrow_forward),
-              onTap: () {},
-            ),
+      body: AsyncView<List<Recommendation>>(
+        future: _items,
+        onRetry: _reload,
+        builder: (context, items) {
+          if (items.isEmpty) {
+            return const Center(child: Text('Nothing recommended yet.'));
+          }
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: items.length,
+            itemBuilder: (context, index) {
+              final item = items[index];
+              return Card(
+                child: ListTile(
+                  key: Key('recommendation-${item.id}'),
+                  title: Text(item.title),
+                  subtitle: Text(item.reason ?? item.creator ?? 'Content #${item.contentId}'),
+                  trailing: Text('${item.views} views'),
+                ),
+              );
+            },
           );
         },
       ),

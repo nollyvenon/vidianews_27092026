@@ -1,69 +1,75 @@
-import 'package:flutter/material.dart';
+// The marketplace: products with their price, rating and stock, searchable by name.
 
-class MarketplaceScreen extends StatelessWidget {
-  const MarketplaceScreen({Key? key}) : super(key: key);
+import 'package:flutter/material.dart';
+import '../services/authenticated_dio.dart';
+import '../services/ecommerce_service.dart';
+import '../widgets/async_view.dart';
+
+class MarketplaceScreen extends StatefulWidget {
+  final EcommerceService? service;
+
+  const MarketplaceScreen({Key? key, this.service}) : super(key: key);
+
+  @override
+  State<MarketplaceScreen> createState() => _MarketplaceScreenState();
+}
+
+class _MarketplaceScreenState extends State<MarketplaceScreen> {
+  late final EcommerceService _service = widget.service ?? EcommerceService(createAuthenticatedDio());
+  final _queryController = TextEditingController();
+  late Future<List<Map<String, dynamic>>> _products = _service.fetchProducts();
+
+  @override
+  void dispose() {
+    _queryController.dispose();
+    super.dispose();
+  }
+
+  void _reload() {
+    setState(() {
+      _products = _service.fetchProducts(query: _queryController.text);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final creators = [
-      {'name': 'Tech Reviews', 'earnings': '\$5.2K', 'followers': '12.4K', 'rating': '4.8'},
-      {'name': 'Lifestyle Vlog', 'earnings': '\$3.8K', 'followers': '8.9K', 'rating': '4.6'},
-      {'name': 'Gaming Pro', 'earnings': '\$7.1K', 'followers': '25.6K', 'rating': '4.9'},
-    ];
-
     return Scaffold(
-      appBar: AppBar(title: const Text('Creator Marketplace')),
-      body: SingleChildScrollView(
+      appBar: AppBar(title: const Text('Marketplace')),
+      body: ListView(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Top Creators', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: creators.length,
-              itemBuilder: (context, index) {
-                final creator = creators[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(creator['name']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                            Text(creator['earnings']!, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
-                          ],
+        children: [
+          TextField(
+            key: const Key('marketplace-search'),
+            controller: _queryController,
+            textInputAction: TextInputAction.search,
+            onSubmitted: (_) => _reload(),
+            decoration: const InputDecoration(labelText: 'Search products'),
+          ),
+          const SizedBox(height: 12),
+          AsyncView<List<Map<String, dynamic>>>(
+            future: _products,
+            onRetry: _reload,
+            builder: (context, products) {
+              if (products.isEmpty) return const Text('No products found.');
+              return Column(
+                children: [
+                  for (final product in products)
+                    Card(
+                      child: ListTile(
+                        key: Key('product-${product['id']}'),
+                        title: Text(product['name'] as String),
+                        subtitle: Text(
+                          '${(product['average_rating'] as num? ?? 0).toStringAsFixed(1)} rating · '
+                          '${product['stock_quantity'] as int? ?? 0} in stock',
                         ),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('👥 ${creator['followers']}', style: const TextStyle(fontSize: 12)),
-                            Text('⭐ ${creator['rating']}/5', style: const TextStyle(fontSize: 12)),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: () {},
-                            child: const Text('View Profile'),
-                          ),
-                        ),
-                      ],
+                        trailing: Text('\$${(product['price'] as num).toStringAsFixed(2)}'),
+                      ),
                     ),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
+                ],
+              );
+            },
+          ),
+        ],
       ),
     );
   }
