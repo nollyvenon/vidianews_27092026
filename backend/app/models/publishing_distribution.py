@@ -430,7 +430,7 @@ class ABTestCampaign(Base):
     name = Column(String(255), nullable=False)
     description = Column(Text)
 
-    status = Column(SQLEnum(ABTestStatus), default=ABTestStatus.DRAFT, index=True)
+    status = Column(SQLEnum(ABTestStatus, name="publishing_distribution_a_b_test_status"), default=ABTestStatus.DRAFT, index=True)
 
     # Test parameters
     test_metric = Column(String(100), nullable=False)  # engagement, clicks, conversion, dwell_time
@@ -548,7 +548,7 @@ class RecommendationEngine(Base):
     description = Column(Text)
 
     # Algorithm configuration
-    recommendation_type = Column(SQLEnum(RecommendationType), nullable=False)
+    recommendation_type = Column(SQLEnum(RecommendationType, name="publishing_distribution_recommendation_type"), nullable=False)
 
     # Weighting
     collaborative_weight = Column(Float, default=0.4)

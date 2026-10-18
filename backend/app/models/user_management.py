@@ -67,7 +67,7 @@ class EmailCampaign(Base):
     bounce_count = Column(Integer, default=0)
     open_rate = Column(Float, default=0.0)
     click_rate = Column(Float, default=0.0)
-    status = Column(Enum(CampaignStatus), default=CampaignStatus.DRAFT)
+    status = Column(Enum(CampaignStatus, name="user_management_campaign_status"), default=CampaignStatus.DRAFT)
     scheduled_at = Column(DateTime)
     sent_at = Column(DateTime)
     created_at = Column(DateTime, server_default=func.now())
@@ -156,7 +156,7 @@ class NotificationLog(Base):
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, nullable=False)
-    channel = Column(Enum(NotificationChannel), nullable=False)
+    channel = Column(Enum(NotificationChannel, name="user_management_notification_channel"), nullable=False)
     title = Column(String(255), nullable=False)
     message = Column(Text, nullable=False)
     status = Column(String(50), default="pending")  # pending, sent, failed, read

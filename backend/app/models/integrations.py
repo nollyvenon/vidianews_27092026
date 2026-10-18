@@ -49,7 +49,7 @@ class AnalyticsReport(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
-    report_type = Column(SQLEnum(ReportType), nullable=False, index=True)
+    report_type = Column(SQLEnum(ReportType, name="integrations_report_type"), nullable=False, index=True)
     title = Column(String(255), nullable=False)
     data = Column(JSON, nullable=False)
     filters = Column(JSON, default={})
@@ -155,7 +155,7 @@ class Notification(Base):
     __tablename__ = "integration_notifications"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    notification_type = Column(SQLEnum(NotificationType), nullable=False, index=True)
+    notification_type = Column(SQLEnum(NotificationType, name="integrations_notification_type"), nullable=False, index=True)
     title = Column(String(255), nullable=False)
     message = Column(Text, nullable=False)
     data = Column(JSON)

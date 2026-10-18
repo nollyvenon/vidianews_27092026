@@ -57,12 +57,24 @@ class Settings(BaseSettings):
     MISTRAL_API_KEY: Optional[str] = None
     GROQ_API_KEY: Optional[str] = None
 
-    # Email
-    SMTP_HOST: str = "mailpit"
-    SMTP_PORT: int = 1025
+    # Email. When SMTP_HOST is unset, outgoing mail is not sent and verification links are
+    # written to the server log instead (development only; see email_sender).
+    SMTP_HOST: Optional[str] = None
+    SMTP_PORT: int = 587
     SMTP_USER: Optional[str] = None
     SMTP_PASSWORD: Optional[str] = None
     SMTP_FROM: str = "noreply@aethercms.com"
+    SMTP_STARTTLS: bool = True
+
+    # Accounts must confirm their email before the first sign-in. Keep this on in production.
+    EMAIL_VERIFICATION_REQUIRED: bool = True
+    # Public URL of the web app; used to build links that are sent by email.
+    FRONTEND_URL: str = "http://localhost:3000"
+
+    # AI chat replies (Anthropic Messages API)
+    AI_CHAT_MODEL: str = "claude-haiku-5-5"
+    AI_CHAT_MAX_TOKENS: int = 1024
+    AI_CHAT_SYSTEM_PROMPT: str = "You are a helpful assistant inside the AetherCMS AI publishing platform."
 
     # Storage
     AWS_ACCESS_KEY_ID: Optional[str] = None

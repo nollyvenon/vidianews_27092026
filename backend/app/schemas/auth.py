@@ -18,12 +18,22 @@ class LoginRequest(BaseModel):
     """User login request"""
     email: EmailStr
     password: str
+    otp_code: Optional[str] = Field(None, pattern=r"^\d{6}$")
 
 
 class TokenResponse(BaseModel):
     """Token response"""
     access_token: str
     refresh_token: str
+    token_type: str = "bearer"
+
+
+class RegisterResponse(BaseModel):
+    """Registration outcome: either a sign-in (verification disabled) or a pending confirmation."""
+    requires_verification: bool
+    message: str
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
     token_type: str = "bearer"
 
 
@@ -55,8 +65,8 @@ class UserResponse(BaseModel):
     """User response"""
     id: int
     email: str
-    first_name: str
-    last_name: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     avatar_url: Optional[str] = None
     status: str
     email_verified_at: Optional[datetime] = None

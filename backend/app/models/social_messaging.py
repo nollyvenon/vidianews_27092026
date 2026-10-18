@@ -55,7 +55,7 @@ class ModerationReport(Base):
     content_id = Column(Integer, ForeignKey("contents.id", ondelete="CASCADE"), nullable=False, index=True)
     reported_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     reason = Column(String(255), nullable=False)
-    status = Column(SQLEnum(ModerationStatus), default=ModerationStatus.PENDING, index=True)
+    status = Column(SQLEnum(ModerationStatus, name="social_messaging_moderation_status"), default=ModerationStatus.PENDING, index=True)
     notes = Column(Text)
     reported_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     resolved_at = Column(DateTime(timezone=True), nullable=True)
@@ -68,7 +68,7 @@ class ContentApproval(Base):
     __tablename__ = "content_approvals"
     id = Column(Integer, primary_key=True, index=True)
     content_id = Column(Integer, ForeignKey("contents.id", ondelete="CASCADE"), nullable=False, unique=True)
-    status = Column(SQLEnum(ModerationStatus), default=ModerationStatus.PENDING)
+    status = Column(SQLEnum(ModerationStatus, name="social_messaging_moderation_status"), default=ModerationStatus.PENDING)
     reviewer_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
     feedback = Column(Text)
@@ -154,7 +154,7 @@ class UserNotification(Base):
     __tablename__ = "user_notifications"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    notification_type = Column(SQLEnum(NotificationType), nullable=False)
+    notification_type = Column(SQLEnum(NotificationType, name="social_messaging_notification_type"), nullable=False)
     actor_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     content_id = Column(Integer, ForeignKey("contents.id", ondelete="CASCADE"), nullable=True)
     message = Column(Text, nullable=False)

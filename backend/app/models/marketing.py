@@ -78,7 +78,7 @@ class EmailCampaign(Base):
     recipient_count = Column(Integer, default=0)
 
     # Scheduling
-    status = Column(SQLEnum(CampaignStatus), default=CampaignStatus.DRAFT, index=True)
+    status = Column(SQLEnum(CampaignStatus, name="marketing_campaign_status"), default=CampaignStatus.DRAFT, index=True)
     scheduled_time = Column(DateTime(timezone=True))
 
     # Performance

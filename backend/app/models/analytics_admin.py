@@ -42,7 +42,7 @@ class AnalyticsEvent(Base):
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    event_type = Column(SQLEnum(AnalyticsEventType), nullable=False)
+    event_type = Column(SQLEnum(AnalyticsEventType, name="analytics_admin_analytics_event_type"), nullable=False)
     event_data = Column(JSON, default={})
     session_id = Column(String(255), index=True)
     ip_address = Column(String(45))
@@ -119,7 +119,7 @@ class Report(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, index=True)
-    report_type = Column(SQLEnum(ReportType), nullable=False)
+    report_type = Column(SQLEnum(ReportType, name="analytics_admin_report_type"), nullable=False)
     title = Column(String(255), nullable=False)
     description = Column(Text)
     start_date = Column(DateTime, nullable=False)

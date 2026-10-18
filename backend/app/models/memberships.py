@@ -36,7 +36,7 @@ class MembershipType(Base):
     tier = Column(SQLEnum(MembershipTier), nullable=False)
     description = Column(Text)
     price = Column(Float, default=0.0)
-    billing_cycle = Column(SQLEnum(BillingCycle), default=BillingCycle.MONTHLY)
+    billing_cycle = Column(SQLEnum(BillingCycle, name="memberships_billing_cycle"), default=BillingCycle.MONTHLY)
     max_courses = Column(Integer, default=-1)
     max_students = Column(Integer, default=-1)
     features = Column(JSON, default={})

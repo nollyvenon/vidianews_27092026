@@ -34,7 +34,7 @@ class Notification(Base):
     # Notification content
     title = Column(String(255), nullable=False)
     message = Column(Text, nullable=False)
-    notification_type = Column(SQLEnum(NotificationType), default=NotificationType.SYSTEM, index=True)
+    notification_type = Column(SQLEnum(NotificationType, name="notifications_notification_type"), default=NotificationType.SYSTEM, index=True)
 
     # Related resource
     resource_type = Column(String(50))  # user, organization, project, etc.
@@ -151,7 +151,7 @@ class NotificationTemplate(Base):
     variables = Column(JSON, default=[])  # ["user_name", "action_url", ...]
 
     # Channel
-    channel = Column(SQLEnum(NotificationChannel), default=NotificationChannel.EMAIL)
+    channel = Column(SQLEnum(NotificationChannel, name="notifications_notification_channel"), default=NotificationChannel.EMAIL)
 
     # Status
     is_active = Column(Boolean, default=True)
@@ -172,7 +172,7 @@ class NotificationLog(Base):
 
     # Log details
     action = Column(String(50), nullable=False)  # created, sent, opened, clicked, failed
-    channel = Column(SQLEnum(NotificationChannel))
+    channel = Column(SQLEnum(NotificationChannel, name="notifications_notification_channel"))
     status = Column(String(50))
     message = Column(Text)
 

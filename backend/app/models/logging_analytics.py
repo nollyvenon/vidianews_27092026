@@ -133,7 +133,7 @@ class AnalyticsEvent(Base):
     __tablename__ = "logging_analytics_events"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
-    event_type = Column(SQLEnum(AnalyticsEventType), nullable=False, index=True)
+    event_type = Column(SQLEnum(AnalyticsEventType, name="logging_analytics_analytics_event_type"), nullable=False, index=True)
     event_data = Column(JSON, default={})
     session_id = Column(String(255), nullable=True, index=True)
     timestamp = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)

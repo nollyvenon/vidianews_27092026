@@ -35,6 +35,13 @@ async def _role_names(session: AsyncSession, user_id: int) -> set:
     return {*legacy, *rbac}
 
 
+async def is_admin(session: AsyncSession, user_id: int, resource: str) -> bool:
+    """True when the user is an administrator, or holds the RBAC permission ``<resource>:manage``."""
+    if ADMIN_ROLE_NAMES & await _role_names(session, user_id):
+        return True
+    return await RBACService(session).has_permission(user_id, resource, MANAGE_ACTION)
+
+
 def require_admin(resource: str) -> Callable:
     """Build a FastAPI dependency that admits admins and holders of ``resource:manage``."""
 
@@ -42,10 +49,20 @@ def require_admin(resource: str) -> Callable:
         user: User = Depends(get_current_user),
         session: AsyncSession = Depends(get_db),
     ) -> User:
-        if ADMIN_ROLE_NAMES & await _role_names(session, user.id):
-            return user
-        if await RBACService(session).has_permission(user.id, resource, MANAGE_ACTION):
+        if await is_admin(session, user.id, resource):
             return user
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+
+    return dependency
+
+
+def admin_status(resource: str) -> Callable:
+    """Build a dependency that reports whether the caller is an administrator, without refusing anyone."""
+
+    async def dependency(
+        user: User = Depends(get_current_user),
+        session: AsyncSession = Depends(get_db),
+    ) -> bool:
+        return await is_admin(session, user.id, resource)
 
     return dependency

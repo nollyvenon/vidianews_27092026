@@ -2,7 +2,7 @@ from sqlalchemy import (
     Column, Integer, String, DateTime, Boolean, Float, Text, ForeignKey,
     Enum, UniqueConstraint, Index, JSON, ARRAY, func, Numeric, DECIMAL
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, synonym
 from datetime import datetime
 import enum
 
@@ -96,7 +96,7 @@ class ContentRecommendation(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, nullable=False)
     content_id = Column(Integer, nullable=False)
-    recommendation_type = Column(Enum(RecommendationType), nullable=False)
+    recommendation_type = Column(Enum(RecommendationType, name="advanced_features_recommendation_type"), nullable=False)
     similarity_score = Column(Float, nullable=False)
     relevance_score = Column(Float, nullable=False)
     confidence = Column(Float, default=0.0)
@@ -104,7 +104,9 @@ class ContentRecommendation(Base):
     clicked = Column(Boolean, default=False)
     conversion = Column(Boolean, default=False)
     click_timestamp = Column(DateTime)
+    reason = Column(Text, nullable=True)  # Why this item was recommended, shown to the user
     created_at = Column(DateTime, server_default=func.now())
+    score = synonym("relevance_score")
 
     __table_args__ = (
         Index("idx_user_id_content_recommendations", "user_id"),
@@ -183,7 +185,7 @@ class ABTest(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(255), nullable=False, unique=True)
     description = Column(Text)
-    status = Column(Enum(ABTestStatus), default=ABTestStatus.DRAFT)
+    status = Column(Enum(ABTestStatus, name="advanced_features_a_b_test_status"), default=ABTestStatus.DRAFT)
     hypothesis = Column(Text)
     metric_to_optimize = Column(String(100), nullable=False)
     variant_a_name = Column(String(100), default="Control")
@@ -374,6 +376,7 @@ class StorageFile(Base):
     checksum_sha256 = Column(String(64), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     deleted_at = Column(DateTime(timezone=True), nullable=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True)
 
 
 class CDNUrl(Base):
@@ -462,5 +465,17 @@ class Reaction(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     content_id = Column(Integer, ForeignKey("contents.id", ondelete="CASCADE"), nullable=False, index=True)
+    reaction_type = Column(Enum(ReactionType, native_enum=False, length=20), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class CommentReaction(Base):
+    """One reaction per user per comment"""
+    __tablename__ = "comment_reactions"
+    __table_args__ = (UniqueConstraint("comment_id", "user_id", name="uq_comment_reactions_comment_user"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    comment_id = Column(Integer, ForeignKey("comments.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     reaction_type = Column(Enum(ReactionType, native_enum=False, length=20), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

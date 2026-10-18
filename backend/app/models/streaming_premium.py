@@ -128,7 +128,7 @@ class DailyAnalytic(Base):
     __tablename__ = "daily_analytics"
     id = Column(Integer, primary_key=True, index=True)
     creator_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    date = Column(DateTime(timezone=True), index=True)
+    date = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
     views = Column(Integer, default=0)
     watch_hours = Column(Float, default=0.0)
     revenue = Column(Float, default=0.0)

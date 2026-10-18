@@ -7,8 +7,10 @@ from passlib.context import CryptContext
 from pydantic import ValidationError
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.authentication import AuthenticationError
 from app.core.config import settings
+from app.db.session import get_db
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -80,11 +82,21 @@ def verify_token_not_expired(token: str) -> bool:
     return datetime.now(timezone.utc) < datetime.fromtimestamp(exp, tz=timezone.utc)
 
 
-security = HTTPBearer()
+# auto_error=False lets get_current_user answer a missing header with 401, not HTTPBearer's 403.
+security = HTTPBearer(auto_error=False)
 
 
-async def get_current_user(credentials = Depends(security)):
+async def get_current_user(
+    credentials = Depends(security),
+    session: AsyncSession = Depends(get_db),
+):
     """Get current authenticated user from JWT token"""
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     token = credentials.credentials
     payload = decode_token(token)
 
@@ -105,15 +117,61 @@ async def get_current_user(credentials = Depends(security)):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    from app.db.session import AsyncSessionLocal
     from app.models.user import User
 
-    async with AsyncSessionLocal() as session:
-        user = await session.get(User, user_id)
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found",
-                headers={"WWW-Authenticate": "Bearer"},
+    user = await session.get(User, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    await attach_memberships(session, user)
+    return user
+
+
+async def attach_memberships(session: AsyncSession, user) -> None:
+    """Attach the user's organization_id and tenant_id for this request.
+
+    Routers scope data by these values. They come from membership rows, because the User row
+    holds neither. Both are None when the user belongs to no organization or tenant.
+    """
+    from sqlalchemy import select
+    from app.models.organizations import Organization, OrganizationMember
+    from app.models.tenants import TenantMember
+
+    membership = (
+        await session.execute(
+            select(OrganizationMember)
+            .where(OrganizationMember.user_id == user.id, OrganizationMember.status == "active")
+            .order_by(OrganizationMember.id)
+        )
+    ).scalars().first()
+
+    organization_id = membership.organization_id if membership else None
+    tenant_id = None
+    if membership:
+        organization = await session.get(Organization, membership.organization_id)
+        tenant_id = organization.tenant_id if organization else None
+    if tenant_id is None:
+        tenant_membership = (
+            await session.execute(
+                select(TenantMember)
+                .where(TenantMember.user_id == user.id, TenantMember.status == "active")
+                .order_by(TenantMember.id)
             )
-        return user
+        ).scalars().first()
+        tenant_id = tenant_membership.tenant_id if tenant_membership else None
+
+    user.organization_id = organization_id
+    user.tenant_id = tenant_id
+
+
+async def get_optional_current_user(
+    credentials = Depends(security),
+    session: AsyncSession = Depends(get_db),
+):
+    """Like get_current_user, but anonymous requests (no token) get None instead of 401."""
+    if credentials is None:
+        return None
+    return await get_current_user(credentials, session)

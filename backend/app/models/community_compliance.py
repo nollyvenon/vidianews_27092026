@@ -107,7 +107,7 @@ class Report(Base):
     __tablename__ = "community_reports"
     id = Column(Integer, primary_key=True, index=True)
     creator_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    report_type = Column(SQLEnum(ReportType), nullable=False)
+    report_type = Column(SQLEnum(ReportType, name="community_compliance_report_type"), nullable=False)
     period_start = Column(DateTime(timezone=True))
     period_end = Column(DateTime(timezone=True))
     data = Column(JSON)

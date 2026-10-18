@@ -118,7 +118,7 @@ class ModerationQueue(Base):
     id = Column(Integer, primary_key=True)
     content_id = Column(Integer, nullable=False)
     content_type = Column(String(100), nullable=False)
-    status = Column(Enum(ModerationStatus), default=ModerationStatus.PENDING)
+    status = Column(Enum(ModerationStatus, name="enterprise_features_moderation_status"), default=ModerationStatus.PENDING)
     reason = Column(Text)
     flags = Column(ARRAY(String), default=[])
     confidence_score = Column(Float, default=0.0)
@@ -219,7 +219,7 @@ class RealTimeNotification(Base):
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, nullable=False)
-    notification_type = Column(Enum(NotificationType), nullable=False)
+    notification_type = Column(Enum(NotificationType, name="enterprise_features_notification_type"), nullable=False)
     title = Column(String(255), nullable=False)
     message = Column(Text, nullable=False)
     data = Column(JSON, default={})

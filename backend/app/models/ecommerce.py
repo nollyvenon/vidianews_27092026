@@ -322,7 +322,7 @@ class PaymentDetail(Base):
 
     # Payment info
     payment_method = Column(SQLEnum(PaymentMethod), nullable=False)
-    status = Column(SQLEnum(PaymentStatus), default=PaymentStatus.PENDING, index=True)
+    status = Column(SQLEnum(PaymentStatus, name="ecommerce_payment_status"), default=PaymentStatus.PENDING, index=True)
 
     # Transaction details
     transaction_id = Column(String(255), unique=True, index=True)
@@ -369,7 +369,7 @@ class Refund(Base):
     description = Column(Text)
 
     # Processing
-    status = Column(SQLEnum(PaymentStatus), default=PaymentStatus.PENDING, index=True)
+    status = Column(SQLEnum(PaymentStatus, name="ecommerce_payment_status"), default=PaymentStatus.PENDING, index=True)
     refund_transaction_id = Column(String(255), unique=True, index=True)
 
     # Timestamps

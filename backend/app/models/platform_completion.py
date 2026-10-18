@@ -2,7 +2,7 @@ from sqlalchemy import (
     Column, Integer, String, DateTime, Boolean, Float, Text, ForeignKey,
     Enum, UniqueConstraint, Index, JSON, ARRAY, func, Numeric, BigInteger
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, synonym
 from datetime import datetime
 import enum
 
@@ -38,6 +38,8 @@ class AdminActionType(str, enum.Enum):
     SYSTEM_CONFIG = "system_config"
     AUDIT = "audit"
     SECURITY = "security"
+    DELETE_CONTENT = "delete_content"
+    BLOCK_USER = "block_user"
 
 
 class UserInteraction(Base):
@@ -46,11 +48,13 @@ class UserInteraction(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, nullable=False)
     interaction_type = Column(Enum(InteractionType), nullable=False)
-    target_id = Column(Integer, nullable=False)
-    target_type = Column(String(50), nullable=False)
+    target_id = Column(Integer, nullable=True)
+    target_type = Column(String(50), nullable=True)
+    content_id = Column(Integer, nullable=True, index=True)
     content = Column(Text)
     extra_metadata = Column("metadata", JSON, default={})
     created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, nullable=True)
 
     __table_args__ = (
         Index("idx_user_id_user_interactions", "user_id"),
@@ -103,6 +107,7 @@ class UserMessage(Base):
     recipient_id = Column(Integer, nullable=False)
     subject = Column(String(255))
     body = Column(Text, nullable=False)
+    text = synonym("body")
     read = Column(Boolean, default=False)
     read_at = Column(DateTime)
     archived = Column(Boolean, default=False)
@@ -120,13 +125,16 @@ class SearchIndex(Base):
 
     id = Column(Integer, primary_key=True)
     index_type = Column(Enum(SearchIndexType), nullable=False)
-    target_id = Column(Integer, nullable=False)
+    target_id = Column(Integer, nullable=True)
+    content_id = Column(Integer, nullable=True, index=True)
     title = Column(String(500))
     description = Column(Text)
     keywords = Column(ARRAY(String), default=[])
     embedding_vector = Column(ARRAY(Float))
     extra_metadata = Column("metadata", JSON, default={})
     indexed_at = Column(DateTime, server_default=func.now())
+    content = synonym("description")
+    embeddings = synonym("embedding_vector")
 
     __table_args__ = (
         Index("idx_index_type", "index_type"),
@@ -155,9 +163,10 @@ class PushNotificationConfig(Base):
     __tablename__ = "push_notification_configs"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, nullable=False, unique=True)
+    user_id = Column(Integer, nullable=False, index=True)
     device_token = Column(String(500))
     platform = Column(String(50))
+    device_name = Column(String(255))
     enabled = Column(Boolean, default=True)
     notification_types = Column(ARRAY(String), default=[])
     quiet_hours_start = Column(String(5))
@@ -176,11 +185,13 @@ class PushNotificationLog(Base):
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, nullable=False)
+    device_id = Column(Integer, ForeignKey("push_notification_configs.id", ondelete="SET NULL"), nullable=True, index=True)
     notification_type = Column(Enum(PushNotificationType), nullable=False)
     title = Column(String(255), nullable=False)
     body = Column(Text)
     deep_link = Column(String(500))
     sent_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime, server_default=func.now())
     delivered_at = Column(DateTime)
     opened_at = Column(DateTime)
     status = Column(String(50), default="sent")
@@ -212,6 +223,9 @@ class AdminActionLog(Base):
 
     id = Column(Integer, primary_key=True)
     admin_id = Column(Integer, nullable=False)
+    admin_user_id = synonym("admin_id")
+    resource_type = synonym("target_type")
+    resource_id = synonym("target_id")
     action_type = Column(Enum(AdminActionType), nullable=False)
     target_id = Column(Integer)
     target_type = Column(String(100))
@@ -234,6 +248,8 @@ class SystemNotification(Base):
     message = Column(Text, nullable=False)
     severity = Column(String(50), default="info")
     category = Column(String(100))
+    notification_type = Column(String(100))
+    extra_metadata = Column("metadata", JSON, default={})
     target_users = Column(ARRAY(Integer), default=[])
     broadcast = Column(Boolean, default=False)
     acknowledged_by = Column(ARRAY(Integer), default=[])
@@ -257,6 +273,11 @@ class PlatformStatistics(Base):
     avg_engagement_rate = Column(Float, default=0.0)
     server_health = Column(Float, default=100.0)
     measured_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime, server_default=func.now())
+    metric_name = Column(String(255), nullable=True, index=True)
+    metric_value = Column(Float, nullable=True)
+    metric_type = Column(String(50), default="count")
+    breakdown = Column(JSON, default={})
 
     __table_args__ = (
         Index("idx_measured_at_platform_statistics", "measured_at"),

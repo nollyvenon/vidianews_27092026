@@ -27,6 +27,8 @@ class User(Base):
     last_name = Column(String(255))
     avatar_url = Column(String(500))
     status = Column(String(50), default="active", index=True)
+    mfa_secret = Column(String(64), nullable=True)
+    mfa_enabled = Column(Boolean, default=False, nullable=False)
     last_login_at = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
