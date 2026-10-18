@@ -1,37 +1,47 @@
-from sqlalchemy.orm import Session
-from sqlalchemy import desc, and_, or_, func
-from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta
-import json
+"""Social, search, push notification, admin and system services (async).
+
+Timestamps are naive UTC to match the naive ``DateTime`` columns in ``app.models.platform_completion``.
+Each static method takes an ``AsyncSession`` as its first argument.
+"""
+
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
+
 from fastapi import HTTPException
+from sqlalchemy import and_, delete, desc, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.platform_completion import (
-    UserInteraction, UserFollow, ContentComment, UserMessage,
-    SearchIndex, SavedSearch, PushNotificationConfig, PushNotificationLog,
-    AdminUser, AdminActionLog, SystemNotification, PlatformStatistics,
-    InteractionType, PushNotificationType, AdminActionType
+    AdminActionLog, AdminActionType, AdminUser, ContentComment, InteractionType, PlatformStatistics,
+    PushNotificationConfig, PushNotificationLog, PushNotificationType, SavedSearch, SearchIndex,
+    SearchIndexType, SystemNotification, UserFollow, UserInteraction, UserMessage,
 )
+
+
+def _utcnow() -> datetime:
+    """Naive UTC, matching the naive DateTime columns"""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class SocialService:
     @staticmethod
     async def create_interaction(
-        db: Session,
+        db: AsyncSession,
         user_id: int,
         content_id: int,
-        interaction_type: str,
+        interaction_type: InteractionType,
         metadata: Optional[Dict] = None
     ) -> UserInteraction:
-        existing = db.query(UserInteraction).filter(
-            and_(
-                UserInteraction.user_id == user_id,
-                UserInteraction.content_id == content_id,
-                UserInteraction.interaction_type == interaction_type
-            )
-        ).first()
+        existing = (await db.execute(select(UserInteraction).where(and_(
+            UserInteraction.user_id == user_id,
+            UserInteraction.content_id == content_id,
+            UserInteraction.interaction_type == interaction_type
+        )))).scalars().first()
 
         if existing:
-            existing.updated_at = datetime.utcnow()
-            db.commit()
+            existing.updated_at = _utcnow()
+            await db.commit()
+            await db.refresh(existing)
             return existing
 
         interaction = UserInteraction(
@@ -41,66 +51,62 @@ class SocialService:
             extra_metadata=metadata or {}
         )
         db.add(interaction)
-        db.commit()
-        db.refresh(interaction)
+        await db.commit()
+        await db.refresh(interaction)
         return interaction
 
     @staticmethod
     async def remove_interaction(
-        db: Session,
+        db: AsyncSession,
         user_id: int,
         content_id: int,
-        interaction_type: str
+        interaction_type: InteractionType
     ) -> bool:
-        result = db.query(UserInteraction).filter(
-            and_(
-                UserInteraction.user_id == user_id,
-                UserInteraction.content_id == content_id,
-                UserInteraction.interaction_type == interaction_type
-            )
-        ).delete()
-        db.commit()
-        return result > 0
+        result = await db.execute(delete(UserInteraction).where(and_(
+            UserInteraction.user_id == user_id,
+            UserInteraction.content_id == content_id,
+            UserInteraction.interaction_type == interaction_type
+        )))
+        await db.commit()
+        return result.rowcount > 0
 
     @staticmethod
     async def get_user_interactions(
-        db: Session,
+        db: AsyncSession,
         user_id: int,
         limit: int = 50,
         offset: int = 0
     ) -> List[UserInteraction]:
-        return db.query(UserInteraction).filter(
-            UserInteraction.user_id == user_id
-        ).order_by(desc(UserInteraction.created_at)).offset(offset).limit(limit).all()
+        result = await db.execute(
+            select(UserInteraction).where(UserInteraction.user_id == user_id)
+            .order_by(desc(UserInteraction.created_at)).offset(offset).limit(limit)
+        )
+        return list(result.scalars().all())
 
     @staticmethod
     async def get_content_interactions(
-        db: Session,
+        db: AsyncSession,
         content_id: int,
-        interaction_type: Optional[str] = None
+        interaction_type: Optional[InteractionType] = None
     ) -> List[UserInteraction]:
-        query = db.query(UserInteraction).filter(
-            UserInteraction.content_id == content_id
-        )
+        stmt = select(UserInteraction).where(UserInteraction.content_id == content_id)
         if interaction_type:
-            query = query.filter(UserInteraction.interaction_type == interaction_type)
-        return query.all()
+            stmt = stmt.where(UserInteraction.interaction_type == interaction_type)
+        return list((await db.execute(stmt)).scalars().all())
 
     @staticmethod
     async def follow_user(
-        db: Session,
+        db: AsyncSession,
         follower_id: int,
         following_id: int
     ) -> UserFollow:
         if follower_id == following_id:
             raise HTTPException(status_code=400, detail="Cannot follow yourself")
 
-        existing = db.query(UserFollow).filter(
-            and_(
-                UserFollow.follower_id == follower_id,
-                UserFollow.following_id == following_id
-            )
-        ).first()
+        existing = (await db.execute(select(UserFollow).where(and_(
+            UserFollow.follower_id == follower_id,
+            UserFollow.following_id == following_id
+        )))).scalars().first()
 
         if existing:
             return existing
@@ -110,50 +116,50 @@ class SocialService:
             following_id=following_id
         )
         db.add(follow)
-        db.commit()
-        db.refresh(follow)
+        await db.commit()
+        await db.refresh(follow)
         return follow
 
     @staticmethod
     async def unfollow_user(
-        db: Session,
+        db: AsyncSession,
         follower_id: int,
         following_id: int
     ) -> bool:
-        result = db.query(UserFollow).filter(
-            and_(
-                UserFollow.follower_id == follower_id,
-                UserFollow.following_id == following_id
-            )
-        ).delete()
-        db.commit()
-        return result > 0
+        result = await db.execute(delete(UserFollow).where(and_(
+            UserFollow.follower_id == follower_id,
+            UserFollow.following_id == following_id
+        )))
+        await db.commit()
+        return result.rowcount > 0
 
     @staticmethod
     async def get_followers(
-        db: Session,
+        db: AsyncSession,
         user_id: int,
         limit: int = 50,
         offset: int = 0
     ) -> List[UserFollow]:
-        return db.query(UserFollow).filter(
-            UserFollow.following_id == user_id
-        ).offset(offset).limit(limit).all()
+        result = await db.execute(
+            select(UserFollow).where(UserFollow.following_id == user_id).offset(offset).limit(limit)
+        )
+        return list(result.scalars().all())
 
     @staticmethod
     async def get_following(
-        db: Session,
+        db: AsyncSession,
         user_id: int,
         limit: int = 50,
         offset: int = 0
     ) -> List[UserFollow]:
-        return db.query(UserFollow).filter(
-            UserFollow.follower_id == user_id
-        ).offset(offset).limit(limit).all()
+        result = await db.execute(
+            select(UserFollow).where(UserFollow.follower_id == user_id).offset(offset).limit(limit)
+        )
+        return list(result.scalars().all())
 
     @staticmethod
     async def create_comment(
-        db: Session,
+        db: AsyncSession,
         user_id: int,
         content_id: int,
         text: str,
@@ -166,47 +172,44 @@ class SocialService:
             parent_comment_id=parent_comment_id
         )
         db.add(comment)
-        db.commit()
-        db.refresh(comment)
+        await db.commit()
+        await db.refresh(comment)
         return comment
 
     @staticmethod
     async def get_comments(
-        db: Session,
+        db: AsyncSession,
         content_id: int,
         parent_comment_id: Optional[int] = None,
         limit: int = 50,
         offset: int = 0
     ) -> List[ContentComment]:
-        query = db.query(ContentComment).filter(
-            ContentComment.content_id == content_id
-        )
+        stmt = select(ContentComment).where(ContentComment.content_id == content_id)
         if parent_comment_id:
-            query = query.filter(ContentComment.parent_comment_id == parent_comment_id)
-        return query.order_by(desc(ContentComment.created_at)).offset(offset).limit(limit).all()
+            stmt = stmt.where(ContentComment.parent_comment_id == parent_comment_id)
+        result = await db.execute(stmt.order_by(desc(ContentComment.created_at)).offset(offset).limit(limit))
+        return list(result.scalars().all())
 
     @staticmethod
     async def delete_comment(
-        db: Session,
+        db: AsyncSession,
         comment_id: int,
         user_id: int
     ) -> bool:
-        comment = db.query(ContentComment).filter(
-            ContentComment.id == comment_id
-        ).first()
+        comment = await db.get(ContentComment, comment_id)
 
         if not comment:
             raise HTTPException(status_code=404, detail="Comment not found")
         if comment.user_id != user_id:
             raise HTTPException(status_code=403, detail="Cannot delete others' comments")
 
-        db.delete(comment)
-        db.commit()
+        await db.delete(comment)
+        await db.commit()
         return True
 
     @staticmethod
     async def send_message(
-        db: Session,
+        db: AsyncSession,
         sender_id: int,
         recipient_id: int,
         text: str
@@ -217,59 +220,58 @@ class SocialService:
         message = UserMessage(
             sender_id=sender_id,
             recipient_id=recipient_id,
-            text=text
+            body=text
         )
         db.add(message)
-        db.commit()
-        db.refresh(message)
+        await db.commit()
+        await db.refresh(message)
         return message
 
     @staticmethod
     async def get_conversation(
-        db: Session,
+        db: AsyncSession,
         user_id: int,
         other_user_id: int,
         limit: int = 50,
         offset: int = 0
     ) -> List[UserMessage]:
-        return db.query(UserMessage).filter(
-            or_(
-                and_(
-                    UserMessage.sender_id == user_id,
-                    UserMessage.recipient_id == other_user_id
-                ),
-                and_(
-                    UserMessage.sender_id == other_user_id,
-                    UserMessage.recipient_id == user_id
-                )
+        result = await db.execute(select(UserMessage).where(or_(
+            and_(
+                UserMessage.sender_id == user_id,
+                UserMessage.recipient_id == other_user_id
+            ),
+            and_(
+                UserMessage.sender_id == other_user_id,
+                UserMessage.recipient_id == user_id
             )
-        ).order_by(desc(UserMessage.created_at)).offset(offset).limit(limit).all()
+        )).order_by(desc(UserMessage.created_at)).offset(offset).limit(limit))
+        return list(result.scalars().all())
 
     @staticmethod
     async def mark_message_read(
-        db: Session,
+        db: AsyncSession,
         message_id: int,
         user_id: int
     ) -> bool:
-        message = db.query(UserMessage).filter(
-            UserMessage.id == message_id
-        ).first()
+        message = await db.get(UserMessage, message_id)
 
-        if not message or message.recipient_id != user_id:
+        if message is None:
+            raise HTTPException(status_code=404, detail="Message not found")
+        if message.recipient_id != user_id:
             raise HTTPException(status_code=403, detail="Cannot mark as read")
 
         message.read = True
-        message.read_at = datetime.utcnow()
-        db.commit()
+        message.read_at = _utcnow()
+        await db.commit()
         return True
 
 
 class SearchService:
     @staticmethod
     async def create_search_index(
-        db: Session,
+        db: AsyncSession,
         content_id: int,
-        index_type: str,
+        index_type: SearchIndexType,
         title: str,
         content: str,
         metadata: Optional[Dict] = None,
@@ -279,37 +281,35 @@ class SearchService:
             content_id=content_id,
             index_type=index_type,
             title=title,
-            content=content,
+            description=content,
             extra_metadata=metadata or {},
-            embeddings=embeddings or []
+            embedding_vector=embeddings or []
         )
         db.add(search_index)
-        db.commit()
-        db.refresh(search_index)
+        await db.commit()
+        await db.refresh(search_index)
         return search_index
 
     @staticmethod
     async def search_content(
-        db: Session,
+        db: AsyncSession,
         query: str,
-        index_type: Optional[str] = None,
+        index_type: Optional[SearchIndexType] = None,
         limit: int = 20,
         offset: int = 0
     ) -> List[SearchIndex]:
-        search_query = db.query(SearchIndex).filter(
-            or_(
-                SearchIndex.title.ilike(f"%{query}%"),
-                SearchIndex.content.ilike(f"%{query}%")
-            )
-        )
+        stmt = select(SearchIndex).where(or_(
+            SearchIndex.title.ilike(f"%{query}%"),
+            SearchIndex.description.ilike(f"%{query}%")
+        ))
         if index_type:
-            search_query = search_query.filter(SearchIndex.index_type == index_type)
+            stmt = stmt.where(SearchIndex.index_type == index_type)
 
-        return search_query.offset(offset).limit(limit).all()
+        return list((await db.execute(stmt.offset(offset).limit(limit))).scalars().all())
 
     @staticmethod
     async def save_search(
-        db: Session,
+        db: AsyncSession,
         user_id: int,
         query: str,
         filters: Optional[Dict] = None,
@@ -323,47 +323,45 @@ class SearchService:
             result_count=result_count
         )
         db.add(saved_search)
-        db.commit()
-        db.refresh(saved_search)
+        await db.commit()
+        await db.refresh(saved_search)
         return saved_search
 
     @staticmethod
     async def get_saved_searches(
-        db: Session,
+        db: AsyncSession,
         user_id: int,
         limit: int = 50,
         offset: int = 0
     ) -> List[SavedSearch]:
-        return db.query(SavedSearch).filter(
-            SavedSearch.user_id == user_id
-        ).order_by(desc(SavedSearch.created_at)).offset(offset).limit(limit).all()
+        result = await db.execute(
+            select(SavedSearch).where(SavedSearch.user_id == user_id)
+            .order_by(desc(SavedSearch.created_at)).offset(offset).limit(limit)
+        )
+        return list(result.scalars().all())
 
     @staticmethod
     async def delete_saved_search(
-        db: Session,
+        db: AsyncSession,
         search_id: int,
         user_id: int
     ) -> bool:
-        result = db.query(SavedSearch).filter(
-            and_(
-                SavedSearch.id == search_id,
-                SavedSearch.user_id == user_id
-            )
-        ).delete()
-        db.commit()
-        return result > 0
+        result = await db.execute(delete(SavedSearch).where(and_(
+            SavedSearch.id == search_id,
+            SavedSearch.user_id == user_id
+        )))
+        await db.commit()
+        return result.rowcount > 0
 
     @staticmethod
     async def update_search_index(
-        db: Session,
+        db: AsyncSession,
         search_index_id: int,
         title: Optional[str] = None,
         content: Optional[str] = None,
         metadata: Optional[Dict] = None
     ) -> SearchIndex:
-        search_index = db.query(SearchIndex).filter(
-            SearchIndex.id == search_index_id
-        ).first()
+        search_index = await db.get(SearchIndex, search_index_id)
 
         if not search_index:
             raise HTTPException(status_code=404, detail="Search index not found")
@@ -371,77 +369,74 @@ class SearchService:
         if title:
             search_index.title = title
         if content:
-            search_index.content = content
+            search_index.description = content
         if metadata:
             search_index.extra_metadata = metadata
 
-        search_index.updated_at = datetime.utcnow()
-        db.commit()
-        db.refresh(search_index)
+        search_index.updated_at = _utcnow()
+        await db.commit()
+        await db.refresh(search_index)
         return search_index
 
 
 class PushNotificationService:
     @staticmethod
     async def register_device(
-        db: Session,
+        db: AsyncSession,
         user_id: int,
         device_token: str,
         platform: str,
         device_name: Optional[str] = None
     ) -> PushNotificationConfig:
-        existing = db.query(PushNotificationConfig).filter(
-            and_(
-                PushNotificationConfig.user_id == user_id,
-                PushNotificationConfig.device_token == device_token
-            )
-        ).first()
+        existing = (await db.execute(select(PushNotificationConfig).where(and_(
+            PushNotificationConfig.user_id == user_id,
+            PushNotificationConfig.device_token == device_token
+        )))).scalars().first()
 
         if existing:
-            existing.last_active = datetime.utcnow()
-            db.commit()
+            existing.last_sync = _utcnow()
+            await db.commit()
+            await db.refresh(existing)
             return existing
 
         config = PushNotificationConfig(
             user_id=user_id,
             device_token=device_token,
             platform=platform,
-            device_name=device_name
+            device_name=device_name,
+            last_sync=_utcnow(),
         )
         db.add(config)
-        db.commit()
-        db.refresh(config)
+        await db.commit()
+        await db.refresh(config)
         return config
 
     @staticmethod
     async def unregister_device(
-        db: Session,
+        db: AsyncSession,
         device_id: int,
         user_id: int
     ) -> bool:
-        result = db.query(PushNotificationConfig).filter(
-            and_(
-                PushNotificationConfig.id == device_id,
-                PushNotificationConfig.user_id == user_id
-            )
-        ).delete()
-        db.commit()
-        return result > 0
+        result = await db.execute(delete(PushNotificationConfig).where(and_(
+            PushNotificationConfig.id == device_id,
+            PushNotificationConfig.user_id == user_id
+        )))
+        await db.commit()
+        return result.rowcount > 0
 
     @staticmethod
     async def get_user_devices(
-        db: Session,
+        db: AsyncSession,
         user_id: int
     ) -> List[PushNotificationConfig]:
-        return db.query(PushNotificationConfig).filter(
-            PushNotificationConfig.user_id == user_id
-        ).all()
+        result = await db.execute(select(PushNotificationConfig).where(PushNotificationConfig.user_id == user_id))
+        return list(result.scalars().all())
 
     @staticmethod
     async def log_notification(
-        db: Session,
+        db: AsyncSession,
         user_id: int,
-        notification_type: str,
+        notification_type: PushNotificationType,
         title: str,
         body: str,
         device_id: Optional[int] = None,
@@ -456,21 +451,19 @@ class PushNotificationService:
             status=status
         )
         db.add(log)
-        db.commit()
-        db.refresh(log)
+        await db.commit()
+        await db.refresh(log)
         return log
 
     @staticmethod
     async def update_notification_status(
-        db: Session,
+        db: AsyncSession,
         log_id: int,
         status: str,
         delivered_at: Optional[datetime] = None,
         opened_at: Optional[datetime] = None
     ) -> PushNotificationLog:
-        log = db.query(PushNotificationLog).filter(
-            PushNotificationLog.id == log_id
-        ).first()
+        log = await db.get(PushNotificationLog, log_id)
 
         if not log:
             raise HTTPException(status_code=404, detail="Notification log not found")
@@ -481,33 +474,33 @@ class PushNotificationService:
         if opened_at:
             log.opened_at = opened_at
 
-        db.commit()
-        db.refresh(log)
+        await db.commit()
+        await db.refresh(log)
         return log
 
     @staticmethod
     async def get_notification_logs(
-        db: Session,
+        db: AsyncSession,
         user_id: int,
         limit: int = 50,
         offset: int = 0
     ) -> List[PushNotificationLog]:
-        return db.query(PushNotificationLog).filter(
-            PushNotificationLog.user_id == user_id
-        ).order_by(desc(PushNotificationLog.created_at)).offset(offset).limit(limit).all()
+        result = await db.execute(
+            select(PushNotificationLog).where(PushNotificationLog.user_id == user_id)
+            .order_by(desc(PushNotificationLog.created_at)).offset(offset).limit(limit)
+        )
+        return list(result.scalars().all())
 
 
 class AdminService:
     @staticmethod
     async def create_admin_user(
-        db: Session,
+        db: AsyncSession,
         user_id: int,
         role: str,
         permissions: Optional[List[str]] = None
     ) -> AdminUser:
-        existing = db.query(AdminUser).filter(
-            AdminUser.user_id == user_id
-        ).first()
+        existing = await AdminService.get_admin_user(db, user_id)
 
         if existing:
             raise HTTPException(status_code=400, detail="User is already an admin")
@@ -518,93 +511,87 @@ class AdminService:
             permissions=permissions or []
         )
         db.add(admin)
-        db.commit()
-        db.refresh(admin)
+        await db.commit()
+        await db.refresh(admin)
         return admin
 
     @staticmethod
     async def remove_admin_user(
-        db: Session,
+        db: AsyncSession,
         user_id: int
     ) -> bool:
-        result = db.query(AdminUser).filter(
-            AdminUser.user_id == user_id
-        ).delete()
-        db.commit()
-        return result > 0
+        result = await db.execute(delete(AdminUser).where(AdminUser.user_id == user_id))
+        await db.commit()
+        return result.rowcount > 0
 
     @staticmethod
     async def get_admin_user(
-        db: Session,
+        db: AsyncSession,
         user_id: int
     ) -> Optional[AdminUser]:
-        return db.query(AdminUser).filter(
-            AdminUser.user_id == user_id
-        ).first()
+        return (await db.execute(select(AdminUser).where(AdminUser.user_id == user_id))).scalars().first()
 
     @staticmethod
     async def log_admin_action(
-        db: Session,
+        db: AsyncSession,
         admin_user_id: int,
-        action_type: str,
+        action_type: AdminActionType,
         resource_type: str,
         resource_id: int,
         details: Optional[Dict] = None,
         status: str = "completed"
     ) -> AdminActionLog:
         log = AdminActionLog(
-            admin_user_id=admin_user_id,
+            admin_id=admin_user_id,
             action_type=action_type,
-            resource_type=resource_type,
-            resource_id=resource_id,
+            target_type=resource_type,
+            target_id=resource_id,
             details=details or {},
             status=status
         )
         db.add(log)
-        db.commit()
-        db.refresh(log)
+        await db.commit()
+        await db.refresh(log)
         return log
 
     @staticmethod
     async def get_admin_logs(
-        db: Session,
+        db: AsyncSession,
         admin_user_id: Optional[int] = None,
         action_type: Optional[str] = None,
         limit: int = 50,
         offset: int = 0
     ) -> List[AdminActionLog]:
-        query = db.query(AdminActionLog)
+        stmt = select(AdminActionLog)
         if admin_user_id:
-            query = query.filter(AdminActionLog.admin_user_id == admin_user_id)
+            stmt = stmt.where(AdminActionLog.admin_id == admin_user_id)
         if action_type:
-            query = query.filter(AdminActionLog.action_type == action_type)
+            stmt = stmt.where(AdminActionLog.action_type == action_type)
 
-        return query.order_by(desc(AdminActionLog.created_at)).offset(offset).limit(limit).all()
+        result = await db.execute(stmt.order_by(desc(AdminActionLog.created_at)).offset(offset).limit(limit))
+        return list(result.scalars().all())
 
     @staticmethod
     async def update_admin_permissions(
-        db: Session,
+        db: AsyncSession,
         user_id: int,
         permissions: List[str]
     ) -> AdminUser:
-        admin = db.query(AdminUser).filter(
-            AdminUser.user_id == user_id
-        ).first()
+        admin = await AdminService.get_admin_user(db, user_id)
 
         if not admin:
             raise HTTPException(status_code=404, detail="Admin user not found")
 
         admin.permissions = permissions
-        admin.updated_at = datetime.utcnow()
-        db.commit()
-        db.refresh(admin)
+        await db.commit()
+        await db.refresh(admin)
         return admin
 
 
 class SystemService:
     @staticmethod
     async def create_system_notification(
-        db: Session,
+        db: AsyncSession,
         title: str,
         message: str,
         notification_type: str,
@@ -619,23 +606,24 @@ class SystemService:
             extra_metadata=metadata or {}
         )
         db.add(notification)
-        db.commit()
-        db.refresh(notification)
+        await db.commit()
+        await db.refresh(notification)
         return notification
 
     @staticmethod
     async def get_system_notifications(
-        db: Session,
+        db: AsyncSession,
         limit: int = 50,
         offset: int = 0
     ) -> List[SystemNotification]:
-        return db.query(SystemNotification).order_by(
-            desc(SystemNotification.created_at)
-        ).offset(offset).limit(limit).all()
+        result = await db.execute(
+            select(SystemNotification).order_by(desc(SystemNotification.created_at)).offset(offset).limit(limit)
+        )
+        return list(result.scalars().all())
 
     @staticmethod
     async def record_platform_statistic(
-        db: Session,
+        db: AsyncSession,
         metric_name: str,
         metric_value: float,
         metric_type: str = "count",
@@ -648,39 +636,36 @@ class SystemService:
             breakdown=breakdown or {}
         )
         db.add(stat)
-        db.commit()
-        db.refresh(stat)
+        await db.commit()
+        await db.refresh(stat)
         return stat
 
     @staticmethod
     async def get_platform_statistics(
-        db: Session,
+        db: AsyncSession,
         metric_name: Optional[str] = None,
         days: int = 7,
         limit: int = 100
     ) -> List[PlatformStatistics]:
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
-        query = db.query(PlatformStatistics).filter(
-            PlatformStatistics.created_at >= cutoff_date
-        )
+        cutoff_date = _utcnow() - timedelta(days=days)
+        stmt = select(PlatformStatistics).where(PlatformStatistics.created_at >= cutoff_date)
         if metric_name:
-            query = query.filter(PlatformStatistics.metric_name == metric_name)
+            stmt = stmt.where(PlatformStatistics.metric_name == metric_name)
 
-        return query.order_by(desc(PlatformStatistics.created_at)).limit(limit).all()
+        result = await db.execute(stmt.order_by(desc(PlatformStatistics.created_at)).limit(limit))
+        return list(result.scalars().all())
 
     @staticmethod
     async def get_aggregated_statistics(
-        db: Session,
+        db: AsyncSession,
         metric_name: str,
         days: int = 30
     ) -> Dict[str, Any]:
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
-        stats = db.query(PlatformStatistics).filter(
-            and_(
-                PlatformStatistics.metric_name == metric_name,
-                PlatformStatistics.created_at >= cutoff_date
-            )
-        ).all()
+        cutoff_date = _utcnow() - timedelta(days=days)
+        stats = (await db.execute(select(PlatformStatistics).where(and_(
+            PlatformStatistics.metric_name == metric_name,
+            PlatformStatistics.created_at >= cutoff_date
+        )))).scalars().all()
 
         if not stats:
             return {
@@ -705,19 +690,16 @@ class SystemService:
 
     @staticmethod
     async def get_dashboard_summary(
-        db: Session
+        db: AsyncSession
     ) -> Dict[str, Any]:
-        total_interactions = db.query(func.count(UserInteraction.id)).scalar() or 0
-        total_follows = db.query(func.count(UserFollow.id)).scalar() or 0
-        total_comments = db.query(func.count(ContentComment.id)).scalar() or 0
-        total_messages = db.query(func.count(UserMessage.id)).scalar() or 0
-        total_notifications = db.query(func.count(PushNotificationLog.id)).scalar() or 0
+        async def count(column) -> int:
+            return (await db.execute(select(func.count(column)))).scalar() or 0
 
         return {
-            "total_interactions": total_interactions,
-            "total_follows": total_follows,
-            "total_comments": total_comments,
-            "total_messages": total_messages,
-            "total_notifications": total_notifications,
-            "timestamp": datetime.utcnow().isoformat()
+            "total_interactions": await count(UserInteraction.id),
+            "total_follows": await count(UserFollow.id),
+            "total_comments": await count(ContentComment.id),
+            "total_messages": await count(UserMessage.id),
+            "total_notifications": await count(PushNotificationLog.id),
+            "timestamp": _utcnow().isoformat()
         }

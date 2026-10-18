@@ -1,9 +1,8 @@
 from sqlalchemy import (
     Column, Integer, String, DateTime, Boolean, Float, Text, ForeignKey,
-    Enum, UniqueConstraint, Index, JSON, ARRAY, func, Numeric, BigInteger
+    Enum, UniqueConstraint, Index, JSON, ARRAY, func, BigInteger
 )
-from sqlalchemy.orm import relationship, synonym
-from datetime import datetime
+from sqlalchemy.orm import synonym
 import enum
 
 from app.db.base import Base
@@ -91,6 +90,11 @@ class ContentComment(Base):
     replies_count = Column(Integer, default=0)
     edited_at = Column(DateTime)
     created_at = Column(DateTime, server_default=func.now())
+
+    @property
+    def status(self) -> str:
+        """Comments carry no stored status; an edited comment is reported as edited."""
+        return "edited" if self.edited_at else "published"
 
     __table_args__ = (
         Index("idx_content_id_content_comments", "content_id"),
