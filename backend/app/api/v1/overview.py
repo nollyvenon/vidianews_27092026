@@ -25,6 +25,9 @@ from app.models.publishing_distribution import (
     ABTestCampaign, ABTestStatus, EngagementMetric as PublishingEngagement, PublishingJob, PublishingStatus,
 )
 from app.models.streaming_premium import LiveStream, StreamViewer
+from app.models.ai_advanced import Chat
+from app.models.content import Content, ContentType
+from app.models.monetization import Payment, PaymentStatus
 from app.models.user import User
 
 router = APIRouter(tags=["overview"])
@@ -176,4 +179,34 @@ async def system_health_checks(
                 "failed": failed,
             },
         ]
+    }
+
+
+@router.get("/dashboard/summary")
+async def dashboard_summary(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """The signed-in user's own totals for the dashboard home: videos and articles they created,
+    their chats, and the completed payments they made this calendar month (UTC)."""
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    async def count_content(content_type: ContentType) -> int:
+        return (await db.execute(select(func.count(Content.id)).where(
+            Content.creator_user_id == current_user.id,
+            Content.content_type == content_type,
+        ))).scalar_one()
+
+    chats = (await db.execute(select(func.count(Chat.id)).where(Chat.user_id == current_user.id))).scalar_one()
+    spend = (await db.execute(select(func.coalesce(func.sum(Payment.amount), 0.0)).where(
+        Payment.user_id == current_user.id,
+        Payment.status == PaymentStatus.COMPLETED,
+        Payment.created_at >= month_start,
+    ))).scalar_one()
+    return {
+        "videos": await count_content(ContentType.VIDEO),
+        "articles": await count_content(ContentType.ARTICLE),
+        "chats": int(chats),
+        "monthly_spend": round(float(spend), 2),
     }
