@@ -6,9 +6,14 @@ import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 import { SocialLoginButtons } from '@/components/social-login-buttons'
 
+/** Message the server uses when the account needs a two-factor code before it can sign in. */
+const MFA_REQUIRED_MESSAGE = 'MFA code required'
+
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [otpCode, setOtpCode] = useState('')
+  const [needsCode, setNeedsCode] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const { login } = useAuth()
@@ -20,10 +25,17 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      await login(email, password)
+      await login(email, password, needsCode ? otpCode : undefined)
       router.push('/dashboard')
     } catch (err: any) {
-      setError(err.message || 'Login failed')
+      const message = err?.message || 'Login failed'
+      if (message === MFA_REQUIRED_MESSAGE) {
+        // The password was right; the account asks for the code from its authenticator app next.
+        setNeedsCode(true)
+        setError('Enter the 6-digit code from your authenticator app.')
+      } else {
+        setError(message)
+      }
     } finally {
       setLoading(false)
     }
@@ -36,7 +48,7 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+            <div role="alert" className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
               {error}
             </div>
           )}
@@ -68,6 +80,27 @@ export default function LoginPage() {
               required
             />
           </div>
+
+          {needsCode && (
+            <div>
+              <label htmlFor="otp_code" className="block text-sm font-medium text-gray-700 mb-1">
+                Authentication code
+              </label>
+              <input
+                id="otp_code"
+                type="text"
+                inputMode="numeric"
+                pattern="\d{6}"
+                maxLength={6}
+                autoComplete="one-time-code"
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md tracking-widest focus:outline-none focus:ring-blue-500"
+                placeholder="123456"
+                required
+              />
+            </div>
+          )}
 
           <button
             type="submit"

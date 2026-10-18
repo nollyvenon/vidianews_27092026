@@ -1,5 +1,6 @@
 import { ReactElement } from 'react'
 import { render, RenderResult } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthContext, AuthContextType, User } from '@/lib/auth-context'
 
 /** Signed-in user used by default in page tests. */
@@ -94,6 +95,17 @@ export function mockFetch(routes: Record<string, RouteValue> = {}): jest.Mock {
 
   global.fetch = fetchMock as unknown as typeof fetch
   return fetchMock
+}
+
+/**
+ * Renders a component that uses react-query hooks. Retries are disabled so failing requests
+ * surface immediately in tests instead of after backoff delays.
+ */
+export function renderWithQuery(ui: ReactElement): RenderResult {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  })
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>)
 }
 
 /** Resolves on the next macrotask so pending promise chains and state updates flush. */

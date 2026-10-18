@@ -197,6 +197,7 @@ class ContentService {
   async recordEngagement(contentId: number, engagementType: string): Promise<void> {
     const response = await fetch(`${this.baseUrl}/${contentId}/engage`, {
       method: 'POST',
+      headers: this.getAuthHeaders(),
       body: JSON.stringify({ engagement_type: engagementType }),
     });
 

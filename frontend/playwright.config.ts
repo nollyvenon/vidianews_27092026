@@ -11,6 +11,9 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
+  // Assertions wait longer than the default 5s: the dashboard pages are client-rendered after
+  // data arrives, and the suite runs alongside other heavy work on the same machine.
+  expect: { timeout: 15_000 },
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
   use: {

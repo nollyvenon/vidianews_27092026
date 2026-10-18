@@ -23,7 +23,7 @@ export interface AuthContextType {
   token: string | null
   user: User | null
   loading: boolean
-  login: (email: string, password: string) => Promise<any>
+  login: (email: string, password: string, otpCode?: string) => Promise<any>
   logout: () => void
   signup: (details: SignupDetails) => Promise<any>
 }

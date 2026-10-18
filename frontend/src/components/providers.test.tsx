@@ -1,4 +1,5 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
+import { QueryClient, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { Providers } from '@/components/providers'
 import { useAuth } from '@/hooks/useAuth'
@@ -42,6 +43,24 @@ function renderProviders() {
     </Providers>
   )
 }
+
+describe('Providers (query client)', () => {
+  it('gives descendants a react-query client so data-driven tabs can render', () => {
+    let client: unknown = null
+    function QueryProbe() {
+      client = useQueryClient()
+      return null
+    }
+    mockFetch({})
+    render(
+      <Providers>
+        <QueryProbe />
+      </Providers>
+    )
+
+    expect(client).toBeInstanceOf(QueryClient)
+  })
+})
 
 describe('Providers (auth session)', () => {
   beforeEach(() => {
