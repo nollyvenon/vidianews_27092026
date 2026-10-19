@@ -1,9 +1,8 @@
 """Social, Messaging & Discovery endpoints: Modules 51-55"""
 
 from app.models.user import User
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
 from app.db.session import get_db
 from app.models.social_messaging import *
 from app.services.social_messaging_service import *

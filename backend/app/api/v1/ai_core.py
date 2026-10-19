@@ -8,7 +8,7 @@ from datetime import datetime
 from app.db.session import get_db
 from app.core.security import get_current_user
 from app.models.user import User
-from app.models.ai_core import PromptStatus, WorkflowStatus, AgentStatus
+from app.models.ai_core import PromptStatus
 from app.services.ai_core_service import PromptService, WorkflowService, AgentService
 from pydantic import BaseModel
 

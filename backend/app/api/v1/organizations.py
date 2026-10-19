@@ -114,9 +114,9 @@ async def create_organization(
         )
         return result
     except ConflictError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
     except ValidationError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
 @router.get("", response_model=OrganizationListResponse)
@@ -152,7 +152,7 @@ async def get_organization(
         service = OrganizationService(session)
         return await service.get_organization(org_id)
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @router.put("/{org_id}", response_model=OrganizationResponse)
@@ -167,11 +167,11 @@ async def update_organization(
         service = OrganizationService(session)
         return await service.update_organization(org_id, **org_update.dict(exclude_unset=True))
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except ConflictError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
     except ValidationError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
 @router.delete("/{org_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -185,7 +185,7 @@ async def delete_organization(
         service = OrganizationService(session)
         await service.delete_organization(org_id)
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # Member endpoints
@@ -202,9 +202,9 @@ async def add_member(
         service = OrganizationService(session)
         return await service.add_member(org_id, user_id, role)
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except ConflictError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
 @router.get("/{org_id}/members", response_model=list[OrganizationMemberResponse])
@@ -218,7 +218,7 @@ async def list_members(
         service = OrganizationService(session)
         return await service.get_organization_members(org_id)
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @router.delete("/{org_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -233,9 +233,9 @@ async def remove_member(
         service = OrganizationService(session)
         await service.remove_member(org_id, user_id)
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except UnauthorizedError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
 
 
 # Invitation endpoints
@@ -251,7 +251,7 @@ async def invite_user(
         service = OrganizationService(session)
         return await service.invite_user(org_id, invite.email, invite.role, current_user.id)
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # Hierarchy endpoints
@@ -272,7 +272,7 @@ async def get_hierarchy(
             "children": [OrganizationResponse.model_validate(child) for child in result["children"]],
         }
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @router.put("/{org_id}/move", response_model=OrganizationResponse)
@@ -287,9 +287,9 @@ async def move_organization(
         service = OrganizationService(session)
         return await service.move_organization(org_id, parent_id)
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except ValidationError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
 # Settings endpoints
@@ -305,7 +305,7 @@ async def get_setting(
         service = OrganizationService(session)
         return await service.get_organization_setting(org_id, key)
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @router.put("/{org_id}/settings/{key}")
@@ -321,4 +321,4 @@ async def update_setting(
         service = OrganizationService(session)
         return await service.set_organization_setting(org_id, key, value)
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e

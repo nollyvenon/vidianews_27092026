@@ -246,7 +246,7 @@ async def create_publishing_job(
         )
     except Exception as e:
         await session.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @publishing_router.get("/jobs/pending")
@@ -269,7 +269,7 @@ async def get_pending_jobs(
             for job in jobs
         ]
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @publishing_router.patch("/jobs/{job_id}/status")
@@ -298,7 +298,7 @@ async def update_job_status(
         )
     except Exception as e:
         await session.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 # ==================== MODULE 67: DISTRIBUTION ====================
@@ -323,7 +323,7 @@ async def get_distribution_channels(
             for channel in channels
         ]
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 class SyndicationProfileRequest(BaseModel):
@@ -381,7 +381,7 @@ async def create_syndication_profile(
         return {"id": profile.id, "partner_name": profile.partner_name, "partner_type": profile.partner_type}
     except Exception as e:
         await session.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @distribution_router.post("/syndicate")
@@ -410,7 +410,7 @@ async def syndicate_content(
         }
     except Exception as e:
         await session.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 # ==================== MODULE 68: ANALYTICS ====================
@@ -441,7 +441,7 @@ async def record_engagement(
         }
     except Exception as e:
         await session.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @analytics_router.get("/metrics/{content_id}")
@@ -468,7 +468,7 @@ async def get_engagement_metrics(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @analytics_router.post("/metrics/update")
@@ -506,7 +506,7 @@ async def update_engagement_metrics(
         )
     except Exception as e:
         await session.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 # ==================== MODULE 69: A/B TESTING ====================
@@ -581,7 +581,7 @@ async def create_ab_test(
         }
     except Exception as e:
         await session.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @ab_test_router.post("/campaigns/{campaign_id}/variants")
@@ -612,7 +612,7 @@ async def create_variant(
         }
     except Exception as e:
         await session.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @ab_test_router.patch("/variants/{variant_id}/performance")
@@ -645,7 +645,7 @@ async def record_variant_performance(
         }
     except Exception as e:
         await session.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @ab_test_router.post("/campaigns/{campaign_id}/analyze")
@@ -670,7 +670,7 @@ async def analyze_test(
         }
     except Exception as e:
         await session.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 # ==================== MODULE 70: RECOMMENDATIONS ====================
@@ -709,7 +709,7 @@ async def create_recommendation_engine(
         return _engine_response(engine)
     except Exception as e:
         await session.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @recommendation_router.post("/generate")
@@ -742,7 +742,7 @@ async def generate_recommendations(
         }
     except Exception as e:
         await session.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @recommendation_router.post("/preferences")
@@ -772,7 +772,7 @@ async def record_preference(
         }
     except Exception as e:
         await session.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @recommendation_router.post("/logs/{log_id}/click")
@@ -808,7 +808,7 @@ async def record_recommendation_click(
         }
     except Exception as e:
         await session.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 # ==================== ROUTER REGISTRATION ====================

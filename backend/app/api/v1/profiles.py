@@ -6,7 +6,7 @@ from app.db.session import get_db
 from app.core.security import get_current_user
 from app.models.user import User
 from app.services.profile_service import ProfileService
-from app.utils.exceptions import NotFoundError, ConflictError, ValidationError
+from app.utils.exceptions import NotFoundError, ConflictError
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
@@ -116,7 +116,7 @@ async def get_my_profile(
         service = ProfileService(session)
         return await service.get_or_create_profile(current_user.id)
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @router.put("/me", response_model=ProfileResponse)
@@ -133,7 +133,7 @@ async def update_my_profile(
             **profile_update.dict(exclude_unset=True)
         )
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
 @router.get("/{user_id}", response_model=ProfileResponse)
@@ -147,7 +147,7 @@ async def get_profile(
         service = ProfileService(session)
         return await service.get_profile(user_id)
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @router.get("/{user_id}/summary", response_model=dict)
@@ -162,7 +162,7 @@ async def get_profile_summary(
         summary = await service.get_profile_summary(user_id)
         return {**summary, "profile": ProfileResponse.model_validate(summary["profile"])}
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # Skills endpoints
@@ -183,7 +183,7 @@ async def add_skill(
             skill.years_experience,
         )
     except ConflictError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
 @router.get("/{user_id}/skills", response_model=list[SkillResponse])
@@ -197,7 +197,7 @@ async def get_skills(
         service = ProfileService(session)
         return await service.get_skills(user_id)
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @router.delete("/skills/{skill_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -211,7 +211,7 @@ async def delete_skill(
         service = ProfileService(session)
         await service.delete_skill(skill_id)
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # Experience endpoints
@@ -234,7 +234,7 @@ async def add_experience(
             description=experience.description,
         )
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
 @router.get("/{user_id}/experiences", response_model=list[ExperienceResponse])
@@ -248,7 +248,7 @@ async def get_experiences(
         service = ProfileService(session)
         return await service.get_experiences(user_id)
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @router.delete("/experiences/{experience_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -262,7 +262,7 @@ async def delete_experience(
         service = ProfileService(session)
         await service.delete_experience(experience_id)
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # Education endpoints
@@ -284,7 +284,7 @@ async def add_education(
             field=education.field,
         )
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
 @router.get("/{user_id}/educations", response_model=list[EducationResponse])
@@ -298,7 +298,7 @@ async def get_educations(
         service = ProfileService(session)
         return await service.get_educations(user_id)
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @router.delete("/educations/{education_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -312,4 +312,4 @@ async def delete_education(
         service = ProfileService(session)
         await service.delete_education(education_id)
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e

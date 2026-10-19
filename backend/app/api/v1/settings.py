@@ -74,7 +74,7 @@ async def get_all_settings(
         service = SettingsService(session)
         return await service.get_all_user_settings(current_user.id)
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
 @router.put("/me", response_model=dict)
@@ -89,7 +89,7 @@ async def update_all_settings(
         updates_dict = updates.dict(exclude_unset=True)
         return await service.update_all_user_settings(current_user.id, updates_dict)
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
 # Notification settings
@@ -131,7 +131,7 @@ async def update_notification_settings(
             "push_enabled": prefs.push_enabled,
         }
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
 # Privacy settings
@@ -171,7 +171,7 @@ async def update_privacy_settings(
             "allow_messages": prefs.allow_messages,
         }
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
 # Display settings
@@ -210,7 +210,7 @@ async def update_display_settings(
             "timezone": prefs.timezone,
         }
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
 # System settings (admin only - simplified)
@@ -225,4 +225,4 @@ async def get_system_setting(
         service = SettingsService(session)
         return await service.get_system_setting(key)
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e

@@ -3,7 +3,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
-from datetime import datetime
 
 from app.db.session import get_db
 from app.core.security import get_current_user, get_optional_current_user
@@ -18,7 +17,7 @@ from app.schemas.content import (
     MediaFileCreate, MediaFileResponse,
     ContentEngagementCreate, ContentEngagementResponse,
     PublishContentRequest, ScheduleContentRequest, ArchiveContentRequest,
-    ContentSearchRequest, ContentBulkUpdateRequest, ContentBulkDeleteRequest
+    ContentBulkUpdateRequest, ContentBulkDeleteRequest
 )
 
 router = APIRouter(prefix="/content", tags=["content"])

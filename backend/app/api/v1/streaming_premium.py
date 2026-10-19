@@ -1,9 +1,8 @@
 """Streaming, Analytics & Premium endpoints: Modules 56-60"""
 
 from app.models.user import User
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
 from app.db.session import get_db
 from app.models.streaming_premium import *
 from app.services.streaming_premium_service import *

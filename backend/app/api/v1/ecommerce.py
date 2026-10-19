@@ -296,7 +296,7 @@ async def create_checkout(
     try:
         return await CheckoutService(session).create_checkout_session(current_user.id, cart.id, checkout.model_dump())
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.get("/checkout/{checkout_id}")
@@ -427,9 +427,9 @@ async def process_payment(
     try:
         await payments.process_stripe_payment(payment_detail.id, payment.card_token)
     except stripe.error.CardError as exc:
-        raise HTTPException(status_code=402, detail=exc.user_message or "Your card was declined")
-    except stripe.error.StripeError:
-        raise HTTPException(status_code=502, detail="The payment provider could not complete the charge")
+        raise HTTPException(status_code=402, detail=exc.user_message or "Your card was declined") from exc
+    except stripe.error.StripeError as err:
+        raise HTTPException(status_code=502, detail="The payment provider could not complete the charge") from err
 
     await session.refresh(payment_detail)
     order = await OrderService(session).create_order(current_user.id, checkout, payment_detail)

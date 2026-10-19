@@ -4,7 +4,7 @@ from app.models.user import User
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from app.db.session import get_db
 from app.models.api_monitoring import *
 from app.services.api_monitoring_service import *
@@ -122,7 +122,7 @@ async def execute_graphql(request: GraphQLExecuteRequest, db: AsyncSession = Dep
     try:
         return await service.execute_stored_query(request.query_id, request.variables)
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 @router.post("/graphql/run")
@@ -132,7 +132,7 @@ async def run_graphql(request: GraphQLRunRequest, db: AsyncSession = Depends(get
     try:
         return await service.run_ad_hoc(request.query, request.variables)
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
 
 # ==================== MODULE 43: WEBHOOKS ====================

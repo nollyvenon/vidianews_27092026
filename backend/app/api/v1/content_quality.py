@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime
 from app.db.session import get_db
 from app.core.security import get_current_user
 from app.models.user import User
@@ -414,7 +414,7 @@ async def check_readability(
     try:
         metrics = analyze(check.text)
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     service = ReadabilityService(db)
     score = await service.create_readability_score(

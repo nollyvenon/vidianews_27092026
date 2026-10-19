@@ -261,4 +261,4 @@ async def redeem_loyalty_points(
         await LoyaltyService(session).redeem_points(member_id, points, reason)
         return {"status": "points_redeemed"}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e

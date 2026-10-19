@@ -6,7 +6,7 @@ from app.db.session import get_db
 from app.core.security import get_current_user
 from app.models.user import User
 from app.services.tenant_service import TenantService
-from app.utils.exceptions import NotFoundError, ConflictError, UnauthorizedError, ValidationError
+from app.utils.exceptions import NotFoundError, ConflictError, UnauthorizedError
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from datetime import datetime
@@ -115,6 +115,8 @@ async def verify_tenant_owner(
     """Verify user is owner of tenant"""
     service = TenantService(session)
     tenant = await service.get_tenant(tenant_id)
+    if tenant is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
     members = await service.get_tenant_members(tenant_id)
 
     is_owner = any(m.user_id == current_user.id and m.is_owner for m in members)
@@ -157,7 +159,7 @@ async def create_tenant(
         )
         return result
     except ConflictError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
 @router.get("", response_model=TenantListResponse)
@@ -188,7 +190,7 @@ async def get_tenant(
         service = TenantService(session)
         return await service.get_tenant(tenant_id)
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @router.put("/{tenant_id}", response_model=TenantResponse)
@@ -204,9 +206,9 @@ async def update_tenant(
         service = TenantService(session)
         return await service.update_tenant(tenant_id, **tenant_update.dict(exclude_unset=True))
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except ConflictError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
 @router.delete("/{tenant_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -221,7 +223,7 @@ async def delete_tenant(
         service = TenantService(session)
         await service.delete_tenant(tenant_id)
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # Member endpoints
@@ -238,9 +240,9 @@ async def add_member(
         service = TenantService(session)
         return await service.add_member(tenant_id, member.user_id, member.role)
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except ConflictError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
 @router.get("/{tenant_id}/members", response_model=list[TenantMemberResponse])
@@ -255,7 +257,7 @@ async def list_members(
         service = TenantService(session)
         return await service.get_tenant_members(tenant_id)
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @router.delete("/{tenant_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -271,9 +273,9 @@ async def remove_member(
         service = TenantService(session)
         await service.remove_member(tenant_id, user_id)
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except UnauthorizedError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
 
 
 # Invitation endpoints
@@ -290,7 +292,7 @@ async def invite_user(
         service = TenantService(session)
         return await service.invite_user(tenant_id, invite.email, invite.role, current_user.id)
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # Settings endpoints
@@ -307,7 +309,7 @@ async def get_setting(
         service = TenantService(session)
         return await service.get_tenant_setting(tenant_id, key)
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @router.put("/{tenant_id}/settings/{key}", response_model=TenantSettingResponse)
@@ -324,4 +326,4 @@ async def update_setting(
         service = TenantService(session)
         return await service.set_tenant_setting(tenant_id, key, setting.value)
     except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e

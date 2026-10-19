@@ -3,7 +3,7 @@
 from app.models.user import User
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Literal
+from typing import Literal
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from app.core.admin_access import require_admin
@@ -12,7 +12,6 @@ from app.models.security_performance import *
 from app.services.security_performance_service import *
 from app.core.security import get_current_user
 from app.services.mfa_service import generate_secret, provisioning_uri
-from fastapi import HTTPException
 
 router = APIRouter(tags=["security"])
 
@@ -56,8 +55,8 @@ async def get_quota(db: AsyncSession = Depends(get_db), user: User = Depends(get
 async def connect_oauth(provider: str, provider_user_id: str, token: str, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     try:
         AuthProvider(provider)
-    except ValueError:
-        raise HTTPException(status_code=422, detail="Unsupported sign-in provider")
+    except ValueError as err:
+        raise HTTPException(status_code=422, detail="Unsupported sign-in provider") from err
     service = AuthService(db)
     oauth = await service.connect_oauth(user.id, provider, provider_user_id, token)
     return {"id": oauth.id, "provider": oauth.provider.value}
@@ -121,8 +120,8 @@ async def update_privacy_settings(
             kwargs["profile_visibility"] = PrivacyLevel(profile_visibility)
         if content_visibility:
             kwargs["content_visibility"] = PrivacyLevel(content_visibility)
-    except ValueError:
-        raise HTTPException(status_code=422, detail="Visibility must be public, private or friends_only")
+    except ValueError as err:
+        raise HTTPException(status_code=422, detail="Visibility must be public, private or friends_only") from err
     settings = await service.update_privacy_settings(user.id, **kwargs)
     return {
         "profile_visibility": settings.profile_visibility.value,

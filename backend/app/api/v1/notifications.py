@@ -6,7 +6,6 @@ from app.db.session import get_db
 from app.core.security import get_current_user
 from app.models.user import User
 from app.services.notification_service import NotificationService
-from app.models.notifications import NotificationType
 from pydantic import BaseModel
 from typing import List, Optional
 
@@ -88,7 +87,7 @@ async def mark_notification_read(
         return notification
     except Exception as e:
         await session.rollback()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
 @router.post("/me/read-all", response_model=dict)
@@ -104,7 +103,7 @@ async def mark_all_read(
         return {"marked_count": count}
     except Exception as e:
         await session.rollback()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
 @router.post("/me/{notification_id}/archive", response_model=NotificationResponse)
@@ -121,7 +120,7 @@ async def archive_notification(
         return notification
     except Exception as e:
         await session.rollback()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
 @router.delete("/me/{notification_id}", response_model=dict)
@@ -138,7 +137,7 @@ async def delete_notification(
         return {"deleted": True}
     except Exception as e:
         await session.rollback()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
 # Email notification endpoints
@@ -168,7 +167,7 @@ async def mark_email_sent(
         return email
     except Exception as e:
         await session.rollback()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
 # Push notification endpoints

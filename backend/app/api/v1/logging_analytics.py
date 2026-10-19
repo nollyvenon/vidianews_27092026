@@ -4,7 +4,7 @@ from app.models.user import User
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
+from typing import Optional
 from app.db.session import get_db
 from app.models.logging_analytics import *
 from app.services.logging_analytics_service import *
@@ -94,7 +94,7 @@ async def create_ab_test(name: str, flag_id: int, variant_a: str, variant_b: str
 # ==================== MODULE 49: ANALYTICS ====================
 
 @router.post("/analytics/event")
-async def track_event(event_type: str, event_data: dict = {}, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+async def track_event(event_type: str, event_data: Optional[dict] = None, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     service = AnalyticsService(db)
     event = await service.track_event(user.id, event_type, event_data)
     return {"id": event.id, "event_type": event.event_type}

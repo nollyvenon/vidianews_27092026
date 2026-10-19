@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.user_management import APIKey
 from typing import List, Dict, Optional, Any
 from datetime import datetime
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 from app.core.admin_access import require_admin
 from app.db.session import get_db
@@ -132,7 +132,7 @@ async def get_email_template(
         result = await service.get_email_template(db, template_id)
         return result
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 # Email Campaign Endpoints
@@ -179,7 +179,7 @@ async def add_campaign_recipients(
         )
         return result
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 @email_router.patch("/campaigns/{campaign_id}/metrics")
@@ -202,7 +202,7 @@ async def update_campaign_metrics(
         )
         return result
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 @email_router.post("/campaigns/{campaign_id}/send")
@@ -216,7 +216,7 @@ async def send_campaign(
         result = await service.send_campaign(db, campaign_id)
         return result
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 # User Segment Endpoints
@@ -253,7 +253,7 @@ async def add_users_to_segment(
         )
         return result
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 @segment_router.get("/{segment_id}/users")
@@ -369,7 +369,7 @@ async def mark_notification_sent(
         result = await service.mark_as_sent(db, notification_id)
         return result
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 @notification_router.patch("/{notification_id}/read")
@@ -383,7 +383,7 @@ async def mark_notification_read(
         result = await service.mark_as_read(db, notification_id)
         return result
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 # Webhook Endpoints
@@ -420,7 +420,7 @@ async def trigger_webhook(
         )
         return result
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 # API Key Endpoints
@@ -491,7 +491,7 @@ async def revoke_api_key(
         result = await service.revoke_api_key(db, key_id)
         return result
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 # Personalization Endpoints
@@ -526,7 +526,7 @@ async def update_user_interests(
         )
         return result
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 @personalization_router.get("/{user_id}/score")

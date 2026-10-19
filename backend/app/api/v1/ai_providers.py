@@ -8,9 +8,9 @@ from datetime import datetime
 from app.db.session import get_db
 from app.core.security import get_current_user
 from app.models.user import User
-from app.models.ai_providers import ProviderType, ModelFamily, APIKeyStatus
+from app.models.ai_providers import ProviderType, ModelFamily
 from app.services.ai_provider_service import AIProviderService
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/ai-providers", tags=["ai-providers"])
 

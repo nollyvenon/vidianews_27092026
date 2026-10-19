@@ -3,7 +3,6 @@ from app.models.user import User
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional, Dict, Any
-from datetime import datetime
 from pydantic import BaseModel
 
 from app.db.session import get_db

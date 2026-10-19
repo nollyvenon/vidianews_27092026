@@ -1,9 +1,8 @@
 """Community, Gamification & Compliance endpoints: Modules 61-65"""
 
 from app.models.user import User
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
 from app.db.session import get_db
 from app.models.community_compliance import *
 from app.services.community_compliance_service import *
@@ -43,7 +42,7 @@ async def create_badge(name: str, description: str, db: AsyncSession = Depends(g
 async def award_badge(badge_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     service = GamificationService(db)
     user_badge = await service.award_badge(user.id, badge_id)
-    return {"earned": True}
+    return {"earned": True, "user_badge_id": user_badge.id, "badge_id": user_badge.badge_id}
 
 @router.get("/leaderboard")
 async def get_leaderboard(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -109,7 +108,7 @@ async def set_language(language_code: str, db: AsyncSession = Depends(get_db), u
     service = LocalizationService(db)
     lang = await service.get_or_create_language(language_code, "")
     localization = await service.set_user_language(user.id, lang.id)
-    return {"set": True}
+    return {"set": True, "language_code": language_code, "language_id": localization.language_id}
 
 @router.get("/translations/{language_code}/{key}")
 async def get_translation(language_code: str, key: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):

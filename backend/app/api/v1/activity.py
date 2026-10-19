@@ -122,8 +122,8 @@ async def get_audit_trail(
             offset=offset,
         )
         return logs
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid entity type")
+    except ValueError as err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid entity type") from err
 
 
 @router.get("/me/audit", response_model=List[AuditLogResponse])
@@ -188,7 +188,7 @@ async def mark_feed_read(
         return feed
     except Exception as e:
         await session.rollback()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
 @router.post("/feed/read-all", response_model=dict)
@@ -204,7 +204,7 @@ async def mark_all_feed_read(
         return {"marked_count": count}
     except Exception as e:
         await session.rollback()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
 @router.post("/feed/{feed_id}/archive", response_model=FeedItemResponse)
@@ -221,4 +221,4 @@ async def archive_feed_item(
         return feed
     except Exception as e:
         await session.rollback()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
