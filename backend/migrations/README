@@ -53,9 +53,14 @@ has the baseline schema. Record that without running the baseline again::
 Revisions
 ---------
 
-- ``16528e4bc671`` - baseline schema. Creates every table, enum type and index
-  that ``Base.metadata`` declares. It is generated from the models at the time
-  of writing and is the starting point for all later revisions.
+- Baseline schema, split into nine parts (``*_baseline_part_<n>_of_9.py``). Together
+  they create every table, index and enum type that ``Base.metadata`` declares. The
+  parts run in order, each in its own transaction, so no single transaction has to
+  lock all 353 tables. Each part holds 40 tables in dependency order, so a foreign
+  key only points at the same part or an earlier one. Part 9 (``16528e4bc671``) is the
+  head revision, so databases created before the split are already at head.
+- Downgrading a part drops its tables and indexes, and drops the enum types that the
+  part created.
 
 Testing
 -------

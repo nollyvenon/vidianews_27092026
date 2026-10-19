@@ -114,7 +114,7 @@ def test_upgrade_head_builds_exactly_the_models_schema(scratch_urls):
     assert table_names == set(Base.metadata.tables)
 
 
-def test_downgrade_base_removes_every_table(scratch_urls):
+def test_downgrade_base_removes_every_table_and_enum_type_then_upgrade_rebuilds_them(scratch_urls):
     async_url, sync_url = scratch_urls
     config = _alembic_config(async_url)
     _run_in_worker_thread(command.upgrade, config, "head")
@@ -124,7 +124,24 @@ def test_downgrade_base_removes_every_table(scratch_urls):
     try:
         with engine.connect() as conn:
             remaining = set(inspect(conn).get_table_names())
+            enum_types = set(
+                conn.execute(text("SELECT typname FROM pg_type WHERE typtype = 'e'")).scalars()
+            )
     finally:
         engine.dispose()
 
     assert remaining == {"alembic_version"}
+    assert enum_types == set()
+
+    _run_in_worker_thread(command.upgrade, config, "head")
+    engine = create_engine(sync_url)
+    try:
+        with engine.connect() as conn:
+            differences = compare_metadata(
+                MigrationContext.configure(conn, opts={"compare_type": True}),
+                Base.metadata,
+            )
+    finally:
+        engine.dispose()
+
+    assert differences == [], f"Schema after downgrade and re-upgrade differs: {differences}"
