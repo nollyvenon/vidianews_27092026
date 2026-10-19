@@ -324,8 +324,15 @@ class TestABTestingService:
             clicks_b=100,
         )
 
-        assert chi_square >= 0
-        assert 0 <= p_value <= 1
+        assert chi_square == pytest.approx(1.142857, abs=1e-6)
+        assert p_value == pytest.approx(0.285049, abs=1e-6)
+
+    def test_chi_square_is_zero_when_a_variant_has_no_traffic(self):
+        assert ABTestingService._chi_square_test(0, 0, 5, 50) == (0.0, 1.0)
+
+    def test_chi_square_flags_a_clear_difference(self):
+        statistic, p_value = ABTestingService._chi_square_test(10, 100, 40, 100)
+        assert p_value < 0.05
 
 
 class TestRecommendationService:
