@@ -1,6 +1,6 @@
 """Advanced AI models: Memory, Templates, Chat, Research, Monitoring, Safety"""
 
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, JSON, Text, Enum as SQLEnum, Index, Float
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, JSON, Text, Enum as SQLEnum, Float
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from app.db.base import Base

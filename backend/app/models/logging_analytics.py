@@ -1,6 +1,6 @@
 """Logging, Analytics & Documentation models: Modules 46-50"""
 
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, JSON, Text, Enum as SQLEnum, Index, Float
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, JSON, Text, Enum as SQLEnum
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from app.db.base import Base

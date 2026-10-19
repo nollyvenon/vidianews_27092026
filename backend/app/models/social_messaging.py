@@ -1,6 +1,6 @@
 """Social, Messaging & Discovery models: Modules 51-55"""
 
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, JSON, Text, Enum as SQLEnum, Index, Float, UniqueConstraint
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, JSON, Text, Enum as SQLEnum, Float, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from app.db.base import Base

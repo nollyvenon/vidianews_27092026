@@ -1,6 +1,6 @@
 """Integration models: Modules 21-25 (Analytics, Webhooks, Notifications, Audit, Search)"""
 
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, JSON, Text, Enum as SQLEnum, Index, Float, BigInteger
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, JSON, Text, Enum as SQLEnum, Index, Float
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from app.db.base import Base

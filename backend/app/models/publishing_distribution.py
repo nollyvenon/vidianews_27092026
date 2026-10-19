@@ -1,7 +1,6 @@
 """Publishing, Distribution & Optimization Models: Modules 66-70"""
 
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, JSON, Text, Enum as SQLEnum, Index, Float
-from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from app.db.base import Base
 import enum

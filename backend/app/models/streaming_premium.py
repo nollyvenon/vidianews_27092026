@@ -1,6 +1,6 @@
 """Streaming, Analytics & Premium models: Modules 56-60"""
 
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, JSON, Text, Enum as SQLEnum, Index, Float
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, JSON, Text, Enum as SQLEnum, Float
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from app.db.base import Base

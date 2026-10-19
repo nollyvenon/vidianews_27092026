@@ -1,7 +1,6 @@
 """Settings models"""
 
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, JSON, Text, Index
-from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from app.db.base import Base
 

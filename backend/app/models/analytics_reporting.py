@@ -2,9 +2,7 @@ from sqlalchemy import (
     Column, Integer, String, DateTime, Boolean, Float, Text, ForeignKey,
     Enum, UniqueConstraint, Index, JSON, func, Numeric
 )
-from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import ARRAY
-from datetime import datetime
 import enum
 
 from app.db.base import Base

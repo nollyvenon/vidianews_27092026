@@ -1,9 +1,9 @@
 """Content management schemas"""
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
-from app.models.content import ContentType, ContentStatus, ContentAccessLevel, VideoQuality
+from app.models.content import ContentType, ContentStatus, ContentAccessLevel
 
 
 # Category Schemas

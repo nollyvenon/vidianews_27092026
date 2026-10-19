@@ -2,7 +2,7 @@
 
 from sqlalchemy import (
     Column, Integer, String, DateTime, Boolean, ForeignKey, JSON, Text,
-    Enum as SQLEnum, Float, Index, Table, UniqueConstraint, Numeric, DECIMAL
+    Enum as SQLEnum, Float, Index, Table, UniqueConstraint, DECIMAL
 )
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone

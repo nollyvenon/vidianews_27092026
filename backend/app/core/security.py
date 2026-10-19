@@ -8,7 +8,6 @@ from pydantic import ValidationError
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.authentication import AuthenticationError
 from app.core.config import settings
 from app.db.session import get_db
 

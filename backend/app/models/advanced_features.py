@@ -1,9 +1,8 @@
 from sqlalchemy import (
     Column, Integer, String, DateTime, Boolean, Float, Text, ForeignKey,
-    Enum, UniqueConstraint, Index, JSON, ARRAY, func, Numeric, DECIMAL
+    Enum, UniqueConstraint, Index, JSON, ARRAY, func, Numeric
 )
-from sqlalchemy.orm import relationship, synonym
-from datetime import datetime
+from sqlalchemy.orm import synonym
 import enum
 
 from app.db.base import Base
