@@ -2,9 +2,8 @@
 
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, and_
 from app.models.profiles import UserProfile, UserSkill, UserExperience, UserEducation, UserBadge
-from app.models.user import User
 from app.utils.exceptions import NotFoundError, ConflictError, ValidationError
 from app.utils.logger import logger
 

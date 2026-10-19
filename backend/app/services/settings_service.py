@@ -8,8 +8,7 @@ from app.models.settings import (
     NotificationPreference, PrivacySetting, DisplaySetting
 )
 from app.models.tenants import TenantSettings as TenantSetting
-from app.models.user import User
-from app.utils.exceptions import NotFoundError, ValidationError
+from app.utils.exceptions import NotFoundError
 from app.utils.logger import logger
 
 

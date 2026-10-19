@@ -1,7 +1,7 @@
 """Services for Community, Gamification & Compliance: Modules 61-65"""
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, and_, desc, func
+from sqlalchemy import select, and_, desc
 from typing import Optional, List
 from datetime import datetime, timezone
 from app.models.community_compliance import *

@@ -9,7 +9,7 @@ from app.services.ai_chat_service import complete_json
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, timedelta
 from app.models.ai_advanced import (
-    Memory, ConversationMemory, AITemplate, Chat, ChatMessage,
+    Memory, AITemplate, Chat, ChatMessage,
     Document, ResearchQuery, UsageMetric, CostAlert,
     SafetyCheck, SafetyLevel, ComplianceLog
 )
@@ -236,8 +236,8 @@ def _safety_analysis(analysis: Any) -> tuple:
         raise HTTPException(status_code=503, detail="AI provider returned an unreadable safety analysis")
     try:
         severity = SafetyLevel(analysis.get("severity"))
-    except ValueError:
-        raise HTTPException(status_code=503, detail="AI provider returned an unreadable safety analysis")
+    except ValueError as err:
+        raise HTTPException(status_code=503, detail="AI provider returned an unreadable safety analysis") from err
     flags = analysis.get("flags", [])
     if not isinstance(flags, list) or not all(isinstance(flag, str) for flag in flags):
         raise HTTPException(status_code=503, detail="AI provider returned an unreadable safety analysis")

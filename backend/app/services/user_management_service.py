@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_, case, cast, Text
+from sqlalchemy import select, func, and_, case, cast, Text
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional, Any
 import json
@@ -9,7 +9,7 @@ import hashlib
 import httpx
 from app.models.user_management import (
     EmailTemplate, EmailCampaign, CampaignRecipient, UserSegment,
-    UserSegmentMembership, UserPreferenceProfile, NotificationLog,
+    UserSegmentMembership, NotificationLog,
     SubscriberProfile, SubscriberActivity, SubscriberAnalytics,
     WebhookEndpoint, WebhookLog, APIKey, PersonalizationProfile,
     CampaignStatus, NotificationChannel, UserSegmentType

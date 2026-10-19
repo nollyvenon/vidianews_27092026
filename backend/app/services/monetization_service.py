@@ -1,8 +1,8 @@
 """Services for Modules 31-35"""
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, and_, desc, func
-from typing import Optional, List, Dict, Any
+from sqlalchemy import select, update, desc
+from typing import Optional, List, Dict
 from datetime import datetime, timezone, timedelta
 from app.models.monetization import *
 
@@ -104,7 +104,8 @@ class AnalyticsService:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def create_dashboard(self, user_id: int, name: str, widgets: List = []) -> CustomDashboard:
+    async def create_dashboard(self, user_id: int, name: str, widgets: Optional[List] = None) -> CustomDashboard:
+        widgets = [] if widgets is None else widgets
         dashboard = CustomDashboard(user_id=user_id, name=name, widgets=widgets)
         self.session.add(dashboard)
         await self.session.commit()

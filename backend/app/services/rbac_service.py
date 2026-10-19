@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from app.models.rbac import Role, Permission, role_permissions, user_roles, ResourcePermission, AuditLog
 from app.models.user import User
-from app.utils.exceptions import NotFoundError, ForbiddenError, ConflictError
+from app.utils.exceptions import NotFoundError, ConflictError
 from app.utils.logger import logger
 from datetime import datetime, timezone
 

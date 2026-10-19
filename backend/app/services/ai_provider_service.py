@@ -5,14 +5,10 @@ from sqlalchemy import select, update, delete, and_, desc, func
 from sqlalchemy.orm import selectinload
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, timedelta
-import httpx
-import json
 from app.models.ai_providers import (
     AIProvider, AIProviderAPIKey, AIModel, AIModelCall, ProviderUsage,
     ProviderType, ModelFamily, APIKeyStatus
 )
-from app.models.user import User
-import math
 
 
 class AIProviderService:

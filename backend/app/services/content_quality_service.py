@@ -1,12 +1,10 @@
 """Content Quality Services: Modules 61-65"""
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, and_, desc, func
+from sqlalchemy import select, update, and_, desc
 from sqlalchemy.orm import selectinload
-from typing import Optional, List, Dict, Any
-from datetime import datetime, timezone, timedelta
-import httpx
-import json
+from typing import Optional, List, Dict
+from datetime import datetime, timezone
 import re
 from app.models.content_quality import (
     ContentCalendarEvent, ContentCalendarRecommendation,
@@ -17,8 +15,6 @@ from app.models.content_quality import (
     CalendarEventType, ProofreadingIssueType, IssueSeverity,
     PlagiarismCheckStatus, BrandVoiceCheckResult
 )
-from app.models.content import Content
-from app.models.organizations import Organization
 
 
 class ContentCalendarService:

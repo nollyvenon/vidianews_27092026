@@ -1,23 +1,18 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, func, and_, or_, desc
-from sqlalchemy.orm import joinedload
-from datetime import datetime, timedelta, timezone
-import json
+from sqlalchemy import select, update, func, and_, desc
+from datetime import datetime, timezone
 import hashlib
 import math
 from typing import List, Optional, Dict, Any
 from scipy import stats
-import numpy as np
 
 from app.models.content import Video
 from app.models.rbac import ResourcePermission
 from app.utils.exceptions import NotFoundError
 from app.models.advanced_features import (
     AdvancedPersonalizationProfile,
-    ContentEmbedding,
     UserEmbedding,
     ContentRecommendation,
-    CollaborativeFilteringModel,
     RetentionMetric,
     RetentionCampaign,
     ABTest,
@@ -28,7 +23,6 @@ from app.models.advanced_features import (
     PredictionModel,
     UserPrediction,
     RecommendationType,
-    RetentionStatus,
     ABTestStatus,
     PermissionLevel,
     ShareLink,
@@ -464,7 +458,7 @@ class ABTestingService:
         self, test_id: int, user_id: int
     ) -> Optional[ABTestVariant]:
         hash_input = f"{test_id}-{user_id}".encode()
-        hash_value = int(hashlib.md5(hash_input).hexdigest(), 16)
+        hash_value = int(hashlib.md5(hash_input, usedforsecurity=False).hexdigest(), 16)
 
         test_result = await self.db.execute(
             select(ABTest).where(ABTest.id == test_id)
@@ -534,10 +528,6 @@ class ABTestingService:
             test.metric_b = b_rate
 
             # Chi-square test
-            contingency_table = [
-                [a_conversions, a_total - a_conversions],
-                [b_conversions, b_total - b_conversions],
-            ]
             chi2 = (
                 (a_conversions * (b_total - b_conversions) - b_conversions * (a_total - a_conversions)) ** 2
                 * (a_total + b_total)

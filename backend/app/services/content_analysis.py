@@ -79,8 +79,8 @@ async def find_proofreading_issues(text: str, grammar: bool, spelling: bool, sty
 def _score(value: Any) -> float:
     try:
         return max(0.0, min(100.0, float(value)))
-    except (TypeError, ValueError):
-        raise _unreadable()
+    except (TypeError, ValueError) as err:
+        raise _unreadable() from err
 
 
 async def analyze_brand_voice(text: str, guide_description: str) -> Dict[str, Any]:

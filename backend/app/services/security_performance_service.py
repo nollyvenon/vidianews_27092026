@@ -1,11 +1,11 @@
 """Services for Modules 36-40"""
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, and_, desc, func
-from typing import Optional, List, Dict, Any
+from sqlalchemy import select, update, and_, desc
+from typing import Optional, List, Dict
 from datetime import datetime, timezone, timedelta
 from app.models.security_performance import *
-from app.utils.exceptions import NotFoundError, ValidationError
+from app.utils.exceptions import ValidationError
 
 
 class RateLimitService:
@@ -135,7 +135,8 @@ class PushNotificationService:
         result = await self.session.execute(stmt)
         return result.scalars().all()
 
-    async def send_notification(self, user_id: int, title: str, body: str, data: Dict = {}) -> PushNotification:
+    async def send_notification(self, user_id: int, title: str, body: str, data: Optional[Dict] = None) -> PushNotification:
+        data = {} if data is None else data
         notif = PushNotification(user_id=user_id, title=title, body=body, data=data)
         self.session.add(notif)
         await self.session.commit()

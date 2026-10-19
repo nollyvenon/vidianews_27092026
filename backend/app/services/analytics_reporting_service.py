@@ -832,7 +832,7 @@ class FeatureFlagService:
             return False
         if flag.rollout_percentage < 100 and user_id is not None:
             # Deterministic bucket per (user, feature) so a user always gets the same answer.
-            digest = hashlib.md5(f"{user_id}{feature_name}".encode()).hexdigest()
+            digest = hashlib.md5(f"{user_id}{feature_name}".encode(), usedforsecurity=False).hexdigest()
             return (int(digest, 16) % 100) < flag.rollout_percentage
         return True
 

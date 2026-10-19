@@ -8,9 +8,7 @@ from app.models.activity_logs import (
     ActivityLog, AuditLog, ActivityFeed, RetentionPolicy,
     ActionType, EntityType
 )
-from app.models.user import User
-from app.utils.exceptions import NotFoundError, ValidationError
-from app.utils.logger import logger
+from app.utils.exceptions import NotFoundError
 
 
 class ActivityService:

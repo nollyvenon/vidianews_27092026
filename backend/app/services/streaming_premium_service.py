@@ -57,7 +57,8 @@ class SubscriptionService:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def create_subscription_tier(self, creator_id: int, name: str, price: float, features: list = []) -> SubscriptionTier:
+    async def create_subscription_tier(self, creator_id: int, name: str, price: float, features: Optional[list] = None) -> SubscriptionTier:
+        features = [] if features is None else features
         tier = SubscriptionTier(creator_id=creator_id, name=name, price_usd=price, features=features)
         self.session.add(tier)
         await self.session.commit()
@@ -143,7 +144,8 @@ class PremiumService:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def create_premium_subscription(self, user_id: int, features: list = []) -> PremiumSubscription:
+    async def create_premium_subscription(self, user_id: int, features: Optional[list] = None) -> PremiumSubscription:
+        features = [] if features is None else features
         premium = PremiumSubscription(user_id=user_id, enabled_features=features, expires_at=datetime.now(timezone.utc) + timedelta(days=365))
         self.session.add(premium)
         await self.session.commit()

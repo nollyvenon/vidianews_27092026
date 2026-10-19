@@ -7,13 +7,11 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, timedelta
 from app.models.content import (
     Content, Video, MediaFile, ContentEngagement, ContentCategory, ContentTag,
-    ContentType, ContentStatus, ContentAccessLevel, content_tags
+    ContentType, ContentStatus, ContentAccessLevel
 )
-from app.models.user import User
 from app.models.advanced_features import VideoProcess
 from app.models.activity_logs import ActivityLog, ActionType, EntityType
-import math
-from app.utils.exceptions import NotFoundError, ValidationError
+from app.utils.exceptions import ValidationError
 
 
 class ContentService:

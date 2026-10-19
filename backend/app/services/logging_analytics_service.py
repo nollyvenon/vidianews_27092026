@@ -3,7 +3,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, and_, desc, func
 from typing import Optional, List
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from app.models.logging_analytics import *
 
 
@@ -11,7 +11,8 @@ class LoggingService:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def log_message(self, level: str, service: str, message: str, user_id: int = None, metadata: dict = {}) -> LogEntry:
+    async def log_message(self, level: str, service: str, message: str, user_id: int = None, metadata: Optional[dict] = None) -> LogEntry:
+        metadata = {} if metadata is None else metadata
         entry = LogEntry(level=level, service=service, message=message, user_id=user_id, extra_metadata=metadata)
         self.session.add(entry)
         await self.session.commit()
@@ -52,7 +53,8 @@ class ErrorTrackingService:
         await self.session.refresh(error)
         return error
 
-    async def record_error_session(self, error_id: int, session_id: str, device_info: dict = {}) -> ErrorSession:
+    async def record_error_session(self, error_id: int, session_id: str, device_info: Optional[dict] = None) -> ErrorSession:
+        device_info = {} if device_info is None else device_info
         session = ErrorSession(error_report_id=error_id, session_id=session_id, device_info=device_info)
         self.session.add(session)
         await self.session.commit()
@@ -103,7 +105,8 @@ class AnalyticsService:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def track_event(self, user_id: int, event_type: str, event_data: dict = {}, session_id: str = None) -> AnalyticsEvent:
+    async def track_event(self, user_id: int, event_type: str, event_data: Optional[dict] = None, session_id: str = None) -> AnalyticsEvent:
+        event_data = {} if event_data is None else event_data
         event = AnalyticsEvent(user_id=user_id, event_type=event_type, event_data=event_data, session_id=session_id)
         self.session.add(event)
         await self.session.commit()

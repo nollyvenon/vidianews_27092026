@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 from app.models.api_monitoring import *
 from app.services.graphql_explorer import run_query
 import hashlib
-import hmac
 import time
 
 
