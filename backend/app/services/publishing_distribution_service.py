@@ -1,10 +1,9 @@
 """Services for Publishing, Distribution & Optimization: Modules 66-70"""
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, desc
+from sqlalchemy import select, and_, desc
 from datetime import datetime, timezone, timedelta
-from typing import List, Optional, Dict, Any
-import json
+from typing import List, Optional
 import math
 
 from app.models.publishing_distribution import (
@@ -13,8 +12,7 @@ from app.models.publishing_distribution import (
     EngagementMetric, PerformanceAnalytics, EngagementTracker,
     ABTestCampaign, ABTestVariant, ABTestResult,
     RecommendationEngine, UserPreference, RecommendationLog,
-    PublishingStatus, DistributionChannel as DistChannelEnum,
-    ABTestStatus, RecommendationType, UserPreferenceCategory
+    PublishingStatus, ABTestStatus, RecommendationType, UserPreferenceCategory
 )
 
 
@@ -270,13 +268,16 @@ class AnalyticsService:
         reactions: int,
     ) -> EngagementMetric:
         """Update or create engagement metrics"""
-        # Try to get existing metric for today
-        today = datetime.now(timezone.utc).date()
+        # One row per content per UTC day: look up today's row only
+        now = datetime.now(timezone.utc)
+        day_start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
         result = await session.execute(
             select(EngagementMetric).where(
                 and_(
                     EngagementMetric.organization_id == org_id,
                     EngagementMetric.content_id == content_id,
+                    EngagementMetric.metric_date >= day_start,
+                    EngagementMetric.metric_date < day_start + timedelta(days=1),
                 )
             )
         )
@@ -286,7 +287,7 @@ class AnalyticsService:
             metric = EngagementMetric(
                 organization_id=org_id,
                 content_id=content_id,
-                metric_date=datetime.now(timezone.utc),
+                metric_date=now,
             )
             session.add(metric)
 
@@ -496,35 +497,22 @@ class ABTestingService:
 
     @staticmethod
     def _chi_square_test(conversions_a: int, clicks_a: int, conversions_b: int, clicks_b: int) -> tuple:
-        """Perform chi-square test for statistical significance"""
-        # Contingency table
-        # [conversions_a, clicks_a - conversions_a]
-        # [conversions_b, clicks_b - conversions_b]
-
+        """Pearson chi-square test of independence on the 2x2 table of conversions versus non-conversions
+        for variants A and B. Returns (statistic, p-value); the p-value is exact for one degree of freedom."""
         non_conversions_a = clicks_a - conversions_a
         non_conversions_b = clicks_b - conversions_b
-
         total = clicks_a + clicks_b
-        if total == 0:
-            return 0, 1
+        row_a, row_b = clicks_a, clicks_b
+        column_conv = conversions_a + conversions_b
+        column_non = non_conversions_a + non_conversions_b
+        if total == 0 or row_a == 0 or row_b == 0 or column_conv == 0 or column_non == 0:
+            return 0.0, 1.0
 
-        # Expected frequencies
-        total_conversions = conversions_a + conversions_b
-        total_non_conversions = non_conversions_a + non_conversions_b
-
-        expected_a = (clicks_a / total) * total_conversions
-        expected_b = (clicks_b / total) * total_conversions
-
-        # Chi-square calculation
-        chi_square = (
-            ((conversions_a - expected_a) ** 2 / expected_a) if expected_a > 0 else 0 +
-            ((conversions_b - expected_b) ** 2 / expected_b) if expected_b > 0 else 0
-        )
-
-        # Simplified p-value (approximation)
-        p_value = 0.05 if chi_square > 3.841 else 0.5
-
-        return chi_square, p_value
+        cross = conversions_a * non_conversions_b - non_conversions_a * conversions_b
+        statistic = total * cross * cross / (row_a * row_b * column_conv * column_non)
+        # Survival function of the chi-square distribution with one degree of freedom
+        p_value = math.erfc(math.sqrt(statistic / 2))
+        return statistic, p_value
 
 
 class RecommendationService:
