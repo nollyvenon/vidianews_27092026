@@ -34,6 +34,14 @@ Check that the models and the migrations agree (exits non-zero on drift)::
 
     python -m alembic check
 
+Application startup
+-------------------
+
+At startup the application creates any missing tables from the models only when
+``DB_AUTO_CREATE_SCHEMA`` is enabled. It is enabled by default everywhere except
+``APP_ENV=production``. In production, run ``alembic upgrade head`` before starting
+the application; the startup step does not change the schema there.
+
 Existing databases
 ------------------
 

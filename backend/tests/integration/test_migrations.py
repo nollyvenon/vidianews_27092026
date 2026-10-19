@@ -30,6 +30,23 @@ def _scratch_database_name() -> str:
     return f"{root}_migrations_test"
 
 
+def _drop_database(admin_engine, name: str) -> None:
+    """Drop the scratch database, ending any sessions still connected to it.
+
+    The lock timeout makes a stuck drop fail with an error instead of hanging the run.
+    """
+    with admin_engine.connect() as conn:
+        conn.execute(text("SET lock_timeout = '30s'"))
+        conn.execute(
+            text(
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                "WHERE datname = :name AND pid <> pg_backend_pid()"
+            ),
+            {"name": name},
+        )
+        conn.execute(text(f'DROP DATABASE IF EXISTS "{name}"'))
+
+
 @pytest.fixture
 def scratch_urls():
     """Create an empty scratch database and yield its (asyncpg, psycopg2) URLs."""
@@ -39,8 +56,8 @@ def scratch_urls():
         make_url(TEST_SYNC_DATABASE_URL).set(database="postgres"),
         isolation_level="AUTOCOMMIT",
     )
+    _drop_database(admin_engine, name)
     with admin_engine.connect() as conn:
-        conn.execute(text(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)'))
         conn.execute(text(f'CREATE DATABASE "{name}"'))
     try:
         yield (
@@ -48,8 +65,7 @@ def scratch_urls():
             make_url(TEST_SYNC_DATABASE_URL).set(database=name).render_as_string(hide_password=False),
         )
     finally:
-        with admin_engine.connect() as conn:
-            conn.execute(text(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)'))
+        _drop_database(admin_engine, name)
         admin_engine.dispose()
 
 
@@ -106,7 +122,8 @@ def test_downgrade_base_removes_every_table(scratch_urls):
 
     engine = create_engine(sync_url)
     try:
-        remaining = set(inspect(engine).get_table_names())
+        with engine.connect() as conn:
+            remaining = set(inspect(conn).get_table_names())
     finally:
         engine.dispose()
 

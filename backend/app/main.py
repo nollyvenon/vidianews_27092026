@@ -34,8 +34,11 @@ async def _flush_api_usage_periodically() -> None:
 async def lifespan(app: FastAPI):
     """Application lifespan events"""
     # Startup
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    if settings.auto_create_schema:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    else:
+        logger.info("Startup schema creation is disabled; run `alembic upgrade head` to update the database.")
     flusher = asyncio.create_task(_flush_api_usage_periodically())
     yield
     # Shutdown

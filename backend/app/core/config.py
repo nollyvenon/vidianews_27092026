@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     # Disable connection pooling (set by the test harness). Connections then
     # are never shared across event loops, e.g. TestClient's loop vs pytest's.
     DB_NULL_POOL: bool = False
+    # Create any missing tables from the models at startup. Leave unset to use the
+    # default: on outside production, off in production, where Alembic migrations
+    # (`alembic upgrade head`) are the only schema path.
+    DB_AUTO_CREATE_SCHEMA: Optional[bool] = None
 
     # Redis
     REDIS_URL: str = "redis://redis:6379/0"
@@ -86,6 +90,17 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: Optional[str] = None
     STRIPE_PUBLIC_KEY: Optional[str] = None
     STRIPE_WEBHOOK_SECRET: Optional[str] = None
+
+    @property
+    def auto_create_schema(self) -> bool:
+        """Whether startup creates missing tables from the models.
+
+        An explicit DB_AUTO_CREATE_SCHEMA always wins. Otherwise it is enabled in
+        every environment except production.
+        """
+        if self.DB_AUTO_CREATE_SCHEMA is not None:
+            return self.DB_AUTO_CREATE_SCHEMA
+        return self.APP_ENV.strip().lower() != "production"
 
     class Config:
         env_file = ".env"
