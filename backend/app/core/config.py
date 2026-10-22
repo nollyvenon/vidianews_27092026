@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # CORS
-    CORS_ORIGINS: list = ["http://localhost:3000", "http://localhost:8000"]
+    CORS_ORIGINS: list = ["http://localhost:3100", "http://localhost:8100"]
     CORS_CREDENTIALS: bool = True
     CORS_METHODS: list = ["*"]
     CORS_HEADERS: list = ["*"]
@@ -81,13 +81,13 @@ class Settings(BaseSettings):
     NEWS_USER_AGENT: str = "VidiaNewsBot/1.0 (+news aggregator; RSS only)"
 
     # Public site / admin panel
-    SITE_URL: str = "http://localhost:3000"  # canonical origin of the public website
+    SITE_URL: str = "http://localhost:3100"  # canonical origin of the public website
     ADMIN_SESSION_HOURS: int = 12  # absolute lifetime of an admin session
     ADMIN_IDLE_MINUTES: int = 120  # a session unused this long expires
     ADMIN_COOKIE_SECURE: Optional[bool] = None  # None = secure when APP_ENV is production or the request is HTTPS
     ADMIN_EMAIL: Optional[str] = None  # optional first-run bootstrap (only used while no admin exists)
     ADMIN_PASSWORD: Optional[str] = None
-    PUBLIC_API_URL: str = "http://localhost:8000"  # how browsers reach this API (used for uploaded images)
+    PUBLIC_API_URL: str = "http://localhost:8100"  # how browsers reach this API (used for uploaded images)
     UPLOAD_DIR: str = "storage/uploads"
 
     class Config:

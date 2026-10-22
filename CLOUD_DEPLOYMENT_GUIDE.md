@@ -22,9 +22,9 @@ bash .devcontainer/start.sh
 ```
 
 Services will start on:
-- **Frontend**: http://localhost:3000
-- **Backend**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
+- **Frontend**: http://localhost:3100
+- **Backend**: http://localhost:8100
+- **API Docs**: http://localhost:8100/docs
 
 ---
 
@@ -168,12 +168,12 @@ REDIS_URL=redis://redis:6379
 ENVIRONMENT=development
 DEBUG=true
 JWT_SECRET_KEY=your-secret-key-change-in-production
-ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8000
+ALLOWED_ORIGINS=http://localhost:3100,http://localhost:8100
 ```
 
 ### Frontend (.env.local)
 ```
-NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+NEXT_PUBLIC_API_URL=http://localhost:8100/api/v1
 ```
 
 ---
@@ -202,8 +202,8 @@ For production deployment, set these secrets in GitHub:
 ### Verify Deployment:
 ```bash
 # In Codespaces terminal
-curl http://localhost:8000/health
-curl http://localhost:3000
+curl http://localhost:8100/health
+curl http://localhost:3100
 ```
 
 ---
@@ -228,8 +228,8 @@ curl http://localhost:3000
 - New containers started
 
 ### Step 4: Verify
-- Frontend accessible: http://localhost:3000
-- Backend accessible: http://localhost:8000
+- Frontend accessible: http://localhost:3100
+- Backend accessible: http://localhost:8100
 - Logs available in container logs
 
 ---
@@ -259,10 +259,10 @@ docker logs vidianews-redis-1
 ### Health Checks:
 ```bash
 # Backend health
-curl http://localhost:8000/health
+curl http://localhost:8100/health
 
 # Frontend
-curl http://localhost:3000
+curl http://localhost:3100
 
 # Database
 docker exec vidianews-postgres-1 pg_isready -U postgres
@@ -300,10 +300,10 @@ docker-compose up -d postgres
 ### Frontend Won't Connect to Backend
 ```bash
 # Check CORS configuration
-curl -H "Origin: http://localhost:3000" http://localhost:8000
+curl -H "Origin: http://localhost:3100" http://localhost:8100
 
 # Check backend is running
-curl http://localhost:8000/health
+curl http://localhost:8100/health
 
 # Check frontend env var
 echo $NEXT_PUBLIC_API_URL
@@ -314,8 +314,8 @@ echo $NEXT_PUBLIC_API_URL
 ## 📚 Documentation
 
 - **Module 10**: `docs/MODULE_10_CONTENT_MANAGEMENT.md` - Complete spec with 40+ API endpoints
-- **API Docs**: http://localhost:8000/docs (Swagger UI)
-- **API ReDoc**: http://localhost:8000/redoc (Alternative UI)
+- **API Docs**: http://localhost:8100/docs (Swagger UI)
+- **API ReDoc**: http://localhost:8100/redoc (Alternative UI)
 - **Completion Summary**: `MODULE_10_COMPLETION_SUMMARY.md`
 
 ---

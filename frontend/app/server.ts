@@ -1,8 +1,8 @@
 import { headers } from "next/headers";
 
 /** Where server components reach the API (the Docker service name inside Compose). */
-export const INTERNAL_API = process.env["INTERNAL_API_URL"] || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-export const SITE_URL = (process.env["SITE_URL"] || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
+export const INTERNAL_API = process.env["INTERNAL_API_URL"] || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8100";
+export const SITE_URL = (process.env["SITE_URL"] || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3100").replace(/\/$/, "");
 
 export interface SiteSettings {
   site_name: string;
