@@ -90,6 +90,8 @@ services:
       MEILISEARCH_PORT: 7700
       QDRANT_HOST: qdrant
       QDRANT_PORT: 6333
+      SITE_URL: ${SITE_URL:-http://localhost:3000}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
@@ -117,6 +119,8 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       NEXT_PUBLIC_API_URL: http://backend:8000
+      INTERNAL_API_URL: http://backend:8000
+      SITE_URL: ${SITE_URL:-http://localhost:3000}
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     networks:

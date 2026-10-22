@@ -62,6 +62,14 @@ class NewsArticle(NewsBase):
     reviewed_by = Column(Integer)
     reviewed_at = Column(DateTime(timezone=True))
 
+    # Editorial controls (admin panel)
+    is_published = Column(Boolean, nullable=False, default=True, server_default="true", index=True)
+    deleted_at = Column(DateTime(timezone=True))  # tombstone: keeps the URL hash so a re-fetch cannot bring it back
+    edited_at = Column(DateTime(timezone=True))
+    edited_by = Column(String(255))
+    meta_title = Column(String(200))
+    meta_description = Column(String(320))
+
     # Engagement / ranking
     click_count = Column(Integer, default=0)
     is_featured = Column(Boolean, default=False, index=True)

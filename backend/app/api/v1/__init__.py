@@ -50,6 +50,10 @@ _ROUTERS = [
     ("courses", "", "courses"),
     ("analytics_admin", "", "analytics-admin"),
     ("news", "/news", "news"),
+    ("site", "/site", "site"),
+    ("admin", "/admin", "admin"),
+    ("admin_content", "/admin", "admin"),
+    ("admin_ops", "/admin", "admin"),
 ]
 
 ROUTER_LOAD_FAILURES = {}

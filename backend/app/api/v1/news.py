@@ -180,7 +180,7 @@ async def get_status():
 @router.get("/articles/{article_id}")
 async def get_article(article_id: int, session: AsyncSession = Depends(get_session)):
     article = await session.get(NewsArticle, article_id)
-    if not article or article.review_status == "rejected":
+    if not queries.is_public(article):
         raise HTTPException(status_code=404, detail="Article not found")
     if article.enriched_at is None:  # not processed yet: fetch the page now so the reader sees the full story
         try:
@@ -194,7 +194,7 @@ async def get_article(article_id: int, session: AsyncSession = Depends(get_sessi
 @router.get("/articles/{article_id}/related")
 async def get_related(article_id: int, limit: int = Query(6, ge=1, le=12), session: AsyncSession = Depends(get_session)):
     article = await session.get(NewsArticle, article_id)
-    if not article or article.review_status == "rejected":
+    if not queries.is_public(article):
         raise HTTPException(status_code=404, detail="Article not found")
     return {"items": await queries.related(session, article, limit)}
 
@@ -203,7 +203,8 @@ async def get_related(article_id: int, limit: int = Query(6, ge=1, le=12), sessi
 async def record_click(article_id: int, session: AsyncSession = Depends(get_session)):
     """Count an outbound click; feeds the trending score."""
     result = await session.execute(
-        update(NewsArticle).where(NewsArticle.id == article_id).values(click_count=NewsArticle.click_count + 1)
+        update(NewsArticle).where(NewsArticle.id == article_id, NewsArticle.deleted_at.is_(None))
+        .values(click_count=NewsArticle.click_count + 1)
     )
     await session.commit()
     if result.rowcount == 0:
@@ -216,7 +217,7 @@ async def refresh(background: BackgroundTasks, source: Optional[str] = None, use
     """Start a fetch of all (or one) sources in the background."""
     if source and source not in SOURCE_BY_KEY:
         raise HTTPException(status_code=422, detail=f"Unknown source: {source}")
-    background.add_task(run_fetch, [source] if source else None)
+    background.add_task(run_fetch, [source] if source else None, "manual", f"user:{user_id}")
     return {"status": "started", "source": source}
 
 
@@ -225,7 +226,7 @@ async def refresh_sync(source: Optional[str] = None, user_id: int = Depends(requ
     """Run a fetch and wait for the result (editors/admins)."""
     if source and source not in SOURCE_BY_KEY:
         raise HTTPException(status_code=422, detail=f"Unknown source: {source}")
-    return await run_fetch([source] if source else None)
+    return await run_fetch([source] if source else None, "manual", f"user:{user_id}")
 
 
 @router.get("/review")

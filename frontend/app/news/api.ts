@@ -25,6 +25,9 @@ export interface ArticleDetail extends Article {
   organizations: string[];
   locations: string[];
   topics: string[];
+  modified_at: string | null;
+  meta_title: string | null;
+  meta_description: string | null;
 }
 
 export interface Location {

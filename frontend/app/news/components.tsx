@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Article, timeAgo } from "./api";
+import { articlePath } from "./slug";
 
 const CATEGORY_STYLES: Record<string, string> = {
   politics: "bg-red-50 text-red-700",
@@ -95,7 +96,7 @@ export function Thumb({ article, className }: { article: Article; className: str
   );
 }
 
-export const articleHref = (a: Article) => `/news/${a.id}`;
+export const articleHref = (a: Article) => articlePath(a);
 
 function ReadLink({ article, children }: { article: Article; children: React.ReactNode }) {
   return (
@@ -110,7 +111,7 @@ export function Meta({ article }: { article: Article }) {
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
       <span className="font-semibold text-gray-700">{article.source.name}</span>
       <span aria-hidden>•</span>
-      <time dateTime={article.published_at} title={new Date(article.published_at).toLocaleString()}>
+      <time dateTime={article.published_at} suppressHydrationWarning>
         {timeAgo(article.published_at)}
       </time>
     </div>

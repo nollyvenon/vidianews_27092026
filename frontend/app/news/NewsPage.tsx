@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Article, ArticlePage, Location, newsApi } from "./api";
+import AdSlot from "../AdSlot";
 import { ArticleCard, CardSkeletons, FeaturedHero, Pagination, TrendingList } from "./components";
 
 const PAGE_SIZE = 12;
@@ -22,14 +23,23 @@ function safeStorage(op: "get" | "set" | "remove", value?: string): string | nul
   return null;
 }
 
-export default function NewsPage() {
-  const [location, setLocation] = useState<Location | null>(null);
+export interface InitialNews {
+  location: Location;
+  articles: ArticlePage;
+  featured: Article[];
+  trending: Article[];
+  categories: { category: string; count: number }[];
+}
+
+/** `initial` is rendered on the server so crawlers and first paint get real headlines. */
+export default function NewsPage({ initial }: { initial?: InitialNews }) {
+  const [location, setLocation] = useState<Location | null>(initial?.location ?? null);
   const [manualCountry, setManualCountry] = useState<string | null>(null);
   const [countries, setCountries] = useState<{ code: string; name: string; sources: number }[]>([]);
   const [sources, setSources] = useState<{ key: string; name: string; articles: number }[]>([]);
-  const [categories, setCategories] = useState<{ category: string; count: number }[]>([]);
-  const [featured, setFeatured] = useState<Article[]>([]);
-  const [trending, setTrending] = useState<Article[]>([]);
+  const [categories, setCategories] = useState<{ category: string; count: number }[]>(initial?.categories ?? []);
+  const [featured, setFeatured] = useState<Article[]>(initial?.featured ?? []);
+  const [trending, setTrending] = useState<Article[]>(initial?.trending ?? []);
 
   const [category, setCategory] = useState("");
   const [source, setSource] = useState("");
@@ -39,10 +49,11 @@ export default function NewsPage() {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
 
-  const [data, setData] = useState<ArticlePage | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<ArticlePage | null>(initial?.articles ?? null);
+  const [loading, setLoading] = useState(!initial);
   const [error, setError] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(!!initial);
+  const usedInitial = useRef(false);
   const listTop = useRef<HTMLDivElement>(null);
 
   const country = location?.country;
@@ -101,6 +112,10 @@ export default function NewsPage() {
 
   useEffect(() => {
     if (!ready) return;
+    if (initial && !usedInitial.current) {
+      usedInitial.current = true; // the server already rendered this exact view
+      return;
+    }
     const ctrl = new AbortController();
     load(ctrl.signal);
     return () => ctrl.abort();
@@ -190,6 +205,8 @@ export default function NewsPage() {
             {location.country_name}.
           </p>
         )}
+
+        <AdSlot placement="home_top" />
 
         {showHero && <FeaturedHero items={featured} />}
 
@@ -294,6 +311,7 @@ export default function NewsPage() {
 
           <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
             <TrendingList items={trending} />
+            <AdSlot placement="home_sidebar" />
             <p className="px-1 text-xs leading-relaxed text-gray-500">
               Headlines and summaries are collected from each publisher&apos;s public RSS feed; summaries and tags are generated automatically.
               Stories marked <em>Unverified</em> or <em>Under review</em> are not independently confirmed. Always read the original article.

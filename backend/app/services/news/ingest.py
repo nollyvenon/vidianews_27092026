@@ -14,6 +14,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from app.core.config import settings
 from app.db.session import AsyncSessionLocal
 from app.models.news import NewsArticle, NewsFetchRun
+from app.models.site import NewsFetchCycle
 from app.services.news import nlp
 from app.services.news.cache import cache_invalidate
 from app.services.news.enrich import clean_image_url, enrich_pending
@@ -180,6 +181,8 @@ async def _refresh_featured() -> None:
                 NewsArticle.validation_status == "passed",
                 NewsArticle.image_url.is_not(None),
                 NewsArticle.review_status != "rejected",
+                NewsArticle.is_published.is_(True),
+                NewsArticle.deleted_at.is_(None),
             ).order_by(NewsArticle.quality_score.desc(), NewsArticle.published_at.desc()).limit(80)
         )).all()
         per_source: Dict[str, int] = {}
@@ -197,46 +200,116 @@ async def _refresh_featured() -> None:
         await session.commit()
 
 
-async def run_fetch(source_keys: Optional[List[str]] = None) -> Dict:
+_background: set = set()
+
+
+def start_background(source_keys: Optional[List[str]], trigger: str, triggered_by: Optional[str]) -> None:
+    """Run a fetch that outlives the HTTP request that asked for it."""
+    task = asyncio.create_task(_guarded_run(source_keys, trigger, triggered_by), name="news-manual-fetch")
+    _background.add(task)  # keep a reference so the task is not garbage-collected mid-run
+    task.add_done_callback(_background.discard)
+
+
+async def _guarded_run(source_keys, trigger, triggered_by) -> None:
+    try:
+        await run_fetch(source_keys, trigger, triggered_by)
+    except Exception:  # noqa: BLE001
+        _log.exception("manual news fetch failed")
+
+
+def is_running() -> bool:
+    return _run_lock.locked()
+
+
+async def _open_cycle(trigger: str, triggered_by: Optional[str], total: int) -> Optional[int]:
+    try:
+        async with AsyncSessionLocal() as session:
+            cycle = NewsFetchCycle(trigger=trigger, triggered_by=triggered_by, sources_total=total)
+            session.add(cycle)
+            await session.commit()
+            return cycle.id
+    except Exception as exc:  # noqa: BLE001 - monitoring must never block fetching
+        _log.warning("could not record fetch cycle start: %r", exc)
+        return None
+
+
+async def _close_cycle(cycle_id: Optional[int], summary: Optional[Dict], error: Optional[str]) -> None:
+    if cycle_id is None:
+        return
+    values: Dict = {"finished_at": datetime.now(timezone.utc)}
+    if summary is None:
+        values.update(status="failed", error=(error or "unknown error")[:1000])
+    else:
+        failed = summary["sources"] - summary["sources_ok"]
+        values.update(
+            status="completed" if failed == 0 else ("failed" if summary["sources_ok"] == 0 else "partial"),
+            sources_ok=summary["sources_ok"], sources_failed=failed,
+            items_seen=sum(r["seen"] for r in summary["results"]), items_new=summary["new"],
+            items_duplicate=summary["duplicate"], items_rejected=summary["rejected"],
+            enriched=summary["enrichment"].get("enriched", 0),
+            error="; ".join(f"{r['source']}: {r['error']}" for r in summary["results"] if r["error"])[:1000] or None,
+        )
+    try:
+        async with AsyncSessionLocal() as session:
+            await session.execute(update(NewsFetchCycle).where(NewsFetchCycle.id == cycle_id).values(**values))
+            await session.commit()
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("could not record fetch cycle end: %r", exc)
+
+
+async def run_fetch(source_keys: Optional[List[str]] = None, trigger: str = "scheduled",
+                    triggered_by: Optional[str] = None) -> Dict:
     """Fetch all (or selected) sources. Only one run at a time."""
     if _run_lock.locked():
         return {"status": "already_running"}
     async with _run_lock:
         sources = [SOURCE_BY_KEY[k] for k in source_keys if k in SOURCE_BY_KEY] if source_keys else SOURCES
-        sem = asyncio.Semaphore(CONCURRENCY)
-        headers = {"User-Agent": settings.NEWS_USER_AGENT, "Accept": "application/rss+xml, application/xml, text/xml, */*"}
-        started = time.monotonic()
-        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, headers=headers) as client:
-            async def guarded(src):
-                async with sem:
-                    return await _ingest_source(client, src)
-            results = await asyncio.gather(*(guarded(s) for s in sources))
-        enrichment = {}
+        cycle_id = await _open_cycle(trigger, triggered_by, len(sources))
         try:
-            for _ in range(4):  # drain a backlog without making one run unbounded
-                batch = await enrich_pending()
-                for k, v in batch.items():
-                    enrichment[k] = enrichment.get(k, 0) + v
-                if batch["enriched"] < 250:
-                    break
-        except Exception as exc:  # noqa: BLE001
-            _log.warning("article enrichment failed: %r", exc)
-        try:
-            await _refresh_featured()
-        except Exception as exc:  # noqa: BLE001
-            _log.warning("featured refresh failed: %r", exc)
-        await cache_invalidate()
-        summary = {
-            "status": "completed",
-            "duration_s": round(time.monotonic() - started, 1),
-            "sources": len(results),
-            "sources_ok": sum(1 for r in results if r["success"]),
-            "new": sum(r["new"] for r in results),
-            "duplicate": sum(r["duplicate"] for r in results),
-            "rejected": sum(r["rejected"] for r in results),
-            "enrichment": enrichment,
-            "nlp_engine": "spacy" if nlp.spacy_available() else "rules",
-            "results": results,
-        }
-        _log.info("news fetch done: %s new, %s/%s sources ok", summary["new"], summary["sources_ok"], summary["sources"])
+            summary = await _run_sources(sources)
+        except BaseException as exc:  # noqa: BLE001 - record the failure, then let it propagate
+            await _close_cycle(cycle_id, None, f"{type(exc).__name__}: {exc}")
+            raise
+        await _close_cycle(cycle_id, summary, None)
         return summary
+
+
+async def _run_sources(sources: List[Source]) -> Dict:
+    """Fetch the given sources, enrich new articles, refresh featured stories."""
+    sem = asyncio.Semaphore(CONCURRENCY)
+    headers = {"User-Agent": settings.NEWS_USER_AGENT, "Accept": "application/rss+xml, application/xml, text/xml, */*"}
+    started = time.monotonic()
+    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, headers=headers) as client:
+        async def guarded(src):
+            async with sem:
+                return await _ingest_source(client, src)
+        results = await asyncio.gather(*(guarded(s) for s in sources))
+    enrichment = {}
+    try:
+        for _ in range(4):  # drain a backlog without making one run unbounded
+            batch = await enrich_pending()
+            for k, v in batch.items():
+                enrichment[k] = enrichment.get(k, 0) + v
+            if batch["enriched"] < 250:
+                break
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("article enrichment failed: %r", exc)
+    try:
+        await _refresh_featured()
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("featured refresh failed: %r", exc)
+    await cache_invalidate()
+    summary = {
+        "status": "completed",
+        "duration_s": round(time.monotonic() - started, 1),
+        "sources": len(results),
+        "sources_ok": sum(1 for r in results if r["success"]),
+        "new": sum(r["new"] for r in results),
+        "duplicate": sum(r["duplicate"] for r in results),
+        "rejected": sum(r["rejected"] for r in results),
+        "enrichment": enrichment,
+        "nlp_engine": "spacy" if nlp.spacy_available() else "rules",
+        "results": results,
+    }
+    _log.info("news fetch done: %s new, %s/%s sources ok", summary["new"], summary["sources_ok"], summary["sources"])
+    return summary

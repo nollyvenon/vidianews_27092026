@@ -20,9 +20,16 @@ LOCAL_BOOST = timedelta(hours=18)
 def _visible():
     """Flagged stories stay hidden until an editor approves them; rejected never show."""
     return and_(
+        A.is_published.is_(True),
+        A.deleted_at.is_(None),
         A.review_status != "rejected",
         or_(A.validation_status != "flagged", A.review_status == "approved"),
     )
+
+
+def is_public(a: Optional[A]) -> bool:
+    """Single-article counterpart of _visible() for detail pages (flagged stories stay reachable by link)."""
+    return bool(a and a.is_published and a.deleted_at is None and a.review_status != "rejected")
 
 
 def _community_penalty():
@@ -79,6 +86,8 @@ def article_to_dict(a: A, brief: bool = False) -> Dict[str, Any]:
             "locations": a.locations or [], "mentioned_countries": a.mentioned_countries or [],
             "nlp_engine": a.nlp_engine, "click_count": a.click_count,
             "body": article_body(a),
+            "modified_at": (a.edited_at or a.enriched_at or a.published_at).isoformat() if (a.edited_at or a.enriched_at or a.published_at) else None,
+            "meta_title": a.meta_title, "meta_description": a.meta_description,
         })
     return data
 
@@ -89,7 +98,8 @@ async def list_articles(
     q: Optional[str] = None, sort: str = "latest", days: Optional[int] = None,
     include_flagged: bool = False, min_quality: Optional[float] = None,
 ) -> Dict[str, Any]:
-    conds = [_visible()] if not include_flagged else [A.review_status != "rejected"]
+    conds = [_visible()] if not include_flagged else [
+        A.is_published.is_(True), A.deleted_at.is_(None), A.review_status != "rejected"]
     if category:
         conds.append(A.category == category)
     if source:
