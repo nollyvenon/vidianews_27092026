@@ -146,7 +146,7 @@ export default function MembersPage() {
                 <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">Actions</th>
               </tr>
             </thead>
-            <tbody divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-200">
               {members.map((member) => (
                 <tr key={member.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm text-gray-900">

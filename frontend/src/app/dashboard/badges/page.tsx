@@ -2,8 +2,8 @@
 import { useState, useEffect } from 'react'
 
 export default function GamificationPage() {
-  const [leaderboard, setLeaderboard] = useState([])
-  const [userBadges, setUserBadges] = useState([])
+  const [leaderboard, setLeaderboard] = useState<any[]>([])
+  const [userBadges, setUserBadges] = useState<any[]>([])
 
   useEffect(() => {
     fetchLeaderboard()

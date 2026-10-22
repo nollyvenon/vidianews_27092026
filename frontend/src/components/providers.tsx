@@ -6,7 +6,7 @@ import { AuthContext } from '@/lib/auth-context'
 import { ApiClient } from '@/lib/api-client'
 
 export function Providers({ children }: { children: ReactNode }) {
-  const [authState, setAuthState] = useState({ token: null, user: null, loading: true })
+  const [authState, setAuthState] = useState<{ token: string | null; user: any; loading: boolean }>({ token: null, user: null, loading: true })
   const router = useRouter()
 
   useEffect(() => {

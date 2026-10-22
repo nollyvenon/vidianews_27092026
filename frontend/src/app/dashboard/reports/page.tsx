@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 
 export default function ReportsPage() {
-  const [reports, setReports] = useState([])
+  const [reports, setReports] = useState<any[]>([])
   const [reportType, setReportType] = useState('views')
   const [loading, setLoading] = useState(false)
 

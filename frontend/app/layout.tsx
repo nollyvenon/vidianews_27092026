@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ReactNode } from "react";
+import "./globals.css";
 
 export const metadata: Metadata = {
   title: "AetherCMS AI - Enterprise AI Publishing Platform",

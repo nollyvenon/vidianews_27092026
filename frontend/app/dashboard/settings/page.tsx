@@ -28,7 +28,7 @@ export default function SettingsPage() {
       await axios.put(`/api/v1/settings/me/${section}`, {
         [key]: value
       });
-      setSettings(prev => ({
+      setSettings((prev: any) => ({
         ...prev,
         [section]: { ...prev[section], [key]: value }
       }));

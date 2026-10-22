@@ -178,7 +178,7 @@ export default function AdvancedFeaturesPage() {
               <div className="flex justify-between items-center p-3 border rounded-lg">
                 <div>
                   <p className="font-medium">High-Value Users</p>
-                  <p className="text-sm text-gray-500">LTV > $1000</p>
+                  <p className="text-sm text-gray-500">LTV &gt; $1000</p>
                 </div>
                 <div className="text-right">
                   <p className="font-semibold">1,247 users</p>

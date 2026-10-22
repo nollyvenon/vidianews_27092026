@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, Eye, Click, Share2 } from 'lucide-react';
+import { TrendingUp, Eye, MousePointerClick, Share2 } from 'lucide-react';
 
 export default function AnalyticsTab() {
   const mockMetrics = {
@@ -32,7 +32,7 @@ export default function AnalyticsTab() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
-              <Click className="h-4 w-4" />
+              <MousePointerClick className="h-4 w-4" />
               Click-Through Rate
             </CardTitle>
           </CardHeader>

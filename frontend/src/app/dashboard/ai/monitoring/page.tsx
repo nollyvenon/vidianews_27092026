@@ -10,7 +10,7 @@ export default function MonitoringPage() {
     average: 0,
     count: 0,
   })
-  const [alerts, setAlerts] = useState([])
+  const [alerts, setAlerts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [newAlertThreshold, setNewAlertThreshold] = useState('100')
 

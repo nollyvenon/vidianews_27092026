@@ -2,8 +2,8 @@
 import { useState, useEffect } from 'react'
 
 export default function CompliancePage() {
-  const [complianceStatus, setComplianceStatus] = useState(null)
-  const [auditLogs, setAuditLogs] = useState([])
+  const [complianceStatus, setComplianceStatus] = useState<any>(null)
+  const [auditLogs, setAuditLogs] = useState<any[]>([])
 
   useEffect(() => {
     fetchCompliance()

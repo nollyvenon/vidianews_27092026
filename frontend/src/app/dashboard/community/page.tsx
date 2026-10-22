@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 
 export default function CommunityPage() {
-  const [threads, setThreads] = useState([])
+  const [threads, setThreads] = useState<any[]>([])
   const [title, setTitle] = useState('')
   const [category, setCategory] = useState('general')
 

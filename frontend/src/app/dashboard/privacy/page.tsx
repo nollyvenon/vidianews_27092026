@@ -9,7 +9,7 @@ export default function PrivacyPage() {
     allowAnalytics: true,
     allowMarketing: false
   })
-  const [deletionRequest, setDeletionRequest] = useState(null)
+  const [deletionRequest, setDeletionRequest] = useState<any>(null)
 
   const handleUpdateSettings = (key: string, value: any) => {
     setSettings({ ...settings, [key]: value })
