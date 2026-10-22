@@ -77,6 +77,7 @@ class Settings(BaseSettings):
     NEWS_FETCH_ON_STARTUP: bool = True
     NEWS_FETCH_INTERVAL_MINUTES: int = 30
     NEWS_MAX_AGE_DAYS: int = 14
+    NEWS_MIN_CONTENT_CHARS: int = 300  # shorter stories are held back from the public site (admin can override)
     NEWS_USER_AGENT: str = "VidiaNewsBot/1.0 (+news aggregator; RSS only)"
 
     # Public site / admin panel

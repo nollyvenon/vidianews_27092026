@@ -20,6 +20,8 @@ _COLUMNS = {
     "is_published": "BOOLEAN NOT NULL DEFAULT TRUE",
     "deleted_at": "TIMESTAMP WITH TIME ZONE",
     "edited_at": "TIMESTAMP WITH TIME ZONE",
+    "cleaned_at": "TIMESTAMP WITH TIME ZONE",
+    "content_issue": "VARCHAR(32)",
     "edited_by": "VARCHAR(255)",
     "meta_title": "VARCHAR(200)",
     "meta_description": "VARCHAR(320)",
@@ -36,6 +38,9 @@ async def ensure_columns(engine: AsyncEngine) -> None:
             ))
             await conn.execute(text(
                 "CREATE INDEX IF NOT EXISTS ix_news_articles_is_published ON news_articles (is_published)"
+            ))
+            await conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_news_articles_content_issue ON news_articles (content_issue)"
             ))
             # A fetch that was running when the process stopped will never finish.
             await conn.execute(text(

@@ -40,9 +40,13 @@ def _is_local(country: str):
     return or_(A.source_country == country, cast(A.mentioned_countries, Text).like(f'%"{country}"%'))
 
 
+def best_text(a: A) -> str:
+    return a.full_content if a.full_content and len(a.full_content) > len(a.content or "") else (a.content or "")
+
+
 def article_body(a: A) -> List[str]:
     """Paragraphs to show on the article page: the extracted page text when we have more than the feed teaser."""
-    text = a.full_content if a.full_content and len(a.full_content) > len(a.content or "") else (a.content or "")
+    text = best_text(a)
     paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
     if len(paragraphs) == 1 and len(paragraphs[0]) > 700:  # feed text arrives as one block: split on sentences
         sentences = re.split(r"(?<=[.!?])\s+(?=[A-Z\"“])", paragraphs[0])

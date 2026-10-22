@@ -13,6 +13,7 @@ from app.db.session import get_session
 from app.models.news import NewsArticle as A
 from app.models.site import SitePage
 from app.services.news import nlp, queries
+from app.services.news.quality import ISSUE_LABELS
 from app.services.news.cache import cache_invalidate
 from app.services.news.enrich import clean_image_url
 from app.services.site import adminauth as auth
@@ -27,6 +28,8 @@ def _now() -> datetime:
 def _status(a: A) -> str:
     if a.deleted_at:
         return "deleted"
+    if a.content_issue and not a.is_published:
+        return "held"  # kept off the public site automatically because its text is too short / incomplete / promo
     return "published" if a.is_published else "unpublished"
 
 
@@ -36,6 +39,8 @@ def _row(a: A) -> Dict[str, Any]:
         "published_at": a.published_at.isoformat() if a.published_at else None,
         "status": _status(a), "has_image": bool(a.image_url), "clicks": a.click_count or 0,
         "validation": a.validation_status, "review_status": a.review_status,
+        "content_issue": a.content_issue, "content_issue_label": ISSUE_LABELS.get(a.content_issue or ""),
+        "text_length": len(queries.best_text(a)),
         "edited_at": a.edited_at.isoformat() if a.edited_at else None, "edited_by": a.edited_by,
     }
 
@@ -53,7 +58,7 @@ def _detail(a: A) -> Dict[str, Any]:
 async def list_articles(
     page: int = Query(1, ge=1, le=2000), page_size: int = Query(25, ge=1, le=100),
     q: Optional[str] = Query(None, max_length=120),
-    status: Literal["all", "published", "unpublished", "deleted"] = "all",
+    status: Literal["all", "published", "unpublished", "held", "deleted"] = "all",
     category: Optional[str] = Query(None, pattern="^[a-z]+$"),
     ctx: auth.AdminCtx = Depends(auth.require_staff), db: AsyncSession = Depends(get_session),
 ):
@@ -66,6 +71,10 @@ async def list_articles(
             conds.append(A.is_published.is_(True))
         elif status == "unpublished":
             conds.append(A.is_published.is_(False))
+            conds.append(A.content_issue.is_(None))
+        elif status == "held":
+            conds.append(A.is_published.is_(False))
+            conds.append(A.content_issue.is_not(None))
     if category:
         conds.append(A.category == category)
     if q:
@@ -171,6 +180,7 @@ async def _set_published(db: AsyncSession, ctx: auth.AdminCtx, article_id: int, 
         raise HTTPException(status_code=409, detail="Restore the article first")
     if article.is_published != value:
         article.is_published = value
+        article.content_issue = None  # an editor's decision overrides the automatic content check
         article.edited_at, article.edited_by = _now(), ctx.email
         auth.audit(db, ctx, "article.publish" if value else "article.unpublish", "article", article.id,
                    {"title": _short(article.title)})

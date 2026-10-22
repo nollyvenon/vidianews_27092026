@@ -10,7 +10,10 @@ interface Row {
   source: string;
   category: string;
   published_at: string;
-  status: "published" | "unpublished" | "deleted";
+  status: "published" | "unpublished" | "held" | "deleted";
+  content_issue: string | null;
+  content_issue_label: string | null;
+  text_length: number;
   has_image: boolean;
   clicks: number;
   validation: string;
@@ -44,7 +47,7 @@ interface SitePage {
   updated_by: string | null;
 }
 
-const STATUS_TONE = { published: "green", unpublished: "amber", deleted: "red" } as const;
+const STATUS_TONE = { published: "green", unpublished: "amber", held: "amber", deleted: "red" } as const;
 
 export default function ContentPage() {
   const [tab, setTab] = useState<"articles" | "pages">("articles");
@@ -90,6 +93,9 @@ function Articles() {
   );
 
   async function act(row: Row, action: "publish" | "unpublish" | "restore" | "delete") {
+    if (action === "publish" && row.status === "held" && !confirm(`“${row.title}” has only ${row.text_length.toLocaleString()} characters of text (${(row.content_issue_label ?? "incomplete").toLowerCase()}).
+
+Publish it anyway?`)) return;
     if (action === "delete" && !confirm(`Delete “${row.title}”?\n\nIt disappears from the site immediately. You can restore it later from the Deleted filter.`)) return;
     setBusyId(row.id);
     try {
@@ -114,6 +120,7 @@ function Articles() {
           <option value="all">All (not deleted)</option>
           <option value="published">Published</option>
           <option value="unpublished">Unpublished</option>
+          <option value="held">Held back (short / incomplete)</option>
           <option value="deleted">Deleted</option>
         </Select>
         <Select value={category} onChange={(e) => { setCategory(e.target.value); setPage(1); }} className="!w-40" aria-label="Category">
@@ -145,16 +152,19 @@ function Articles() {
                       <button className="text-left font-medium text-gray-900 hover:text-blue-700" onClick={() => setEditing(r.id)}>
                         {r.title}
                       </button>
+                      {r.content_issue_label && r.status === "held" && (
+                        <div className="text-xs text-amber-700">Held back automatically: {r.content_issue_label.toLowerCase()} ({r.text_length.toLocaleString()} characters)</div>
+                      )}
                       <div className="text-xs text-gray-500">#{r.id} · {r.source}{r.edited_by ? ` · edited by ${r.edited_by}` : ""}{!r.has_image ? " · no image" : ""}</div>
                     </td>
                     <td className="px-4 py-2.5 capitalize">{r.category}</td>
                     <td className="whitespace-nowrap px-4 py-2.5">{fmtDate(r.published_at, false)}</td>
-                    <td className="px-4 py-2.5"><Badge tone={STATUS_TONE[r.status]}>{r.status}</Badge></td>
+                    <td className="px-4 py-2.5"><Badge tone={STATUS_TONE[r.status]}>{r.status === "held" ? "held back" : r.status}</Badge></td>
                     <td className="whitespace-nowrap px-4 py-2.5 text-right">
                       <div className="flex justify-end gap-1">
                         {r.status !== "deleted" && <Button small onClick={() => setEditing(r.id)}>Edit</Button>}
                         {r.status === "published" && <Button small busy={busyId === r.id} onClick={() => act(r, "unpublish")}>Unpublish</Button>}
-                        {r.status === "unpublished" && <Button small tone="primary" busy={busyId === r.id} onClick={() => act(r, "publish")}>Publish</Button>}
+                        {(r.status === "unpublished" || r.status === "held") && <Button small tone="primary" busy={busyId === r.id} onClick={() => act(r, "publish")}>{r.status === "held" ? "Publish anyway" : "Publish"}</Button>}
                         {r.status === "deleted" ? (
                           <Button small busy={busyId === r.id} onClick={() => act(r, "restore")}>Restore</Button>
                         ) : (

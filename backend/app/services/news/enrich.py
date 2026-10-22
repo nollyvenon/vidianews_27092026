@@ -21,6 +21,7 @@ from sqlalchemy import func, select, update
 from app.core.config import settings
 from app.db.session import AsyncSessionLocal
 from app.models.news import NewsArticle as A
+from app.services.news.cleaning import clean_body
 
 _log = logging.getLogger(__name__)
 
@@ -191,7 +192,7 @@ async def enrich_row(client: httpx.AsyncClient, row: Dict[str, Any], repeated: S
         if markup:
             page = await asyncio.to_thread(parse_page, markup)
             if page["paragraphs"]:
-                full = "\n\n".join(page["paragraphs"])
+                full = clean_body("\n\n".join(page["paragraphs"]), row["source_key"])
                 if len(full) > len(row["content"] or ""):
                     updates["full_content"] = full
             page_image = clean_image_url(page["image"], row["url"])
@@ -211,7 +212,7 @@ async def enrich_row(client: httpx.AsyncClient, row: Dict[str, Any], repeated: S
     return updates
 
 
-_COLUMNS = (A.id, A.url, A.title, A.source_name, A.image_url, A.content, A.people, A.organizations)
+_COLUMNS = (A.id, A.url, A.title, A.source_key, A.source_name, A.image_url, A.content, A.people, A.organizations)
 
 
 def _client() -> httpx.AsyncClient:

@@ -1,5 +1,6 @@
 """FastAPI application entry point"""
 
+import asyncio
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -40,6 +41,16 @@ async def lifespan(app: FastAPI):
         pending = [t for t, _ in failed]
     from app.services.news.migrate import ensure_columns
     await ensure_columns(engine)
+    from app.services.news.cleanup import clean_existing
+    from app.services.news.quality import sweep as quality_sweep
+
+    async def tidy_stored_articles():
+        try:
+            await clean_existing()  # strips stored publisher boilerplate; resumes where it left off
+            await quality_sweep()  # then holds back stories that are too short, cut off or only promotion
+        except Exception as exc:  # noqa: BLE001 - housekeeping must never stop the API
+            logger.warning("stored-article clean-up failed: %r", exc)
+    asyncio.create_task(tidy_stored_articles())
     from app.services.site import adminauth, maintenance, sitesettings
     try:
         await adminauth.bootstrap_admin()

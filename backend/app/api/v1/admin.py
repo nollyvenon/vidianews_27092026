@@ -4,6 +4,7 @@ Everything except /auth/login requires a valid admin session; writes also need t
 CSRF header (see app.services.site.adminauth).
 """
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
@@ -15,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_session
 from app.models.news import NewsArticle as A
 from app.models.site import AdminSession, AdminUser, AuditLog, SitePage
+from app.services.news.quality import sweep as quality_sweep
 from app.services.site import adminauth as auth
 from app.services.site.sitesettings import DEFINITIONS, load_settings, save_settings
 
@@ -79,7 +81,10 @@ async def put_settings(body: SettingsBody, ctx: auth.AdminCtx = Depends(auth.req
     auth.audit(db, ctx, "settings.update", "settings", "", {
         k: [before.get(k), v] for k, v in saved.items() if before.get(k) != v})
     await db.commit()
-    return {"settings": await load_settings(db, fresh=True)}
+    current = await load_settings(db, fresh=True)
+    if before.get("news_min_content_chars") != current["news_min_content_chars"]:
+        asyncio.create_task(quality_sweep(current["news_min_content_chars"]))  # apply the new minimum to stored stories
+    return {"settings": current}
 
 
 # --------------------------------------------------------------------- audit
@@ -173,6 +178,8 @@ async def seo_report(ctx: auth.AdminCtx = Depends(auth.require_staff), db: Async
         "missing_summary": await count(A.summary.is_(None)),
         "with_custom_meta": await count(A.meta_description.is_not(None)),
         "unpublished": (await db.execute(select(func.count()).select_from(A).where(
-            A.is_published.is_(False), A.deleted_at.is_(None)))).scalar_one(),
+            A.is_published.is_(False), A.deleted_at.is_(None), A.content_issue.is_(None)))).scalar_one(),
+        "held_back": (await db.execute(select(func.count()).select_from(A).where(
+            A.is_published.is_(False), A.deleted_at.is_(None), A.content_issue.is_not(None)))).scalar_one(),
         "recent_24h": await count(A.published_at > datetime.now(timezone.utc) - timedelta(days=1)),
     }

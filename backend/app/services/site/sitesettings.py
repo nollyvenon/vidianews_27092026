@@ -8,6 +8,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.db.session import AsyncSessionLocal
 from app.models.site import SitePage, SiteSetting
 
@@ -27,6 +28,8 @@ DEFINITIONS: Dict[str, tuple] = {
     "respect_dnt": (bool, True, None, False),  # skip tracking when the browser sends Do Not Track / GPC
     "analytics_retention_days": (int, 395, 3650, False),
     "ads_enabled": (bool, True, None, False),  # global switch for every advert
+    # stories with less article text than this are held back from the public site
+    "news_min_content_chars": (int, settings.NEWS_MIN_CONTENT_CHARS, 5000, False),
 }
 
 _cache: Dict[str, Any] = {}

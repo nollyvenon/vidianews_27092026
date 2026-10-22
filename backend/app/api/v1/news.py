@@ -200,7 +200,8 @@ async def get_related(article_id: int, limit: int = Query(6, ge=1, le=12), sessi
 async def record_click(article_id: int, session: AsyncSession = Depends(get_session)):
     """Count an outbound click; feeds the trending score."""
     result = await session.execute(
-        update(NewsArticle).where(NewsArticle.id == article_id, NewsArticle.deleted_at.is_(None))
+        update(NewsArticle).where(NewsArticle.id == article_id, NewsArticle.deleted_at.is_(None),
+                                  NewsArticle.is_published.is_(True))
         .values(click_count=NewsArticle.click_count + 1)
     )
     await session.commit()

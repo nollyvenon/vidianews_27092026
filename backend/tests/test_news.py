@@ -108,7 +108,7 @@ def test_nlp_category_summary_and_countries():
     # extractive: the summary only contains words from the article
     assert res.summary and set(res.summary.split()) <= set(text.split())
     assert res.keywords
-    assert "Punch" in res.description
+    assert "Punch" not in res.description and "VidiaNews" in res.description
 
 
 def test_nlp_never_fails_on_empty_text():
@@ -205,3 +205,78 @@ def test_article_body_prefers_longer_full_content_and_splits_teasers():
     parts = article_body(teaser)
     assert len(parts) > 1 and all(p.endswith(".") for p in parts)
     assert article_body(SimpleNamespace(full_content=None, content="")) == []
+
+
+# ------------------------------------------------------------ boilerplate cleaning
+
+def test_cleaning_removes_publisher_promotion_but_keeps_the_story():
+    from app.services.news.cleaning import clean_body
+    body = "\n\n".join([
+        "Gilbert Ekugbe is a journalist at Punch Newspapers with over a decade of experience. He covers markets.",
+        "ATTENTION NIGERIANS: You can now comfortably earn US Dollars when you acquire premium domains for as low as $3000.",
+        "The central bank raised rates by 50 basis points on Thursday, citing inflation.",
+        "Stay informed and ahead of the curve! Follow The Punch Newspaper on WhatsApp for real-time updates. Don't miss a headline – join now!",
+        "Stay in the know—fast. Get instant alerts with the Punch News App. Download now and never miss a beat.",
+        "Officials told BBC News that the airport remains closed.",
+    ])
+    out = clean_body(body, "punch")
+    assert out == ("The central bank raised rates by 50 basis points on Thursday, citing inflation.\n\n"
+                   "Officials told BBC News that the airport remains closed.")
+
+
+def test_cleaning_handles_subscription_copyright_and_credit_lines():
+    from app.services.news.cleaning import clean_body, clean_title
+    assert clean_body("All content is Copyrighted © 2025 The Premium Times, Nigeria", "premiumtimes") == ""
+    assert clean_body("Comments have to be in English, and in full sentences.", "hindu") == ""
+    assert clean_body("Published - October 22, 2026 06:46 pm IST", "hindu") == ""
+    assert clean_body("Polling officials. | Photo Credit: ANI", "hindu") == "Polling officials."
+    assert clean_body("A market (PHOTO CREDIT: PREMIUM TIMES)", "premiumtimes") == "A market"
+    assert clean_body("taken down, external following complaints", "bbc") == "taken down following complaints"
+    assert clean_body("forces from the north, external actors", "aljazeera") == "forces from the north, external actors"
+    assert clean_title("Fuel prices rise | Margaret Sullivan", "guardian_uk") == "Fuel prices rise"
+    assert clean_title("Fuel prices rise - The Punch", "punch") == "Fuel prices rise"
+    assert clean_title("Gunmen attack NDTV World Summit venue", "ndtv") == "Gunmen attack NDTV World Summit venue"
+
+
+def test_cleaning_does_not_drop_ordinary_news_mentioning_apps_or_following():
+    from app.services.news.cleaning import clean_body
+    for sentence in (
+        "Apple said the App Store fee change takes effect next month.",
+        "The ceasefire followed weeks of talks mediated by Qatar.",
+        "He urged supporters to join the march on Saturday.",
+        "The minister is a journalist by training and will address the press.",
+    ):
+        assert clean_body(sentence, "punch") == sentence
+
+
+def test_cleaning_drops_correspondent_bios_and_publisher_signoffs():
+    from app.services.news.cleaning import clean_body
+    bio = "With three years of experience, Stephen, The PUNCH correspondent, has been covering Nigeria’s presidency, politics and security."
+    assert clean_body(bio, "punch") == ""
+    assert clean_body("Voting continued without delay. Vanguard News", "vanguard") == "Voting continued without delay."
+    assert clean_body("He told Vanguard that voting continued.", "vanguard") == "He told Vanguard that voting continued."
+
+
+from app.services.news.quality import assess
+
+_FULL_STORY = " ".join(
+    ["The minister said on Tuesday that the new road between the two cities will open to traffic next month."] * 4)
+
+
+def test_quality_gate_holds_short_empty_and_promo_only_text():
+    assert assess("", None, 300) == "empty"
+    assert assess("Follow The Punch Newspaper on WhatsApp\n\nDownload the Punch News App", None, 300, "punch") == "promo_only"
+    assert assess("A man has died after a gravestone gave way at a cemetery.", None, 300) == "too_short"
+    assert assess("The centre's draft rules propose removing fees for several services and giving...", None, 300) == "incomplete"
+
+
+def test_quality_gate_passes_complete_stories_and_prefers_full_text():
+    assert assess(_FULL_STORY, None, 300) is None
+    assert assess("Short teaser only.", _FULL_STORY, 300) is None  # page text longer than the feed teaser wins
+    assert assess(_FULL_STORY, None, 1000) == "too_short"  # the minimum is configurable
+
+
+def test_quality_gate_judges_text_after_promo_is_removed():
+    padded = "Follow The Punch Newspaper on WhatsApp for more updates and the latest breaking news " * 6
+    assert assess(padded + "\n\nA man has died.", None, 300, "punch") in ("promo_only", "too_short")
+    assert assess(_FULL_STORY + "\n\nDownload the Punch News App", None, 300, "punch") is None

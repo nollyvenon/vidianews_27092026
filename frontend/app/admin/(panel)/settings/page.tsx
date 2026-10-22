@@ -13,6 +13,7 @@ interface Seo {
   missing_summary: number;
   with_custom_meta: number;
   unpublished: number;
+  held_back: number;
 }
 interface AuditItem { id: number; at: string; admin: string; action: string; entity_type: string | null; entity_id: string | null; detail: Record<string, unknown> }
 interface AdminRow { id: number; email: string; name: string | null; role: string; is_active: boolean; last_login_at: string | null }
@@ -79,6 +80,9 @@ function SiteSettings({ isAdmin }: { isAdmin: boolean }) {
           <Field label="Keep visit records for (days)">
             <Input type="number" min={1} max={3650} value={Number(v.analytics_retention_days)} onChange={(e) => set("analytics_retention_days", Number(e.target.value))} className="!w-32" />
           </Field>
+          <Field label="Minimum article length (characters)" hint="Stories with less article text than this are kept off the public site and listed under Content → Held back. Applies to new fetches and to the next quality check.">
+            <Input type="number" min={1} max={5000} value={Number(v.news_min_content_chars ?? 300)} onChange={(e) => set("news_min_content_chars", Number(e.target.value))} className="!w-32" />
+          </Field>
           <Toggle label="Show adverts on the site (master switch)" checked={Boolean(v.ads_enabled)} onChange={(x) => set("ads_enabled", x)} />
         </div>
       </fieldset>
@@ -107,6 +111,7 @@ function SeoHealth() {
             {row("Stories missing a summary", s.missing_summary, s.missing_summary === 0)}
             {row("Stories with a hand-written meta description", s.with_custom_meta, true, "Optional: automatic descriptions are used otherwise")}
             {row("Unpublished stories (hidden from search)", s.unpublished, true)}
+            {row("Held back: text too short, cut off or only promotion", s.held_back, true, "Review them under Content → Held back")}
           </ul>
           <p className="mt-3 flex flex-wrap gap-4 text-sm">
             <a href="/sitemap.xml" target="_blank" className="text-blue-700 hover:underline">sitemap.xml ↗</a>

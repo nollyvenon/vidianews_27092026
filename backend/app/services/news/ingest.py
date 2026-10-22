@@ -16,9 +16,11 @@ from app.db.session import AsyncSessionLocal
 from app.models.news import NewsArticle, NewsFetchRun
 from app.models.site import NewsFetchCycle
 from app.services.news import nlp
+from app.services.news.cleaning import clean_body, clean_title
 from app.services.news.cache import cache_invalidate
 from app.services.news.enrich import clean_image_url, enrich_pending
 from app.services.news.feed_parser import RawItem, parse_feed
+from app.services.news.quality import assess, current_min_chars, sweep as quality_sweep
 from app.services.news.sources import SOURCES, SOURCE_BY_KEY, Source
 from app.services.news.validation import (
     STATUS_FLAGGED, STATUS_REJECTED, is_near_duplicate, normalize_url, title_tokens, validate_article,
@@ -62,7 +64,11 @@ async def _ingest_source(client: httpx.AsyncClient, source: Source) -> Dict:
     try:
         items: List[RawItem] = parse_feed(await _download(client, source["feed_url"]))
         stats["seen"] = len(items)
+        for item in items:  # strip publisher promotion before anything is validated, summarised or stored
+            item.title = clean_title(item.title, source["key"])
+            item.content = clean_body(item.content, source["key"])
         now = datetime.now(timezone.utc)
+        min_chars = await current_min_chars()
         items.sort(key=lambda i: i.published_at or now, reverse=True)
         items = items[:MAX_ITEMS_PER_FEED]
 
@@ -127,7 +133,11 @@ async def _ingest_source(client: httpx.AsyncClient, source: Source) -> Dict:
             rows = []
             for (item, url, result), a in zip(fresh, analyses):
                 image = clean_image_url(item.image_url)
+                # Too short / promo-only text is stored but not published; the sweep re-checks it once the
+                # full page text has been fetched.
+                issue = assess(item.content, None, min_chars, source["key"])
                 rows.append(dict(
+                    is_published=issue is None, content_issue=issue,
                     source_key=source["key"], source_name=source["name"], source_country=source["country"],
                     source_type=source.get("kind", "rss"), title=item.title[:500], url=url[:2048],
                     url_hash=_sha(url), title_hash=_title_key(item.title),
@@ -136,7 +146,7 @@ async def _ingest_source(client: httpx.AsyncClient, source: Source) -> Dict:
                     image_credit=f"Image: {source['name']}" if image else None,
                     image_credit_url=url[:2048] if image else None,
                     content=item.content[:5000], summary=a.summary, description=a.description,
-                    published_at=item.published_at or now, fetched_at=now, category=a.category,
+                    published_at=item.published_at or now, fetched_at=now, cleaned_at=now, category=a.category,
                     keywords=a.keywords, topics=a.topics, people=a.people, organizations=a.organizations,
                     locations=a.locations, mentioned_countries=a.mentioned_countries,
                     nlp_engine=a.engine, quality_score=result.score,
@@ -294,6 +304,12 @@ async def _run_sources(sources: List[Source]) -> Dict:
                 break
     except Exception as exc:  # noqa: BLE001
         _log.warning("article enrichment failed: %r", exc)
+    try:
+        held = await quality_sweep()
+        enrichment["held_back"] = held["held"]
+        enrichment["released"] = held["released"]
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("content quality check failed: %r", exc)
     try:
         await _refresh_featured()
     except Exception as exc:  # noqa: BLE001

@@ -170,7 +170,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
           <AdSlot placement="article_bottom" />
 
           <footer className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-600">
-            <p>{teaserOnly ? "This is an excerpt." : "Summaries and tags are generated automatically."}</p>
+            <p>{teaserOnly ? "This is an excerpt." : "Summaries and tags are generated automatically."} Stay informed with VidiaNews.</p>
           </footer>
         </article>
 

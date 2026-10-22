@@ -66,6 +66,8 @@ class NewsArticle(NewsBase):
     is_published = Column(Boolean, nullable=False, default=True, server_default="true", index=True)
     deleted_at = Column(DateTime(timezone=True))  # tombstone: keeps the URL hash so a re-fetch cannot bring it back
     edited_at = Column(DateTime(timezone=True))
+    cleaned_at = Column(DateTime(timezone=True))  # NULL = publisher boilerplate not yet stripped
+    content_issue = Column(String(32), index=True)  # why the text is held back (empty|promo_only|too_short|incomplete); NULL = fine
     edited_by = Column(String(255))
     meta_title = Column(String(200))
     meta_description = Column(String(320))

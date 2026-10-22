@@ -211,8 +211,8 @@ def _summarize(sentences: List[str], keyword_weights: Counter, title: str, entit
     return summary[:600].rsplit(" ", 1)[0] + "…" if len(summary) > 600 else summary
 
 
-def _describe(res: NlpResult, source_name: str, published_at: Optional[datetime]) -> str:
-    parts = [f"{res.category.capitalize()} report from {source_name}"]
+def _describe(res: NlpResult, published_at: Optional[datetime]) -> str:
+    parts = [f"{res.category.capitalize()} report from VidiaNews"]
     if published_at:
         parts[0] += f", published {published_at.strftime('%d %b %Y')}"
     parts[0] += "."
@@ -307,7 +307,7 @@ def analyze(title: str, content: str, feed_categories: Sequence[str] = (), sourc
     for w in res.keywords:
         weights[w] += 1
     res.summary = _summarize(sentences, weights, title, res.people + res.organizations + res.locations)
-    res.description = _describe(res, source_name or "the source", published_at)
+    res.description = _describe(res, published_at)
     if hasattr(res, "_doc"):
         del res._doc
     return res

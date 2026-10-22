@@ -1,5 +1,6 @@
 """Admin operations: analytics, news-fetch monitoring and adverts."""
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Literal, Optional
 
@@ -12,7 +13,7 @@ from app.core.config import settings
 from app.db.session import get_session
 from app.models.news import NewsArticle as A, NewsFetchRun
 from app.models.site import Advert, NewsFetchCycle
-from app.services.news import ingest, queries, scheduler
+from app.services.news import cleanup, ingest, quality, queries, scheduler
 from app.services.news.sources import SOURCE_BY_KEY
 from app.services.site import adminauth as auth
 from app.services.site import adverts as ads
@@ -98,6 +99,25 @@ async def start_fetch(source: Optional[str] = Query(None, max_length=64),
     await db.commit()
     ingest.start_background([source] if source else None, "manual", ctx.email)
     return {"status": "started", "source": source}
+
+
+@router.post("/news/clean", status_code=202)
+async def clean_stored_articles(force: bool = Query(False), ctx: auth.AdminCtx = Depends(auth.require_admin),
+                                db: AsyncSession = Depends(get_session)):
+    """Re-run the publisher-boilerplate cleaner over stored articles (originals are kept in the database)."""
+    auth.audit(db, ctx, "news.clean", "news", "all", {"force": force})
+    await db.commit()
+    asyncio.create_task(cleanup.clean_existing(force=force))
+    return {"status": "started", "force": force}
+
+
+@router.post("/news/quality-check")
+async def run_quality_check(ctx: auth.AdminCtx = Depends(auth.require_admin), db: AsyncSession = Depends(get_session)):
+    """Re-check every stored article against the minimum-content rule (current threshold from settings)."""
+    result = await quality.sweep()
+    auth.audit(db, ctx, "news.quality_check", "news", "all", result)
+    await db.commit()
+    return result
 
 
 # ------------------------------------------------------------------ adverts
