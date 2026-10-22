@@ -32,6 +32,11 @@ class NewsArticle(NewsBase):
     title_hash = Column(String(64), nullable=False, index=True)
     author = Column(String(255))
     image_url = Column(String(2048))
+    image_source = Column(String(16))  # publisher | page | wikimedia (NULL = no image)
+    image_credit = Column(String(500))
+    image_credit_url = Column(String(2048))
+    full_content = Column(Text)  # article text extracted from the publisher page
+    enriched_at = Column(DateTime(timezone=True), index=True)  # NULL = page not fetched yet
     content = Column(Text)  # cleaned text supplied by the feed (may be a teaser)
     summary = Column(Text)  # generated extractive summary
     description = Column(Text)  # generated contextual description

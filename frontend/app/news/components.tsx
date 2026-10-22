@@ -1,6 +1,8 @@
 "use client";
 
-import { Article, newsApi, timeAgo } from "./api";
+import { useState } from "react";
+import Link from "next/link";
+import { Article, timeAgo } from "./api";
 
 const CATEGORY_STYLES: Record<string, string> = {
   politics: "bg-red-50 text-red-700",
@@ -49,40 +51,57 @@ export function ValidationBadge({ article }: { article: Article }) {
   );
 }
 
-function Thumb({ article, className }: { article: Article; className: string }) {
-  if (!article.image_url) {
-    return (
-      <div className={`${className} flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 text-slate-400`} aria-hidden>
-        <span className="text-3xl">📰</span>
-      </div>
-    );
-  }
+const FALLBACK_TONE: Record<string, string> = {
+  politics: "from-red-100 to-red-200 text-red-400",
+  business: "from-emerald-100 to-emerald-200 text-emerald-500",
+  sports: "from-orange-100 to-orange-200 text-orange-400",
+  technology: "from-indigo-100 to-indigo-200 text-indigo-400",
+  entertainment: "from-pink-100 to-pink-200 text-pink-400",
+  health: "from-teal-100 to-teal-200 text-teal-500",
+  science: "from-cyan-100 to-cyan-200 text-cyan-500",
+  world: "from-blue-100 to-blue-200 text-blue-400",
+  crime: "from-slate-200 to-slate-300 text-slate-500",
+  education: "from-amber-100 to-amber-200 text-amber-500",
+  lifestyle: "from-purple-100 to-purple-200 text-purple-400",
+  general: "from-slate-100 to-slate-200 text-slate-400",
+};
+
+/** Used only when a story has no image of its own. */
+export function FallbackImage({ category, className }: { category: string; className: string }) {
+  return (
+    <div
+      className={`${className} flex items-center justify-center bg-gradient-to-br ${FALLBACK_TONE[category] ?? FALLBACK_TONE.general}`}
+      role="img"
+      aria-label={`${category} story`}
+    >
+      <span className="text-sm font-semibold uppercase tracking-widest">{category}</span>
+    </div>
+  );
+}
+
+export function Thumb({ article, className }: { article: Article; className: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!article.image_url || failed) return <FallbackImage category={article.category} className={className} />;
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={article.image_url}
-      alt=""
+      alt={article.title}
       loading="lazy"
       referrerPolicy="no-referrer"
       className={`${className} object-cover bg-slate-100`}
-      onError={(e) => {
-        (e.currentTarget as HTMLImageElement).style.visibility = "hidden";
-      }}
+      onError={() => setFailed(true)}
     />
   );
 }
 
+export const articleHref = (a: Article) => `/news/${a.id}`;
+
 function ReadLink({ article, children }: { article: Article; children: React.ReactNode }) {
   return (
-    <a
-      href={article.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      onClick={() => newsApi.click(article.id)}
-      className="font-medium text-blue-700 hover:text-blue-900 hover:underline"
-    >
+    <Link href={articleHref(article)} className="font-medium text-blue-700 hover:text-blue-900 hover:underline">
       {children}
-    </a>
+    </Link>
   );
 }
 
@@ -94,12 +113,6 @@ export function Meta({ article }: { article: Article }) {
       <time dateTime={article.published_at} title={new Date(article.published_at).toLocaleString()}>
         {timeAgo(article.published_at)}
       </time>
-      {article.author && (
-        <>
-          <span aria-hidden>•</span>
-          <span className="truncate max-w-[12rem]">{article.author}</span>
-        </>
-      )}
     </div>
   );
 }
@@ -114,9 +127,9 @@ export function ArticleCard({ article }: { article: Article }) {
           <ValidationBadge article={article} />
         </div>
         <h3 className="text-base font-semibold leading-snug text-gray-900">
-          <a href={article.url} target="_blank" rel="noopener noreferrer" onClick={() => newsApi.click(article.id)} className="hover:text-blue-700">
+          <Link href={articleHref(article)} className="hover:text-blue-700">
             {article.title}
-          </a>
+          </Link>
         </h3>
         {article.summary && <p className="line-clamp-3 text-sm text-gray-600">{article.summary}</p>}
         <div className="mt-auto flex items-end justify-between gap-2 pt-2">
@@ -144,9 +157,9 @@ export function FeaturedHero({ items }: { items: Article[] }) {
             <CategoryBadge category={lead.category} />
           </div>
           <h2 className="text-xl font-bold leading-tight sm:text-3xl">
-            <a href={lead.url} target="_blank" rel="noopener noreferrer" onClick={() => newsApi.click(lead.id)}>
+            <Link href={articleHref(lead)}>
               {lead.title}
-            </a>
+            </Link>
           </h2>
           {lead.summary && <p className="line-clamp-2 max-w-3xl text-sm text-gray-200">{lead.summary}</p>}
           <p className="text-xs text-gray-300">
@@ -161,9 +174,9 @@ export function FeaturedHero({ items }: { items: Article[] }) {
             <div className="flex min-w-0 flex-col gap-1">
               <CategoryBadge category={a.category} />
               <h3 className="line-clamp-3 text-sm font-semibold leading-snug">
-                <a href={a.url} target="_blank" rel="noopener noreferrer" onClick={() => newsApi.click(a.id)} className="hover:text-blue-700">
+                <Link href={articleHref(a)} className="hover:text-blue-700">
                   {a.title}
-                </a>
+                </Link>
               </h3>
               <Meta article={a} />
             </div>
@@ -186,15 +199,12 @@ export function TrendingList({ items }: { items: Article[] }) {
             <li key={a.id} className="flex gap-3">
               <span className="w-5 flex-none text-lg font-bold text-gray-300">{i + 1}</span>
               <div className="min-w-0">
-                <a
-                  href={a.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => newsApi.click(a.id)}
+                <Link
+                  href={articleHref(a)}
                   className="line-clamp-2 text-sm font-medium leading-snug text-gray-900 hover:text-blue-700"
                 >
                   {a.title}
-                </a>
+                </Link>
                 <Meta article={a} />
               </div>
             </li>

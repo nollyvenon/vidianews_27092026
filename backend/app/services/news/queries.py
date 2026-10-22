@@ -1,5 +1,6 @@
 """Read-side queries for the news API."""
 
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
@@ -32,14 +33,33 @@ def _is_local(country: str):
     return or_(A.source_country == country, cast(A.mentioned_countries, Text).like(f'%"{country}"%'))
 
 
+def article_body(a: A) -> List[str]:
+    """Paragraphs to show on the article page: the extracted page text when we have more than the feed teaser."""
+    text = a.full_content if a.full_content and len(a.full_content) > len(a.content or "") else (a.content or "")
+    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+    if len(paragraphs) == 1 and len(paragraphs[0]) > 700:  # feed text arrives as one block: split on sentences
+        sentences = re.split(r"(?<=[.!?])\s+(?=[A-Z\"“])", paragraphs[0])
+        paragraphs, current = [], ""
+        for sentence in sentences:
+            current = f"{current} {sentence}".strip()
+            if len(current) >= 350:
+                paragraphs.append(current)
+                current = ""
+        if current:
+            paragraphs.append(current)
+    return paragraphs
+
+
 def article_to_dict(a: A, brief: bool = False) -> Dict[str, Any]:
     data = {
         "id": a.id,
         "title": a.title,
         "url": a.url,
         "source": {"key": a.source_key, "name": a.source_name, "country": a.source_country, "type": a.source_type},
-        "author": a.author,
         "image_url": a.image_url,
+        "image_source": a.image_source,
+        "image_credit": a.image_credit,
+        "image_credit_url": a.image_credit_url,
         "summary": a.summary,
         "description": a.description,
         "category": a.category,
@@ -58,6 +78,7 @@ def article_to_dict(a: A, brief: bool = False) -> Dict[str, Any]:
             "topics": a.topics or [], "people": a.people or [], "organizations": a.organizations or [],
             "locations": a.locations or [], "mentioned_countries": a.mentioned_countries or [],
             "nlp_engine": a.nlp_engine, "click_count": a.click_count,
+            "body": article_body(a),
         })
     return data
 
@@ -167,3 +188,24 @@ def valid_country(code: Optional[str]) -> Optional[str]:
     if code and len(code) == 2 and code.upper() in COUNTRY_NAMES:
         return code.upper()
     return None
+
+
+async def related(session: AsyncSession, article: A, limit: int = 6) -> List[Dict]:
+    """Recent stories on the same topic: shared keywords/entities first, then the same category."""
+    window = datetime.now(timezone.utc) - timedelta(days=14)
+    pool = (await session.execute(
+        select(A).where(_visible(), A.id != article.id, A.published_at > window,
+                        or_(A.category == article.category, A.source_key == article.source_key))
+        .order_by(A.published_at.desc()).limit(300)
+    )).scalars().all()
+    mine_terms = {t.lower() for t in (article.keywords or []) + (article.people or []) + (article.organizations or [])}
+    mine_title = set(article.title.lower().split())
+
+    def score(r: A) -> float:
+        terms = {t.lower() for t in (r.keywords or []) + (r.people or []) + (r.organizations or [])}
+        shared = len(mine_terms & terms)
+        overlap = len(mine_title & set(r.title.lower().split()))
+        return shared * 3 + overlap * 0.5 + (2 if r.category == article.category else 0) + (1 if r.image_url else 0)
+
+    ranked = sorted(pool, key=lambda r: (score(r), r.published_at), reverse=True)
+    return [article_to_dict(r, brief=True) for r in ranked[:limit]]

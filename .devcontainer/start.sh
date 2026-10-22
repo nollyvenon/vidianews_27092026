@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "🚀 VidiNews Platform - Starting Services in GitHub Codespaces"
+echo "🚀 VidiaNews Platform - Starting Services in GitHub Codespaces"
 echo ""
 
 # Colors for output

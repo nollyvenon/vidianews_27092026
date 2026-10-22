@@ -6,8 +6,10 @@ export interface Article {
   title: string;
   url: string;
   source: { key: string; name: string; country: string; type: string };
-  author: string | null;
   image_url: string | null;
+  image_source: "publisher" | "page" | "wikimedia" | null;
+  image_credit: string | null;
+  image_credit_url: string | null;
   summary: string | null;
   description: string | null;
   category: string;
@@ -15,6 +17,14 @@ export interface Article {
   published_at: string;
   is_featured: boolean;
   validation: { status: "passed" | "unverified" | "flagged"; score: number; flags: string[]; review_status: string };
+}
+
+export interface ArticleDetail extends Article {
+  body: string[];
+  people: string[];
+  organizations: string[];
+  locations: string[];
+  topics: string[];
 }
 
 export interface Location {
@@ -72,6 +82,8 @@ export const newsApi = {
   countries: () => get<{ countries: { code: string; name: string; sources: number }[] }>("/countries"),
   sources: () =>
     get<{ sources: { key: string; name: string; country: string; articles: number; kind: string }[] }>("/sources"),
+  article: (id: number) => get<ArticleDetail>(`/articles/${id}`),
+  related: (id: number) => get<{ items: Article[] }>(`/articles/${id}/related`),
   location: (country?: string) => get<Location>("/location", { country }),
   click: (id: number) => fetch(`${BASE}/articles/${id}/click`, { method: "POST", keepalive: true }).catch(() => undefined),
 };

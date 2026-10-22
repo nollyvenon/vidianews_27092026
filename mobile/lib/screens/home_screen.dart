@@ -24,7 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('VidiNews'),
+        title: const Text('VidiaNews'),
         elevation: 0,
       ),
       body: _screens[_selectedIndex],

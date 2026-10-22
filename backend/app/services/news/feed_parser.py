@@ -46,9 +46,23 @@ class _TextExtractor(HTMLParser):
             self.parts.append(data)
 
 
+_MOJIBAKE = re.compile("[ÂÃâ][-¿ƒ†-›€ŒœŠšŽžŸˆ˜™]")
+
+
+def fix_mojibake(text: str) -> str:
+    """Undo UTF-8 text that a publisher's feed had decoded as Windows-1252 ("â€”" -> "—")."""
+    if not text or not _MOJIBAKE.search(text):
+        return text
+    try:
+        return text.encode("cp1252").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return text
+
+
 def strip_html(raw: str) -> str:
     if not raw:
         return ""
+    raw = fix_mojibake(raw)
     parser = _TextExtractor()
     try:
         parser.feed(raw)

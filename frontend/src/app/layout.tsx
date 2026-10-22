@@ -3,7 +3,7 @@ import { Providers } from '@/components/providers'
 import '@/styles/globals.css'
 
 export const metadata: Metadata = {
-  title: 'VidiNews - AI-Powered Video Platform',
+  title: 'VidiaNews - AI-Powered Video Platform',
   description: 'Enterprise video management and AI content platform',
 }
 

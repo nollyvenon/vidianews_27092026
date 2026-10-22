@@ -62,7 +62,7 @@ async def test_log_webhook_event(test_db):
 @pytest.mark.asyncio
 async def test_create_notification(test_db):
     service = NotificationService(test_db)
-    notif = await service.create_notification(1, "email", "Welcome", "Welcome to VidiNews!")
+    notif = await service.create_notification(1, "email", "Welcome", "Welcome to VidiaNews!")
     assert notif.notification_type == "email"
 
 @pytest.mark.asyncio

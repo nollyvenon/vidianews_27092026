@@ -10,7 +10,7 @@ export default function PremiumPage() {
       <h1 className="text-3xl font-bold mb-8">Premium Features</h1>
       <div className="grid gap-6">
         <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow p-8 text-white">
-          <h2 className="text-2xl font-bold mb-2">VidiNews Premium</h2>
+          <h2 className="text-2xl font-bold mb-2">VidiaNews Premium</h2>
           <p className="opacity-90">Ad-free streaming, exclusive content, and more</p>
           {isPremium ? (
             <div className="mt-4">

@@ -327,7 +327,7 @@ POST   /api/v1/ai/compliance/log                  Log action
 
 ## 📊 Platform Progress
 
-### VidiNews Platform Status
+### VidiaNews Platform Status
 - **Modules Complete**: 20/175 (11%)
 - **Code Written (Cumulative)**: ~80,000 LOC
 - **Estimated Completion Rate**: 1-2 modules/hour

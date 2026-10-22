@@ -16,6 +16,7 @@ from app.db.session import AsyncSessionLocal
 from app.models.news import NewsArticle, NewsFetchRun
 from app.services.news import nlp
 from app.services.news.cache import cache_invalidate
+from app.services.news.enrich import clean_image_url, enrich_pending
 from app.services.news.feed_parser import RawItem, parse_feed
 from app.services.news.sources import SOURCES, SOURCE_BY_KEY, Source
 from app.services.news.validation import (
@@ -124,11 +125,15 @@ async def _ingest_source(client: httpx.AsyncClient, source: Source) -> Dict:
 
             rows = []
             for (item, url, result), a in zip(fresh, analyses):
+                image = clean_image_url(item.image_url)
                 rows.append(dict(
                     source_key=source["key"], source_name=source["name"], source_country=source["country"],
                     source_type=source.get("kind", "rss"), title=item.title[:500], url=url[:2048],
                     url_hash=_sha(url), title_hash=_title_key(item.title),
-                    author=(item.author or None) and item.author[:255], image_url=item.image_url,
+                    author=None,  # bylines are deliberately not stored or shown
+                    image_url=image, image_source="publisher" if image else None,
+                    image_credit=f"Image: {source['name']}" if image else None,
+                    image_credit_url=url[:2048] if image else None,
                     content=item.content[:5000], summary=a.summary, description=a.description,
                     published_at=item.published_at or now, fetched_at=now, category=a.category,
                     keywords=a.keywords, topics=a.topics, people=a.people, organizations=a.organizations,
@@ -206,6 +211,16 @@ async def run_fetch(source_keys: Optional[List[str]] = None) -> Dict:
                 async with sem:
                     return await _ingest_source(client, src)
             results = await asyncio.gather(*(guarded(s) for s in sources))
+        enrichment = {}
+        try:
+            for _ in range(4):  # drain a backlog without making one run unbounded
+                batch = await enrich_pending()
+                for k, v in batch.items():
+                    enrichment[k] = enrichment.get(k, 0) + v
+                if batch["enriched"] < 250:
+                    break
+        except Exception as exc:  # noqa: BLE001
+            _log.warning("article enrichment failed: %r", exc)
         try:
             await _refresh_featured()
         except Exception as exc:  # noqa: BLE001
@@ -219,6 +234,7 @@ async def run_fetch(source_keys: Optional[List[str]] = None) -> Dict:
             "new": sum(r["new"] for r in results),
             "duplicate": sum(r["duplicate"] for r in results),
             "rejected": sum(r["rejected"] for r in results),
+            "enrichment": enrichment,
             "nlp_engine": "spacy" if nlp.spacy_available() else "rules",
             "results": results,
         }

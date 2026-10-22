@@ -77,7 +77,7 @@ class Settings(BaseSettings):
     NEWS_FETCH_ON_STARTUP: bool = True
     NEWS_FETCH_INTERVAL_MINUTES: int = 30
     NEWS_MAX_AGE_DAYS: int = 14
-    NEWS_USER_AGENT: str = "VidiNewsBot/1.0 (+news aggregator; RSS only)"
+    NEWS_USER_AGENT: str = "VidiaNewsBot/1.0 (+news aggregator; RSS only)"
 
     class Config:
         env_file = ".env"

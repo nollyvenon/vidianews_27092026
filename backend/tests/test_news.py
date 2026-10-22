@@ -137,3 +137,71 @@ def test_read_more_links_are_removed_from_content():
            b'<link>https://punchng.com/x</link>'
            b'<description>Real text here. Read More: https://punchng.com/x/</description></item></channel></rss>')
     assert parse_feed(xml)[0].content == "Real text here."
+
+
+# --- article pages, images, bodies -------------------------------------------------
+
+from types import SimpleNamespace
+
+from app.services.news.enrich import _query_for, clean_image_url, is_generic_image, parse_page
+from app.services.news.feed_parser import fix_mojibake
+from app.services.news.queries import article_body
+
+PAGE = """<html><head>
+<meta property="og:image" content="/img/story.jpg?a=1&amp;b=2"><title>x</title></head><body>
+<nav><p>Home news sport world and other navigation text that is long enough to count</p></nav>
+<article><h1>Headline</h1>
+<p>The Senate on Wednesday passed the national budget after a long and tense debate in the chamber, with several amendments tabled and voted on late into the evening.</p>
+<p>Advertisement</p>
+<p>Lawmakers said the bill would be sent to the president for assent within the next two weeks, according to the leadership of both chambers of parliament.</p>
+<aside><p>Related story that should be ignored because it lives in a sidebar element.</p></aside>
+<p>Opposition members objected to several lines of the capital expenditure plan during the session and promised to challenge them in court if necessary.</p>
+</article><footer><p>Copyright 2026 all rights reserved by the publisher of this website.</p></footer>
+</body></html>"""
+
+
+def test_parse_page_extracts_article_paragraphs_and_image():
+    page = parse_page(PAGE)
+    assert page["image"] == "/img/story.jpg?a=1&b=2"
+    assert len(page["paragraphs"]) == 3
+    assert all("navigation" not in p and "sidebar" not in p and "Copyright" not in p for p in page["paragraphs"])
+
+
+def test_parse_page_too_little_text_returns_no_body():
+    assert parse_page("<article><p>Short teaser only, nothing more than this one line of text here.</p></article>")["paragraphs"] == []
+
+
+def test_clean_image_url_resolves_and_rejects_junk():
+    assert clean_image_url("/a.jpg", "https://x.com/news/1") == "https://x.com/a.jpg"
+    assert clean_image_url("undefined") is None
+    assert clean_image_url("data:image/png;base64,AAAA") is None
+    assert clean_image_url(None) is None
+
+
+def test_generic_images_are_detected():
+    assert is_generic_image("https://cdn.punchng.com/uploads/punch-logo-500x179-1.png", set())
+    assert is_generic_image("https://x.com/a.jpg", {"https://x.com/a.jpg"})  # reused across many stories
+    assert is_generic_image(None, set())
+    assert not is_generic_image("https://x.com/uploads/2026/senate-budget.jpg", set())
+
+
+def test_wikimedia_query_uses_headline_names_not_photo_credits():
+    title = "Martha Karua urges Opposition to remain open"
+    assert _query_for(title, ["Martha Karua"], []) == "Martha Karua"
+    assert _query_for("Dream study", ["Justin Sullivan"], ["Getty Images"]) is None  # not in the headline
+    assert _query_for("Photos by Getty Images today", [], ["Getty Images"]) is None  # credit agency
+    assert _query_for("Tinubu wins", ["Tinubu"], []) is None  # single word is too ambiguous
+
+
+def test_fix_mojibake_only_touches_broken_text():
+    assert fix_mojibake("Abuse \u00e2\u20ac\u201d Expert") == "Abuse \u2014 Expert"
+    assert fix_mojibake("Caf\u00e9 \u2014 fine") == "Caf\u00e9 \u2014 fine"
+
+
+def test_article_body_prefers_longer_full_content_and_splits_teasers():
+    full = SimpleNamespace(full_content="First paragraph.\n\nSecond paragraph.", content="Short")
+    assert article_body(full) == ["First paragraph.", "Second paragraph."]
+    teaser = SimpleNamespace(full_content=None, content=" ".join(["A sentence that is of a decent length."] * 40))
+    parts = article_body(teaser)
+    assert len(parts) > 1 and all(p.endswith(".") for p in parts)
+    assert article_body(SimpleNamespace(full_content=None, content="")) == []

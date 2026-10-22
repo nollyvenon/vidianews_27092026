@@ -34,6 +34,8 @@ async def lifespan(app: FastAPI):
                 logger.warning("could not create table %s: %s", t.name, str(exc).splitlines()[0][:160])
             break
         pending = [t for t, _ in failed]
+    from app.services.news.migrate import ensure_columns
+    await ensure_columns(engine)
     from app.services.news import scheduler as news_scheduler
     news_scheduler.start()
     yield

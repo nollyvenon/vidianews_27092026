@@ -22,6 +22,7 @@ from app.models.news import NewsArticle
 from app.models.user import Role, User, user_roles
 from app.services.news import nlp, queries
 from app.services.news.cache import cache_get, cache_invalidate, cache_set
+from app.services.news.enrich import enrich_one
 from app.services.news.geo import detect_country
 from app.services.news.ingest import run_fetch
 from app.services.news.sources import SOURCE_BY_KEY
@@ -181,7 +182,21 @@ async def get_article(article_id: int, session: AsyncSession = Depends(get_sessi
     article = await session.get(NewsArticle, article_id)
     if not article or article.review_status == "rejected":
         raise HTTPException(status_code=404, detail="Article not found")
+    if article.enriched_at is None:  # not processed yet: fetch the page now so the reader sees the full story
+        try:
+            await asyncio.wait_for(enrich_one(article_id), timeout=20)
+            await session.refresh(article)
+        except (asyncio.TimeoutError, Exception):  # noqa: BLE001 - show the stored teaser instead
+            pass
     return queries.article_to_dict(article)
+
+
+@router.get("/articles/{article_id}/related")
+async def get_related(article_id: int, limit: int = Query(6, ge=1, le=12), session: AsyncSession = Depends(get_session)):
+    article = await session.get(NewsArticle, article_id)
+    if not article or article.review_status == "rejected":
+        raise HTTPException(status_code=404, detail="Article not found")
+    return {"items": await queries.related(session, article, limit)}
 
 
 @router.post("/articles/{article_id}/click")

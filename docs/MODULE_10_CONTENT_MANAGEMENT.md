@@ -8,7 +8,7 @@
 
 ## 📋 Overview
 
-**Module 10** is the core content management system for VidiNews, enabling users to create, edit, publish, and manage video and article content with full workflow support, engagement tracking, and analytics.
+**Module 10** is the core content management system for VidiaNews, enabling users to create, edit, publish, and manage video and article content with full workflow support, engagement tracking, and analytics.
 
 ### Key Features
 
