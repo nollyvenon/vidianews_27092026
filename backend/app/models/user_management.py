@@ -205,7 +205,7 @@ class SubscriberActivity(Base):
     subscriber_id = Column(Integer, ForeignKey("subscriber_profiles.id"), nullable=False)
     activity_type = Column(String(50), nullable=False)  # login, read, share, comment, subscribe
     content_id = Column(Integer)
-    metadata = Column(JSON, default={})
+    extra_metadata = Column("metadata", JSON, default={})
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (

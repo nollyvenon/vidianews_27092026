@@ -51,7 +51,7 @@ class LogEntry(Base):
     level = Column(SQLEnum(LogLevel), nullable=False, index=True)
     service = Column(String(255), nullable=False, index=True)
     message = Column(Text, nullable=False)
-    metadata = Column(JSON, default={})
+    extra_metadata = Column("metadata", JSON, default={})
     timestamp = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 

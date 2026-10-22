@@ -201,7 +201,7 @@ class SystemLog(Base):
     level = Column(String(20), nullable=False)  # INFO, WARNING, ERROR, CRITICAL
     component = Column(String(100), nullable=False)
     message = Column(Text, nullable=False)
-    metadata = Column(JSON, default={})
+    extra_metadata = Column("metadata", JSON, default={})
     timestamp = Column(DateTime, server_default=func.now())
 
     __table_args__ = (

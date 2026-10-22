@@ -132,7 +132,7 @@ class Document(Base):
     source_url = Column(String(500), nullable=True)
     embeddings = Column(JSON, default=[])
     chunks = Column(JSON, default=[])
-    metadata = Column(JSON, default={})
+    extra_metadata = Column("metadata", JSON, default={})
     is_indexed = Column(Boolean, default=False, index=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 

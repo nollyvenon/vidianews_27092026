@@ -89,7 +89,7 @@ class ContentCalendarEvent(Base):
     # Status and metadata
     is_tentative = Column(Boolean, default=False)
     tags = Column(JSON, default=[])
-    metadata = Column(JSON, default={})
+    extra_metadata = Column("metadata", JSON, default={})
 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

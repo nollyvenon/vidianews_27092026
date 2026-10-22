@@ -50,7 +50,7 @@ class UserInteraction(Base):
     target_id = Column(Integer, nullable=False)
     target_type = Column(String(50), nullable=False)
     content = Column(Text)
-    metadata = Column(JSON, default={})
+    extra_metadata = Column("metadata", JSON, default={})
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
@@ -126,7 +126,7 @@ class SearchIndex(Base):
     description = Column(Text)
     keywords = Column(ARRAY(String), default=[])
     embedding_vector = Column(ARRAY(Float))
-    metadata = Column(JSON, default={})
+    extra_metadata = Column("metadata", JSON, default={})
     indexed_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (

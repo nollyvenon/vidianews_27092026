@@ -276,7 +276,7 @@ class SubscriberService:
             subscriber_id=subscriber_id,
             activity_type=activity_type,
             content_id=content_id,
-            metadata=metadata or {},
+            extra_metadata=metadata or {},
         )
         db.add(activity)
 

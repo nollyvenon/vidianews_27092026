@@ -33,7 +33,7 @@ class User(Base):
     deleted_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
-    sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
+    sessions = relationship("app.models.user.UserSession", back_populates="user", cascade="all, delete-orphan")
     roles = relationship("Role", secondary=user_roles, back_populates="users")
     api_keys = relationship("ApiKey", back_populates="user", cascade="all, delete-orphan")
     activity_logs = relationship("ActivityLog", back_populates="user", cascade="all, delete-orphan")

@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.db.session import engine
 from app.db.base import Base
+from app.utils.logger import logger
 
 # Import routers
 from app.api.v1 import api_router
@@ -15,10 +16,29 @@ from app.api.v1 import api_router
 async def lifespan(app: FastAPI):
     """Application lifespan events"""
     # Startup
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # Create tables one at a time, in repeated passes, so a legacy table with a
+    # broken foreign key cannot block the rest (news, users, ...).
+    from app.models.news import NewsBase
+    pending = list(Base.metadata.tables.values()) + list(NewsBase.metadata.tables.values())
+    for _ in range(5):
+        failed = []
+        for table in pending:
+            try:
+                async with engine.begin() as conn:
+                    await conn.run_sync(table.create, checkfirst=True)
+            except Exception as exc:  # noqa: BLE001
+                failed.append((table, exc))
+        if not failed or len(failed) == len(pending):
+            pending = failed and [t for t, _ in failed]
+            for t, exc in failed:
+                logger.warning("could not create table %s: %s", t.name, str(exc).splitlines()[0][:160])
+            break
+        pending = [t for t, _ in failed]
+    from app.services.news import scheduler as news_scheduler
+    news_scheduler.start()
     yield
     # Shutdown
+    await news_scheduler.stop()
     await engine.dispose()
 
 

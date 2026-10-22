@@ -292,7 +292,7 @@ class CheckoutSession(Base):
 
     # Metadata
     notes = Column(Text)
-    metadata = Column(JSON)
+    extra_metadata = Column("metadata", JSON)
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)

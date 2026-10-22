@@ -90,7 +90,7 @@ class PublishingJob(Base):
 
     # Metadata
     tags = Column(JSON, default=[])
-    metadata = Column(JSON, default={})
+    extra_metadata = Column("metadata", JSON, default={})
     error_message = Column(Text)
 
     retry_count = Column(Integer, default=0)
@@ -170,7 +170,7 @@ class PublishingLog(Base):
     error_message = Column(Text)
 
     # Metadata
-    metadata = Column(JSON, default={})
+    extra_metadata = Column("metadata", JSON, default={})
 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
@@ -282,7 +282,7 @@ class SyndicationLog(Base):
     error_message = Column(Text)
 
     # Metadata
-    metadata = Column(JSON, default={})
+    extra_metadata = Column("metadata", JSON, default={})
 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -404,7 +404,7 @@ class EngagementTracker(Base):
     city = Column(String(100))
 
     # Metadata
-    metadata = Column(JSON, default={})
+    extra_metadata = Column("metadata", JSON, default={})
 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
