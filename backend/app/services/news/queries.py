@@ -61,14 +61,11 @@ def article_to_dict(a: A, brief: bool = False) -> Dict[str, Any]:
     data = {
         "id": a.id,
         "title": a.title,
-        "url": a.url,
-        "source": {"key": a.source_key, "name": a.source_name, "country": a.source_country, "type": a.source_type},
         "image_url": a.image_url,
         "image_source": a.image_source,
-        "image_credit": a.image_credit,
-        "image_credit_url": a.image_credit_url,
+        # Publisher images are credited to the source; that attribution stays internal (admin only).
+        "image_credit": a.image_credit if a.image_source == "wikimedia" else None,
         "summary": a.summary,
-        "description": a.description,
         "category": a.category,
         "keywords": a.keywords or [],
         "published_at": a.published_at.isoformat() if a.published_at else None,
@@ -111,7 +108,7 @@ async def list_articles(
     if q:
         term = "%" + q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
         conds.append(or_(
-            A.title.ilike(term), A.summary.ilike(term), A.source_name.ilike(term),
+            A.title.ilike(term), A.summary.ilike(term),
             cast(A.keywords, Text).ilike(term), cast(A.people, Text).ilike(term),
             cast(A.organizations, Text).ilike(term),
         ))

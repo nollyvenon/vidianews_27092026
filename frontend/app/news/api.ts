@@ -4,14 +4,10 @@ const BASE = `${API_URL}/api/v1/news`;
 export interface Article {
   id: number;
   title: string;
-  url: string;
-  source: { key: string; name: string; country: string; type: string };
   image_url: string | null;
   image_source: "publisher" | "page" | "wikimedia" | null;
   image_credit: string | null;
-  image_credit_url: string | null;
   summary: string | null;
-  description: string | null;
   category: string;
   keywords: string[];
   published_at: string;
@@ -52,7 +48,6 @@ export interface Params {
   category?: string;
   country?: string;
   scope?: "all" | "local";
-  source?: string;
   q?: string;
   sort?: "latest" | "trending";
 }
@@ -83,8 +78,6 @@ export const newsApi = {
   categories: (country?: string, scope?: string) =>
     get<{ categories: { category: string; count: number }[] }>("/categories", { country, scope }),
   countries: () => get<{ countries: { code: string; name: string; sources: number }[] }>("/countries"),
-  sources: () =>
-    get<{ sources: { key: string; name: string; country: string; articles: number; kind: string }[] }>("/sources"),
   article: (id: number) => get<ArticleDetail>(`/articles/${id}`),
   related: (id: number) => get<{ items: Article[] }>(`/articles/${id}/related`),
   location: (country?: string) => get<Location>("/location", { country }),

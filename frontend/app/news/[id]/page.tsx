@@ -78,9 +78,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
     image: article.image_url ? [article.image_url] : undefined,
     articleSection: article.category,
     keywords: article.keywords.slice(0, 8).join(", "),
-    isBasedOn: article.url,
     publisher: { "@type": "Organization", name: settings.site_name, url: SITE_URL },
-    sourceOrganization: { "@type": "Organization", name: article.source.name },
   };
   const breadcrumbs = {
     "@context": "https://schema.org",
@@ -125,8 +123,6 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
           </div>
           <h1 className="text-2xl font-bold leading-tight text-gray-900 sm:text-4xl">{article.title}</h1>
           <p className="text-sm text-gray-600">
-            <span className="font-semibold text-gray-800">{article.source.name}</span>
-            {" • "}
             <time dateTime={article.published_at}>
               {published.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })}
             </time>
@@ -138,7 +134,6 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
             image_url={article.image_url}
             image_source={article.image_source}
             image_credit={article.image_credit}
-            image_credit_url={article.image_credit_url}
           />
 
           <AdSlot placement="article_top" />
@@ -175,13 +170,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
           <AdSlot placement="article_bottom" />
 
           <footer className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-600">
-            <p>
-              {teaserOnly ? "This is an excerpt. " : ""}
-              Published by <span className="font-semibold text-gray-800">{article.source.name}</span>.
-            </p>
-            <a href={article.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block font-medium text-blue-700 hover:underline">
-              Read the original article at {article.source.name} ↗
-            </a>
+            <p>{teaserOnly ? "This is an excerpt." : "Summaries and tags are generated automatically."}</p>
           </footer>
         </article>
 

@@ -109,8 +109,6 @@ function ReadLink({ article, children }: { article: Article; children: React.Rea
 export function Meta({ article }: { article: Article }) {
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
-      <span className="font-semibold text-gray-700">{article.source.name}</span>
-      <span aria-hidden>•</span>
       <time dateTime={article.published_at} suppressHydrationWarning>
         {timeAgo(article.published_at)}
       </time>
@@ -164,7 +162,7 @@ export function FeaturedHero({ items }: { items: Article[] }) {
           </h2>
           {lead.summary && <p className="line-clamp-2 max-w-3xl text-sm text-gray-200">{lead.summary}</p>}
           <p className="text-xs text-gray-300">
-            {lead.source.name} • {timeAgo(lead.published_at)}
+            {timeAgo(lead.published_at)}
           </p>
         </div>
       </article>

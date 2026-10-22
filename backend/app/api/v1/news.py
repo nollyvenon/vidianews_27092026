@@ -162,9 +162,6 @@ async def get_categories(request: Request, country: Optional[str] = None, scope:
     return data
 
 
-@router.get("/sources")
-async def get_sources(session: AsyncSession = Depends(get_session)):
-    return {"sources": await queries.source_stats(session)}
 
 
 @router.get("/status")

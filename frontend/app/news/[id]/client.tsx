@@ -18,7 +18,6 @@ export function ArticleImage(props: {
   image_url: string | null;
   image_source: string | null;
   image_credit: string | null;
-  image_credit_url: string | null;
 }) {
   const [failed, setFailed] = useState(false);
   if (!props.image_url || failed) {
@@ -36,13 +35,7 @@ export function ArticleImage(props: {
       />
       <figcaption className="mt-1 text-xs text-gray-500">
         {props.image_source === "wikimedia" && <span className="mr-1 font-medium">Illustrative image.</span>}
-        {props.image_credit_url ? (
-          <a href={props.image_credit_url} target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-700">
-            {props.image_credit}
-          </a>
-        ) : (
-          props.image_credit
-        )}
+        {props.image_credit}
       </figcaption>
     </figure>
   );

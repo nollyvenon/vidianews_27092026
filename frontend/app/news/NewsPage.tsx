@@ -36,13 +36,11 @@ export default function NewsPage({ initial }: { initial?: InitialNews }) {
   const [location, setLocation] = useState<Location | null>(initial?.location ?? null);
   const [manualCountry, setManualCountry] = useState<string | null>(null);
   const [countries, setCountries] = useState<{ code: string; name: string; sources: number }[]>([]);
-  const [sources, setSources] = useState<{ key: string; name: string; articles: number }[]>([]);
   const [categories, setCategories] = useState<{ category: string; count: number }[]>(initial?.categories ?? []);
   const [featured, setFeatured] = useState<Article[]>(initial?.featured ?? []);
   const [trending, setTrending] = useState<Article[]>(initial?.trending ?? []);
 
   const [category, setCategory] = useState("");
-  const [source, setSource] = useState("");
   const [scope, setScope] = useState<Scope>("all");
   const [sort, setSort] = useState<Sort>("latest");
   const [searchInput, setSearchInput] = useState("");
@@ -68,7 +66,6 @@ export default function NewsPage({ initial }: { initial?: InitialNews }) {
       .catch(() => setLocation({ country: "XX", country_name: "International", source: "default", has_local_sources: false }))
       .finally(() => setReady(true));
     newsApi.countries().then((r) => setCountries(r.countries)).catch(() => undefined);
-    newsApi.sources().then((r) => setSources(r.sources.filter((s) => s.articles > 0))).catch(() => undefined);
   }, []);
 
   // Debounce search input.
@@ -98,7 +95,7 @@ export default function NewsPage({ initial }: { initial?: InitialNews }) {
       setLoading(true);
       setError(null);
       newsApi
-        .articles({ page, page_size: PAGE_SIZE, category, country, scope, source, q: query, sort }, signal)
+        .articles({ page, page_size: PAGE_SIZE, category, country, scope, q: query, sort }, signal)
         .then(setData)
         .catch((e: Error) => {
           if (e.name !== "AbortError") setError(e.message);
@@ -107,7 +104,7 @@ export default function NewsPage({ initial }: { initial?: InitialNews }) {
           if (!signal?.aborted) setLoading(false);
         });
     },
-    [country, page, category, scope, source, query, sort]
+    [country, page, category, scope, query, sort]
   );
 
   useEffect(() => {
@@ -144,7 +141,7 @@ export default function NewsPage({ initial }: { initial?: InitialNews }) {
     listTop.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const showHero = page === 1 && !category && !query && !source && sort === "latest" && featured.length > 0;
+  const showHero = page === 1 && !category && !query && sort === "latest" && featured.length > 0;
   const items = data?.items ?? [];
 
   const chip = (active: boolean) =>
@@ -201,7 +198,7 @@ export default function NewsPage({ initial }: { initial?: InitialNews }) {
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
         {location && !location.has_local_sources && location.country !== "XX" && (
           <p className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-800">
-            We don&apos;t have a dedicated {location.country_name} source yet, so you&apos;re seeing international coverage plus stories that mention{" "}
+            We don&apos;t have dedicated {location.country_name} coverage yet, so you&apos;re seeing international coverage plus stories that mention{" "}
             {location.country_name}.
           </p>
         )}
@@ -244,25 +241,11 @@ export default function NewsPage({ initial }: { initial?: InitialNews }) {
               </button>
             ))}
           </div>
-          <select
-            value={source}
-            onChange={(e) => resetTo(setSource)(e.target.value)}
-            className="rounded-lg border border-gray-300 bg-white px-2 py-1.5"
-            aria-label="Source"
-          >
-            <option value="">All sources</option>
-            {sources.map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.name} ({s.articles})
-              </option>
-            ))}
-          </select>
-          {(category || source || query || scope !== "all" || sort !== "latest") && (
+          {(category || query || scope !== "all" || sort !== "latest") && (
             <button
               className="text-blue-700 hover:underline"
               onClick={() => {
                 setCategory("");
-                setSource("");
                 setScope("all");
                 setSort("latest");
                 setSearchInput("");
@@ -294,7 +277,7 @@ export default function NewsPage({ initial }: { initial?: InitialNews }) {
               <div className="rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center text-gray-600">
                 <p className="text-lg font-medium">No stories found</p>
                 <p className="mt-1 text-sm">
-                  {query || category || source
+                  {query || category
                     ? "Try different filters or search terms."
                     : "News is still being collected — check back in a minute."}
                 </p>
@@ -313,8 +296,8 @@ export default function NewsPage({ initial }: { initial?: InitialNews }) {
             <TrendingList items={trending} />
             <AdSlot placement="home_sidebar" />
             <p className="px-1 text-xs leading-relaxed text-gray-500">
-              Headlines and summaries are collected from each publisher&apos;s public RSS feed; summaries and tags are generated automatically.
-              Stories marked <em>Unverified</em> or <em>Under review</em> are not independently confirmed. Always read the original article.
+              Summaries and tags are generated automatically.
+              Stories marked <em>Unverified</em> or <em>Under review</em> are not independently confirmed.
             </p>
           </div>
         </div>
